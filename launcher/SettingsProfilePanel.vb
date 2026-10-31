@@ -10,18 +10,26 @@ Public Class SettingsProfilePanel
     Private ReadOnly profileName As New TextBox With {.Name = "SettingsProfileName", .MaxLength = 64, .AccessibleName = "Settings profile name"}
     Private ReadOnly message As New Label With {.Name = "SettingsProfileMessage", .AutoSize = True, .UseMnemonic = False}
     Private ReadOnly loadButton As New Button With {.Name = "LoadSettingsProfile", .Text = "Load", .AutoSize = True}
-    Private ReadOnly updateButton As New Button With {.Name = "UpdateSettingsProfile", .Text = "Update selected…", .AutoSize = True}
+    Private ReadOnly updateButton As New Button With {.Name = "UpdateSettingsProfile", .Text = "Overwrite profile…", .AutoSize = True}
     Private ReadOnly renameButton As New Button With {.Name = "RenameSettingsProfile", .Text = "Rename", .AutoSize = True}
     Private ReadOnly deleteButton As New Button With {.Name = "DeleteSettingsProfile", .Text = "Delete…", .AutoSize = True}
     Private ReadOnly exportButton As New Button With {.Name = "ExportSettingsProfile", .Text = "Export…", .AutoSize = True}
+    Private ReadOnly tips As New ToolTip()
 
     Public Sub New(context As InstallContext, current As Func(Of LauncherSettings), apply As Func(Of SettingsProfile, Boolean))
         Name = "SettingsProfiles" : Margin = New Padding(0)
         currentSettings = current : loadProfile = apply
-        Controls.Add(New Label With {.Text = "Save desktop, VR, startup, appearance and logging choices. Loading changes the controls; Save settings or Launch keeps those choices. Game saves and local paths stay separate.", .AutoSize = True})
+        ' Profiles and the footer's Save settings both "save", so say which one each button changes.
+        Controls.Add(New Label With {.Name = "SettingsProfileHelp", .AutoSize = True, .Text = "A profile is a named preset of your desktop, VR, startup, appearance and logging choices. " &
+            "Save as new profile and Overwrite profile store the current controls in a profile; Load copies a profile into the controls. " &
+            "Save settings at the bottom is separate: like Launch, it keeps the current controls as the launcher's settings for next time and never changes a profile. " &
+            "Game saves and local paths are not included."})
         Field(Me, "Saved profile", choices) : StyleChoice(choices, Me)
         Field(Me, "Name", profileName)
-        Dim create As New Button With {.Name = "CreateSettingsProfile", .Text = "Save as new", .AutoSize = True}
+        Dim create As New Button With {.Name = "CreateSettingsProfile", .Text = "Save as new profile", .AutoSize = True}
+        tips.SetToolTip(create, "Store the current controls in a new profile with this name. The launcher's settings are not saved.")
+        tips.SetToolTip(updateButton, "Replace the selected profile's choices with the current controls. The launcher's settings are not saved.")
+        tips.SetToolTip(loadButton, "Copy the selected profile into the controls. Use Save settings or Launch to keep them.")
         Dim importButton As New Button With {.Name = "ImportSettingsProfile", .Text = "Import…", .AutoSize = True}
         Dim refresh As New Button With {.Name = "RefreshSettingsProfiles", .Text = "Refresh", .AutoSize = True}
         Dim commands As New FlowLayoutPanel With {.AutoSize = True, .WrapContents = True, .Margin = New Padding(0, 8, 0, 8)}
@@ -36,7 +44,7 @@ Public Class SettingsProfilePanel
         AddHandler create.Click, Sub() Run(Sub()
                                               Dim added = store.Create(profileName.Text, ProfileValues.Capture(currentSettings()))
                                               Reload(added.Id)
-                                              message.Text = "Saved profile: " & added.Profile.Name & ". Current launcher preferences were not overwritten."
+                                              message.Text = "Saved profile " & added.Profile.Name & ". The launcher's settings were not changed."
                                           End Sub)
         AddHandler loadButton.Click, Sub() Run(Sub()
                                                   Dim selected = Selection()
@@ -49,9 +57,9 @@ Public Class SettingsProfilePanel
         AddHandler updateButton.Click, Sub() Run(Sub()
                                                     Dim selected = Selection()
                                                     If selected?.Profile Is Nothing Then Return
-                                                    If Not Confirm("Replace the settings saved in " & ChrW(34) & selected.Profile.Name & ChrW(34) & " with the current controls?") Then Return
+                                                    If Not Confirm("Overwrite profile " & ChrW(34) & selected.Profile.Name & ChrW(34) & " with the current controls? The launcher's settings are not changed.") Then Return
                                                     Dim saved = store.Update(selected, selected.Profile.Name, ProfileValues.Capture(currentSettings()))
-                                                    Reload(saved.Id) : message.Text = "Updated " & saved.Profile.Name & "."
+                                                    Reload(saved.Id) : message.Text = "Overwrote profile " & saved.Profile.Name & " with the current controls. The launcher's settings were not changed."
                                                 End Sub)
         AddHandler renameButton.Click, Sub() Run(Sub()
                                                     Dim selected = Selection()
@@ -109,7 +117,7 @@ Public Class SettingsProfilePanel
                     choices.Items.Add(entry)
                     If entry.Id = selectedId Then choices.SelectedItem = entry
                 Next
-                message.Text = If(choices.Items.Count = 0, "No saved settings profiles. Enter a name and choose Save as new.", If(Selection()?.Problem, "Select a saved profile, then click Load to use it."))
+                message.Text = If(choices.Items.Count = 0, "No saved settings profiles. Enter a name and choose Save as new profile.", If(Selection()?.Problem, "Select a saved profile, then click Load to use it."))
             End Sub)
     End Sub
 
@@ -123,6 +131,11 @@ Public Class SettingsProfilePanel
         Catch ex As Exception When TypeOf ex Is IOException OrElse TypeOf ex Is UnauthorizedAccessException OrElse TypeOf ex Is System.Text.Json.JsonException
             message.Text = ex.Message
         End Try
+    End Sub
+
+    Protected Overrides Sub Dispose(disposing As Boolean)
+        If disposing Then tips.Dispose()
+        MyBase.Dispose(disposing)
     End Sub
 
     Protected Overrides Sub OnSizeChanged(e As EventArgs)

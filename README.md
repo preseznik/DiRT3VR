@@ -58,7 +58,10 @@ report is investigated.
    restores the saved desktop configuration afterward.
 4. **Settings** provides Modern/Classic appearance and runtime selection.
    **Settings profiles** saves named copies of the current controls per installation.
-   Enter a name and choose **Save as new**, or explicitly **Update selected**.
+   Enter a name and choose **Save as new profile**, or explicitly **Overwrite profile**.
+   Both change only the profile. **Save settings** in the footer is separate: it
+   keeps the current controls as the launcher's settings, as Launch does, and never
+   changes a profile.
    Selecting a profile does nothing until **Load**; loading asks before replacing
    unsaved edits and does not save preferences until **Save settings** or Launch.
    **Rename** uses the Name field. **Delete** removes only the selected profile.

@@ -135,7 +135,7 @@ Public Class MainForm
         AddHandler save.Click, Sub() SafeAction(Sub()
                                                    CurrentSettings().Save(context)
                                                    RememberSavedSettings()
-                                                   notice.Text = "Launcher settings saved."
+                                                   notice.Text = "Launcher settings saved. Settings profiles were not changed."
                                                End Sub)
         AddHandler vr.Click, Async Sub() Await ActionAsync(Async Function()
                                                               If interactive IsNot Nothing Then
@@ -193,6 +193,7 @@ Public Class MainForm
                            End Sub
         AddHandler Shown, Sub() FitInitialWindow()
         tips.SetToolTip(desktop, "Start the game with your desktop graphics choices and saved driving controls. No headset is required.")
+        tips.SetToolTip(save, "Keep the current controls as the launcher's settings for next time, as Launch does. Settings profiles are not changed.")
         tips.SetToolTip(probe, "Check OpenXR and headset access without starting DiRT 3. This does not validate stereoscopic game rendering.")
         tips.SetToolTip(skipStartupMovies, "Skips the AMD and DiRT 3 logo movies in desktop and VR launches. Copyright and Press Start remain. Keep this launcher open until the game exits so the original startup file can be restored.")
         UpdateResolutionLabels()
@@ -566,7 +567,7 @@ Public Class MainForm
                 "Launch starts DiRT 3 Complete Edition with the desktop choices under Graphics. Use game setting preserves each existing option. Desktop changes remain in the game graphics file; exact backups are kept in desktop-backups under the preferences folder below. Save settings only saves launcher preferences. Steam must be running with access to the game. Driving controls and saves remain managed by DiRT 3." & vbCrLf & vbCrLf &
                 "Advanced → Enable experimental VR enables the VDXR session when supported by this package. All rendered 3D camera views use stereo and tracking. Loading screens and movies use a virtual screen. Camera transitions remain experimental. F10 recenters while the game is foreground." & vbCrLf & vbCrLf &
                 "Settings → Check runtime and headset runs an x86 OpenXR probe without starting the game. Choose VDXR or SteamVR explicitly; the selected runtime is used for that process only, independently of the system OpenXR default. VDXR and SteamVR require separate checks. Browse to the selected runtime file if it is installed elsewhere." & vbCrLf & vbCrLf &
-                "Settings → Settings profiles saves named copies of desktop, VR, appearance and logging choices. Load changes the controls and asks before replacing unsaved edits; Save settings or Launch keeps those choices. Import adds a profile without loading it, and Export writes the selected saved profile. Game saves and local paths are excluded." & vbCrLf & vbCrLf &
+                "Settings → Settings profiles keeps named presets of desktop, VR, startup, appearance and logging choices. Save as new profile and Overwrite profile store the current controls in a profile without saving the launcher's settings. Save settings (or Launch) keeps the current controls as the launcher's settings and never changes a profile. Load copies a profile into the controls and asks before replacing unsaved edits. Import adds a profile without loading it, and Export writes the selected saved profile. Game saves and local paths are excluded." & vbCrLf & vbCrLf &
                 "Launcher → Skip startup logo movies temporarily replaces the two startup movie states for desktop or VR. Copyright and Press Start remain. Keep the launcher open until game exit for restoration; closing it during the session minimizes it. Leave skipping off for multiplayer until checked. Background play is not implemented for DiRT 3." & vbCrLf & vbCrLf &
                 ExperimentalFiles.ProfileDescription & vbCrLf & vbCrLf &
                 "Restore original files only handles this launcher's recorded changes. Foreign mods and real settings changes are preserved. Keep the launcher open until the game exits and recovery finishes." & vbCrLf & vbCrLf &

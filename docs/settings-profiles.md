@@ -2,6 +2,10 @@
 
 Step 5 adds a Settings profiles section to the existing Settings tab. It supports
 Save as new, Load, Update selected, Rename, Delete, Import, Export and Refresh.
+After 0.1.20 the two profile save buttons were renamed **Save as new profile**
+and **Overwrite profile…**, and the section, tooltips and status messages now say
+that they change only the profile while the footer's **Save settings** changes
+only the launcher's settings (user request: the two kinds of saving were confusing).
 The user accepted the desktop fullscreen Alt+Tab resolution change as a known
 issue and requested this next batch on 2026-10-29.
 
