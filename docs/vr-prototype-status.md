@@ -31,7 +31,7 @@ The agent must ask and receive approval before every game launch.
   and session failure handling, and zero-layer aborts for incomplete frames.
 - Interactive integration: stereo and tracking for all valid main 3D views,
   including external, reverse, replay and unnamed cameras; a virtual screen
-  when there is no eligible 3D scene; foreground F9 recentering. Owner/name
+  when there is no eligible 3D scene; foreground F10 recentering. Owner/name
   classification is diagnostic only. Displayed-camera matching remains exact.
 - Owner-thread window-close/process-exit cleanup. Unsafe or foreign-thread
   exits log unavailable cleanup; GPU/XR objects are never destroyed from a
@@ -312,7 +312,7 @@ transitions and offscreen UI. A clean interactive recovery was observed in the
 failed cockpit session; UAC cancellation and interrupted-session recovery still
 need attended acceptance.
 
-Further approved live tests should cover bumper, reverse and replay, F9,
+Further approved live tests should cover bumper, reverse and replay, F10,
 extended driving and effect correctness. Version 0.1.5
 uses the actual displayed 3D camera for activation; it does not require a
 live-driving or cockpit label. Pause/replay/flashback transitions still need
