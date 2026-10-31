@@ -106,7 +106,12 @@ and enable the experimental VR option in Advanced. Close other VR games first.
 If an OpenXR add-on such as ReShade or the OBS mirror stops VR from starting,
 Launch VR names it and offers **Disable and retry**, which turns it off for
 DiRT 3 only (other apps keep it). Remembered choices can be undone under
-**Settings → VR runtime → OpenXR add-ons…**.
+**Settings → VR runtime → OpenXR add-ons…**. If DiRT 3 starts without
+DiRT3VR's renderer, the launcher says why once the game window is up: the
+`d3d11.dll` was removed (usually antivirus) or replaced by another mod,
+Windows' 'prefer system32 images' rule applied, or Windows used its own copy
+(install the Visual C++ 2015-2022 Redistributable, x86). It refuses to start VR
+when that rule would apply anyway.
 Use **Launch VR** and select any camera through DiRT 3's native controls.
 Rendered 3D scenes use stereo and headset tracking; loading screens, movies and
 frames without a valid 3D scene use a virtual screen. Press
