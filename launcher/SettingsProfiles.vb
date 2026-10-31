@@ -13,6 +13,8 @@ Public Class ProfileValues
     Public Property DesktopDisplayMode As String = "game"
     Public Property DesktopVSync As String = "game"
     Public Property SkipStartupMovies As Boolean
+    Public Property RecenterKey As Integer = RecenterShortcut.DefaultKey
+    Public Property RecenterModifiers As Integer
 
     Public Shared Function Capture(value As LauncherSettings) As ProfileValues
         value.Validate()
@@ -20,7 +22,8 @@ Public Class ProfileValues
             .ModernInterface = value.ModernInterface, .RuntimeMode = value.RuntimeMode,
             .DiagnosticLogging = value.DiagnosticLogging, .ExperimentalVrEnabled = value.ExperimentalVrEnabled,
             .VrRenderScale = value.VrRenderScale, .DesktopWidth = value.DesktopWidth, .DesktopHeight = value.DesktopHeight,
-            .DesktopDisplayMode = value.DesktopDisplayMode, .DesktopVSync = value.DesktopVSync, .SkipStartupMovies = value.SkipStartupMovies}
+            .DesktopDisplayMode = value.DesktopDisplayMode, .DesktopVSync = value.DesktopVSync, .SkipStartupMovies = value.SkipStartupMovies,
+            .RecenterKey = value.RecenterKey, .RecenterModifiers = value.RecenterModifiers}
     End Function
 
     Public Function ApplyTo(local As LauncherSettings) As LauncherSettings
@@ -29,7 +32,8 @@ Public Class ProfileValues
             .SteamRuntimeManifest = local.SteamRuntimeManifest, .VdxrRuntimeManifest = local.VdxrRuntimeManifest,
             .DiagnosticLogging = DiagnosticLogging, .ExperimentalVrEnabled = ExperimentalVrEnabled,
             .VrRenderScale = VrRenderScale, .DesktopWidth = DesktopWidth, .DesktopHeight = DesktopHeight,
-            .DesktopDisplayMode = DesktopDisplayMode, .DesktopVSync = DesktopVSync, .SkipStartupMovies = SkipStartupMovies}
+            .DesktopDisplayMode = DesktopDisplayMode, .DesktopVSync = DesktopVSync, .SkipStartupMovies = SkipStartupMovies,
+            .RecenterKey = RecenterKey, .RecenterModifiers = RecenterModifiers}
         result.Validate()
         Return result
     End Function
@@ -42,10 +46,11 @@ Public Class SettingsProfile
     Public Property Settings As ProfileValues
 
     Public Sub Validate()
-        If Kind <> "DiRT3VR.SettingsProfile" OrElse (Schema <> 1 AndAlso Schema <> 2) Then Throw New IOException("This is not a supported DiRT3VR settings profile.")
+        If Kind <> "DiRT3VR.SettingsProfile" OrElse (Schema < 1 OrElse Schema > 3) Then Throw New IOException("This is not a supported DiRT3VR settings profile.")
         Name = SettingsProfileStore.ValidateName(Name)
         If Settings Is Nothing Then Throw New IOException("The profile has no settings.")
         If Schema = 1 AndAlso Settings.SkipStartupMovies Then Throw New IOException("Startup choices require settings profile schema 2.")
+        If Schema < 3 AndAlso (Settings.RecenterKey <> RecenterShortcut.DefaultKey OrElse Settings.RecenterModifiers <> 0) Then Throw New IOException("Recenter keys require settings profile schema 3.")
         Settings.ApplyTo(New LauncherSettings())
     End Sub
 End Class
@@ -142,7 +147,7 @@ Public Class SettingsProfileStore
     End Function
 
     Private Function MakeProfile(name As String, values As ProfileValues, Optional exceptId As String = Nothing) As SettingsProfile
-        Dim profile As New SettingsProfile With {.Kind = "DiRT3VR.SettingsProfile", .Schema = 2, .Name = name, .Settings = values}
+        Dim profile As New SettingsProfile With {.Kind = "DiRT3VR.SettingsProfile", .Schema = 3, .Name = name, .Settings = values}
         profile.Validate()
         Dim entries = List()
         If exceptId Is Nothing AndAlso entries.Count >= MaximumProfiles Then Throw New IOException("Keep at most 128 settings profiles per installation.")

@@ -20,6 +20,7 @@ Module Program
             TestSettings(root)
             DesktopTests.Run(root, AddressOf Check)
             ProfileTests.Run(root, AddressOf Check)
+            RecenterTests.Run(root, AddressOf Check)
             StartupTests.Run(root, AddressOf Check)
             InstallerTests.Run(root, AddressOf Check)
             TestHeadsetResolution(root)
@@ -148,6 +149,12 @@ Module Program
         preferences.VrRenderScale = 75
         Dim start = InteractiveSession.StartInfo(one, runtimeInfo, Path.Combine(one.UserRoot, "logs", "fixture"), preferences, headset)
         Check(start.Environment("DIRT3VR_VR_RENDER_SCALE") = "75", "selected VR render scale reaches the VR child")
+        Check(start.Environment("DIRT3VR_RECENTER_KEY") = "121 0", "default F10 recenter reaches the VR child")
+        preferences.RecenterKey = 82 : preferences.RecenterModifiers = 5
+        Check(InteractiveSession.StartInfo(one, runtimeInfo, Path.Combine(one.UserRoot, "logs", "fixture"), preferences, headset).Environment("DIRT3VR_RECENTER_KEY") = "82 5", "chosen recenter key and modifiers reach the VR child")
+        preferences.RecenterKey = 9 : preferences.RecenterModifiers = 2
+        Reject(Sub() InteractiveSession.StartInfo(one, runtimeInfo, Path.Combine(one.UserRoot, "logs", "fixture"), preferences, headset), "edited preferences cannot pass a reserved recenter key to the VR child")
+        preferences.RecenterKey = RecenterShortcut.DefaultKey : preferences.RecenterModifiers = 0
         Check(start.Environment("DIRT3VR_PRESENTATION_TRACE") = If(preferences.DiagnosticLogging, "1", "0"), "presentation trace follows the logging preference")
         Dim logging = preferences.DiagnosticLogging
         preferences.DiagnosticLogging = False
@@ -480,6 +487,7 @@ Module Program
         DesktopTests.RunWindows(AddressOf Check)
         StartupTests.RunWindowLifecycle(root, AddressOf Check)
         ProfileTests.RunUi(root, AddressOf Check)
+        RecenterTests.RunUi(root, AddressOf Check)
         WheelGuardTests.Run(root, AddressOf Check)
         InstallerTests.RunUi(AddressOf Check)
         SectionCollapseTests.Run(root, AddressOf Check)

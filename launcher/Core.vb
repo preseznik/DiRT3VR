@@ -158,6 +158,8 @@ Public Class LauncherSettings
     Public Property DesktopDisplayMode As String = "game"
     Public Property DesktopVSync As String = "game"
     Public Property SkipStartupMovies As Boolean = False
+    Public Property RecenterKey As Integer = RecenterShortcut.DefaultKey
+    Public Property RecenterModifiers As Integer = 0
 
     Public Sub Validate()
         If Version <> 1 Then Throw New IOException("Unsupported launcher settings version. The existing settings were preserved.")
@@ -166,6 +168,7 @@ Public Class LauncherSettings
         If SteamRuntimeManifest Is Nothing OrElse SteamRuntimeManifest.Length > 32768 Then Throw New IOException("Invalid SteamVR runtime path.")
         If VdxrRuntimeManifest Is Nothing OrElse VdxrRuntimeManifest.Length > 32768 Then Throw New IOException("Invalid VDXR runtime path.")
         If VrRenderScale < 50 OrElse VrRenderScale > 300 Then Throw New IOException("Choose a VR render scale between 50% and 300%.")
+        If Not RecenterShortcut.Valid(RecenterKey, RecenterModifiers) Then Throw New IOException("Choose another recenter key. Windows shortcuts such as Alt+Tab are reserved.")
         DesktopGraphics.Validate(Me)
     End Sub
 

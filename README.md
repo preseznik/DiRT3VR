@@ -87,19 +87,22 @@ are not reinterpreted as scene scale. Other preferences are preserved.
 Closing the launcher remembers its window size and maximized state separately;
 it does not save unsaved game settings. The title shows the build version.
 
-Named settings profiles now export schema 2, including the startup choice.
-Existing schema-1 profiles remain readable and keep startup skipping off.
+Named settings profiles now export schema 3, including the startup choice and
+the recenter key. Schema-1 and schema-2 profiles remain readable, with startup
+skipping off and F10 for recentering where they lack those choices.
 
 For experimental VR, connect the headset through Virtual Desktop, choose VDXR,
 and enable the experimental VR option in Advanced. Close other VR games first.
 Use **Launch VR** and select any camera through DiRT 3's native controls.
 Rendered 3D scenes use stereo and headset tracking; loading screens, movies and
 frames without a valid 3D scene use a virtual screen. Press
-**F10** with the game focused to recenter. Recognized 2D HUD/menu draws now use
+**F10** with the game focused to recenter; choose another key, optionally with
+Ctrl, Alt or Shift, under **Controls → VR and seat controls**. DiRT 3 still
+receives that key, so pick one the game doesn't use. Recognized 2D HUD/menu draws now use
 an experimental transparent panel, 2 metres away. The usual panel is at most
 1.6 metres wide and 1.8 metres tall. The verified widescreen menu canvas expands
 sideways (up to 3.2 metres) while preserving the physical size and position of
-already-visible interface elements. F10 moves the panel to the recentered position.
+already-visible interface elements. Recentering also moves the panel.
 The captured interface also remains visible in the desktop mirror.
 
 Version 0.1.11 corrects horizontal clipping for the menu camera identified in
