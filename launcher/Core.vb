@@ -160,6 +160,8 @@ Public Class LauncherSettings
     Public Property SkipStartupMovies As Boolean = False
     Public Property RecenterKey As Integer = RecenterShortcut.DefaultKey
     Public Property RecenterModifiers As Integer = 0
+    ' Optional controller/wheel button; machine-specific, so never part of settings profiles.
+    Public Property RecenterDevice As RecenterDeviceBinding
 
     Public Sub Validate()
         If Version <> 1 Then Throw New IOException("Unsupported launcher settings version. The existing settings were preserved.")
@@ -169,6 +171,7 @@ Public Class LauncherSettings
         If VdxrRuntimeManifest Is Nothing OrElse VdxrRuntimeManifest.Length > 32768 Then Throw New IOException("Invalid VDXR runtime path.")
         If VrRenderScale < 50 OrElse VrRenderScale > 300 Then Throw New IOException("Choose a VR render scale between 50% and 300%.")
         If Not RecenterShortcut.Valid(RecenterKey, RecenterModifiers) Then Throw New IOException("Choose another recenter key. Windows shortcuts such as Alt+Tab are reserved.")
+        RecenterDevice?.Validate()
         DesktopGraphics.Validate(Me)
     End Sub
 

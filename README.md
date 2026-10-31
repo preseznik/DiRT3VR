@@ -117,7 +117,10 @@ Rendered 3D scenes use stereo and headset tracking; loading screens, movies and
 frames without a valid 3D scene use a virtual screen. Press
 **F10** with the game focused to recenter; choose another key, optionally with
 Ctrl, Alt or Shift, under **Controls → VR and seat controls**. DiRT 3 still
-receives that key, so pick one the game doesn't use. Recognized 2D HUD/menu draws now use
+receives that key, so pick one the game doesn't use. You can also bind a
+controller, wheel or button-box button (or D-pad / hat direction) there; the
+launcher watches it during VR, only while DiRT 3 is in front, without taking
+the device over. Recognized 2D HUD/menu draws now use
 an experimental transparent panel, 2 metres away. The usual panel is at most
 1.6 metres wide and 1.8 metres tall. The verified widescreen menu canvas expands
 sideways (up to 3.2 metres) while preserving the physical size and position of

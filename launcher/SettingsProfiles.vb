@@ -29,7 +29,7 @@ Public Class ProfileValues
     Public Function ApplyTo(local As LauncherSettings) As LauncherSettings
         Dim result As New LauncherSettings With {
             .ModernInterface = ModernInterface, .RuntimeMode = RuntimeMode,
-            .SteamRuntimeManifest = local.SteamRuntimeManifest, .VdxrRuntimeManifest = local.VdxrRuntimeManifest,
+            .SteamRuntimeManifest = local.SteamRuntimeManifest, .VdxrRuntimeManifest = local.VdxrRuntimeManifest, .RecenterDevice = local.RecenterDevice,
             .DiagnosticLogging = DiagnosticLogging, .ExperimentalVrEnabled = ExperimentalVrEnabled,
             .VrRenderScale = VrRenderScale, .DesktopWidth = DesktopWidth, .DesktopHeight = DesktopHeight,
             .DesktopDisplayMode = DesktopDisplayMode, .DesktopVSync = DesktopVSync, .SkipStartupMovies = SkipStartupMovies,

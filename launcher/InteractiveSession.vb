@@ -7,12 +7,14 @@ Public Class InteractiveSession
     Public ReadOnly Game As Process
     Public ReadOnly LogDirectory As String
     Public ReadOnly StopPath As String
+    Public ReadOnly RecenterRequestPath As String
     Public ReadOnly StartedUtc As DateTime
     Private stopRequested As Boolean
 
     Private Sub New(install As InstallContext, child As Process, folder As String, sessionLease As FileStream)
         context = install : Game = child : LogDirectory = folder : lease = sessionLease
         StopPath = Path.Combine(folder, "xr-stop.request")
+        RecenterRequestPath = Path.Combine(folder, "recenter.request")
         StartedUtc = DateTime.UtcNow
         Try
             StartedUtc = child.StartTime.ToUniversalTime()
@@ -38,6 +40,8 @@ Public Class InteractiveSession
         start.Environment("DIRT3VR_HEADSET_HEIGHT") = headset.Height.ToString(Globalization.CultureInfo.InvariantCulture)
         start.Environment("DIRT3VR_LOG_DIR") = directory
         start.Environment("DIRT3VR_XR_STOP_FILE") = Path.Combine(directory, "xr-stop.request")
+        ' A bound controller/wheel button asks for a recenter by creating this file; the renderer removes it.
+        start.Environment("DIRT3VR_RECENTER_REQUEST_FILE") = Path.Combine(directory, "recenter.request")
         start.Environment("XR_RUNTIME_JSON") = runtime.ManifestPath
         VrApiLayers.Configure(start, layers)
         Return start
