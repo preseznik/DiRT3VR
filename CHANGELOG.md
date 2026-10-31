@@ -4,7 +4,7 @@
 
 - Make the difference between saving a profile and Save settings clear. The profile buttons are now **Save as new profile** and **Overwrite profile…**. The section text, tooltips, confirmation and status messages say that they change only the profile, while **Save settings** (like Launch) keeps the current controls as the launcher's settings and never changes a profile. Help and README updated.
 - Harden `ProfileTests.RunUi` against its intermittent failure ("Sequence contains no elements" after Save as new); the exact cause was not reproduced. `Button.PerformClick` silently does nothing unless the button can be selected, so the test now brings the button's tab forward, waits up to two seconds for it to become clickable, and otherwise fails naming the hidden or disabled control. Failures after a click include the panel's message, which is where the profile handler reports store errors. New checks confirm Save settings leaves every profile file unchanged and that both status messages say what was not saved.
-- Compiled on Linux with Windows targeting (launcher and launcher tests, no warnings); the launcher test suite has not been run yet.
+- Compiled on Linux with Windows targeting (launcher and launcher tests, no warnings) and ran the launcher tests with `--ui` under Wine 9.0. Every group passed except the two that need the local DiRT 3 startup fixture (`StartupTests.Run` and `RunWindowLifecycle`); `ProfileTests.RunUi` passed in 5 of 5 runs without needing the click wait. Unchanged `main` failed the same groups in the same environment. A Windows run with the fixture is still to do.
 
 ## 0.1.20 — installer, F10 recenter, race display panel, collapsible sections and safer scrolling
 
