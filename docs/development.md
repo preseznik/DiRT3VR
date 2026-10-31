@@ -3,7 +3,11 @@
 Requirements: Windows x64, Visual Studio C++ x86 tools with CMake/Ninja,
 Python 3, Git, .NET 10 SDK and Inno Setup 7 (`ISCC.exe`, default
 `%LOCALAPPDATA%\Programs\Inno Setup 7`, or pass `-InnoCompiler`). Native outputs
-target x86; the launcher targets x64.
+target x86; the launcher targets x64. The launcher's controller reader
+(`tools/driving-input`, from GRID2VR; see its `source.json`) is a separate x64
+DLL: `tools/build.ps1` builds it with `vcvars64.bat` and Ninja into
+`build/driving-input`, runs its `driving_axes` test, and the launcher tests copy
+it beside themselves when present. Packages ship it as `payload/driving_input.dll`.
 
 `tools/package.ps1` writes the portable folder, its ZIP, the
 `DiRT3VR-<version>-Setup.exe` installer built from `installer/DiRT3VR.iss` and

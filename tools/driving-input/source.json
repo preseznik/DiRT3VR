@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "sourceProject": "GRID2VR",
+  "sourceRepository": "https://github.com/preseznik/GRID2VR",
+  "sourceCommit": "8b2e2a3a6fc185cd2b41dd80ae19b7c7e53ba3bc",
+  "adaptation": "Game-independent controller reader for the 64-bit launcher: non-exclusive DirectInput/XInput reading and an explicit force-feedback test. Copied unchanged except the CMake project name. sha256 values are of the GRID2VR originals.",
+  "files": [
+    {
+      "path": "tools/driving-input/input.cpp",
+      "sha256": "1b8c251cc6843aeb76ce4a564b378cb716366cb444efa923ef48f01c175f32ef",
+      "identical": true
+    },
+    {
+      "path": "tools/driving-input/axes.h",
+      "sha256": "569c5e8f1151558d7026a37d94602674fbb2273ea638fe621c14600ddfbf8b62",
+      "identical": true
+    },
+    {
+      "path": "tools/driving-input/axes_test.cpp",
+      "sha256": "61d775cf98ae89e1fe7b24227c743c8c844bf7efda434621ea5139e5fc272342",
+      "identical": true
+    },
+    {
+      "path": "tools/driving-input/exports.def",
+      "sha256": "c47f94faf9a475e140c0e85974138d681de754c1262e2b1af57fbe3722fdf15a",
+      "identical": true
+    },
+    {
+      "path": "tools/driving-input/CMakeLists.txt",
+      "sha256": "e1b2f659f4ed05bc37f0ddc9e48a8fd986b05f3313d896ed09494e505e1c0784",
+      "identical": false
+    }
+  ]
+}

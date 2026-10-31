@@ -31,6 +31,26 @@ if (!$SkipTests) {
     if ($LASTEXITCODE) { throw 'Native tests failed.' }
 }
 if (!$NativeOnly) {
+    # The 64-bit launcher reads controllers through its own x64 DLL (tools/driving-input).
+    $inputBatch = @"
+@echo off
+call "$vs\VC\Auxiliary\Build\vcvars64.bat"
+if errorlevel 1 exit /b 1
+"$cmake" -S "$root\tools\driving-input" -B "$root\build\driving-input" -G Ninja -DCMAKE_MAKE_PROGRAM="$ninja" -DCMAKE_BUILD_TYPE=Release
+if errorlevel 1 exit /b 1
+"$cmake" --build "$root\build\driving-input"
+exit /b %errorlevel%
+"@
+    $inputBatchPath = "$root/build/driving-input-build.cmd"
+    [IO.File]::WriteAllText($inputBatchPath, $inputBatch, [Text.Encoding]::ASCII)
+    & $env:ComSpec /d /c $inputBatchPath
+    if ($LASTEXITCODE) { throw 'Controller input build failed.' }
+    if (!$SkipTests) {
+        & (Join-Path (Split-Path $cmake) 'ctest.exe') --test-dir "$root/build/driving-input" --output-on-failure
+        if ($LASTEXITCODE) { throw 'Controller input tests failed.' }
+    }
+}
+if (!$NativeOnly) {
     & dotnet build "$root/launcher/DiRT3VR.vbproj" -c Release --nologo
     if ($LASTEXITCODE) { throw 'Launcher build failed.' }
     if (!$SkipTests) {

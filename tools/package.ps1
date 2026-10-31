@@ -12,7 +12,7 @@ New-Item -ItemType Directory -Path "$stage/payload", "$stage/licenses/OpenXR" -F
 & dotnet publish "$root/launcher/DiRT3VR.vbproj" -c Release -o "$output/publish" --nologo
 if ($LASTEXITCODE) { throw 'Launcher publish failed.' }
 Copy-Item -LiteralPath "$output/publish/DiRT3VR.exe" -Destination $stage
-Copy-Item -LiteralPath "$root/build/native/bin/d3d11.dll", "$root/build/native/bin/DiRT3VR.RuntimeProbe.exe" -Destination "$stage/payload"
+Copy-Item -LiteralPath "$root/build/native/bin/d3d11.dll", "$root/build/native/bin/DiRT3VR.RuntimeProbe.exe", "$root/build/driving-input/driving_input.dll" -Destination "$stage/payload"
 Copy-Item -LiteralPath "$root/README.md" -Destination $stage
 Copy-Item -LiteralPath "$root/.deps/minhook/LICENSE.txt" -Destination "$stage/licenses/MinHook.txt"
 Copy-Item -LiteralPath "$root/.deps/OpenXR-SDK/LICENSE" -Destination "$stage/licenses/OpenXR/LICENSE.txt"
