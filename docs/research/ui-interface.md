@@ -22,8 +22,9 @@ DiRT3 `dx11/shaderpack/ui.pssg` SHA-256:
 `tools/research/inspect_ui_shaders.py` traverses its typed PSSG hierarchy and
 maps SHADERPROGRAM names to DXBC code blocks. An independent raw DXBC scan
 matched all 591 code offsets; 304 programs are vertex shaders. Names explicitly
-containing `.ui_2d_` map to 41 unique vertex hashes: 35 exclusive to those names,
-six shared with other UI programs. None of DiRT2VR's six recognized HUD vertex
+containing `.ui_2d_` or `.ui_osd_2d_` map to 44 unique vertex hashes: 38 exclusive
+to those names, six shared with other UI programs (41/35 before the OSD correction
+below). None of DiRT2VR's six recognized HUD vertex
 hashes are present. Full name/hash/offset evidence is in `ui-shaders.json`.
 
 This is offline shipped-asset inspection, not live draw coverage. Shader names
@@ -292,3 +293,30 @@ intro/splash sequence finishes, HUD proportions are normal, and transitions stay
 clear. The remaining frontend triangle-shadow defect is separate; see
 [frontend shadows](frontend-shadows.md).
 
+
+## Race display (OSD) shader coverage
+
+During VR racing a cyan and black rectangle stayed at the top of the headset
+view and followed head movement. The 0.1.14 racing trace
+(`artifacts/diagnostics/presentation-0.1.14-20261028`) records only uncaptured
+draws inside eye scopes (`hud_hooks.cpp` traces `HudShaderKind::None` while a
+capture is current). Apart from the final DOF composite, the only screen-space
+draws left in both eyes are three race display programs:
+
+| Vertex shader | Program | Pixel shader |
+| --- | --- | --- |
+| `15472d78cb54f392` | `uiio_osd_2d_image` | `ba80fd4101a15296` |
+| `f89762721daadb0b` | `uiio_osd_2d_colour` | `ecf67d6e4a1d06d2` |
+| `1d3d792d462f6733` | `uiio_osd_2d_image_scroll` | `523ffb99f2bb4a53` |
+
+The inventory matched only `.ui_2d_`, so the `ui_2d_osd_*` family was captured
+but the word-swapped `ui_osd_2d_*` family was not. None of these vertex hashes is
+used by a non-OSD program. The traced draws use the UI camera, a full viewport,
+no depth test and ordinary source-over blending, so the existing capture admits
+them unchanged. The inventory now also matches `.ui_osd_2d_`; `hud_shaders.h`
+classifies the three as dedicated two-dimensional HUD shaders. The shipped-pack
+contract test and shader-hook test verify the regenerated list.
+
+The OSD textures were not captured, so the rectangle's colours are not confirmed
+offline. A VR race must confirm that it moves onto the HUD panel or disappears.
+If anything remains, F8 while it is visible records its exact draw.

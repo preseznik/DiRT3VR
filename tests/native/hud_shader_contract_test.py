@@ -21,4 +21,5 @@ for key, kind in [('exclusiveTwoDimensionalVertexHashes', 'TwoDimensional'),
     group = re.search(r'((?:    case 0x[0-9a-f]+ull:\n)+)        return HudShaderKind::' + kind, source).group(1)
     hashes = re.findall(r'0x([0-9a-f]+)ull', group)
     assert hashes == actual[key] == recorded[key], kind + ' classifier differs from shipped asset'
-print('Verified 35 dedicated 2D and 6 shared UI shader hashes against the fingerprinted DiRT3 asset')
+print(f"Verified {len(actual['exclusiveTwoDimensionalVertexHashes'])} dedicated 2D and "
+      f"{len(actual['sharedWithOtherUiHashes'])} shared UI shader hashes against the fingerprinted DiRT3 asset")

@@ -203,6 +203,9 @@ float4 ps():SV_Target { return float4(1,0,0,.5); }
         context->IASetInputLayout(nullptr); context->OMSetBlendState(blend.Get(),nullptr,0xffffffff);
         hud.Reset();
         Check(ClassifyHudShader(0xbef999561247f2d5ull)==HudShaderKind::None && ClassifyHudShader(0x5c571e5a5daa0ce4ull)==HudShaderKind::Shared,"wrong-game/shared classification");
+        // ui_osd_2d_* race display programs, not only ui_2d_osd_*, belong on the HUD panel.
+        Check(ClassifyHudShader(0x15472d78cb54f392ull)==HudShaderKind::TwoDimensional && ClassifyHudShader(0xf89762721daadb0bull)==HudShaderKind::TwoDimensional &&
+              ClassifyHudShader(0x1d3d792d462f6733ull)==HudShaderKind::TwoDimensional,"race display (OSD) classification");
         // Unknown shaders and draws outside a capture scope must remain normal.
         context->OMSetRenderTargets(1,&raw,nullptr); context->Draw(3,0);
         Check(Pixel(back.Get())[0]>=127,"hook changed ordinary game drawing");
