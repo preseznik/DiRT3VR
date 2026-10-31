@@ -307,8 +307,8 @@ bool Prepare(PrototypeState& state,ID3D11Texture2D* back) {
 void RecenterKey(PrototypeState& state) {
     DWORD process{};
     GetWindowThreadProcessId(GetForegroundWindow(),&process);
-    const bool pressed=process==GetCurrentProcessId() && (GetAsyncKeyState(VK_F9)&0x8000);
-    if(pressed && !state.recenterHeld) { state.xr.RequestRecenter(); RuntimeLog("XR recenter requested key=F9"); }
+    const bool pressed=process==GetCurrentProcessId() && (GetAsyncKeyState(VK_F10)&0x8000);
+    if(pressed && !state.recenterHeld) { state.xr.RequestRecenter(); RuntimeLog("XR recenter requested key=F10"); }
     state.recenterHeld=pressed;
 }
 }

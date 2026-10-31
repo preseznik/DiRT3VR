@@ -87,11 +87,11 @@ and enable the experimental VR option in Advanced. Close other VR games first.
 Use **Launch VR** and select any camera through DiRT 3's native controls.
 Rendered 3D scenes use stereo and headset tracking; loading screens, movies and
 frames without a valid 3D scene use a virtual screen. Press
-**F9** with the game focused to recenter. Recognized 2D HUD/menu draws now use
+**F10** with the game focused to recenter. Recognized 2D HUD/menu draws now use
 an experimental transparent panel, 2 metres away. The usual panel is at most
 1.6 metres wide and 1.8 metres tall. The verified widescreen menu canvas expands
 sideways (up to 3.2 metres) while preserving the physical size and position of
-already-visible interface elements. F9 moves the panel to the recentered position.
+already-visible interface elements. F10 moves the panel to the recentered position.
 The captured interface also remains visible in the desktop mirror.
 
 Version 0.1.11 corrects horizontal clipping for the menu camera identified in

@@ -289,7 +289,7 @@ Public Class MainForm
         Dim general = Section(content, "General")
         general.Controls.Add(Info("Use your existing keyboard, controller or wheel bindings in DiRT 3. During experimental VR, closing this launcher minimizes it until the game exits and original files are restored."))
         Dim vrControls = Section(content, "VR and seat controls")
-        vrControls.Controls.Add(Info("Press F9 to recenter while DiRT 3 is the foreground application. Head tracking applies to every rendered 3D camera view, including replay. Per-car seat adjustment is not available yet."))
+        vrControls.Controls.Add(Info("Press F10 to recenter while DiRT 3 is the foreground application. Head tracking applies to every rendered 3D camera view, including replay. Per-car seat adjustment is not available yet."))
     End Sub
 
     Private Sub BuildSettings()
@@ -526,7 +526,7 @@ Public Class MainForm
             Dim text As New TextBox With {.ReadOnly = True, .Multiline = True, .ScrollBars = ScrollBars.Vertical, .Dock = DockStyle.Fill, .BorderStyle = BorderStyle.None}
             text.Text = "DiRT3VR " & BuildVersion & " — Research build" & vbCrLf & vbCrLf &
                 "Launch starts DiRT 3 Complete Edition with the desktop choices under Graphics. Use game setting preserves each existing option. Desktop changes remain in the game graphics file; exact backups are kept in desktop-backups under the preferences folder below. Save settings only saves launcher preferences. Steam must be running with access to the game. Driving controls and saves remain managed by DiRT 3." & vbCrLf & vbCrLf &
-                "Advanced → Enable experimental VR enables the VDXR session when supported by this package. All rendered 3D camera views use stereo and tracking. Loading screens and movies use a virtual screen. Camera transitions remain experimental. F9 recenters while the game is foreground." & vbCrLf & vbCrLf &
+                "Advanced → Enable experimental VR enables the VDXR session when supported by this package. All rendered 3D camera views use stereo and tracking. Loading screens and movies use a virtual screen. Camera transitions remain experimental. F10 recenters while the game is foreground." & vbCrLf & vbCrLf &
                 "Settings → Check runtime and headset runs an x86 OpenXR probe without starting the game. Choose VDXR or SteamVR explicitly; the selected runtime is used for that process only, independently of the system OpenXR default. VDXR and SteamVR require separate checks. Browse to the selected runtime file if it is installed elsewhere." & vbCrLf & vbCrLf &
                 "Settings → Settings profiles saves named copies of desktop, VR, appearance and logging choices. Load changes the controls and asks before replacing unsaved edits; Save settings or Launch keeps those choices. Import adds a profile without loading it, and Export writes the selected saved profile. Game saves and local paths are excluded." & vbCrLf & vbCrLf &
                 "Launcher → Skip startup logo movies temporarily replaces the two startup movie states for desktop or VR. Copyright and Press Start remain. Keep the launcher open until game exit for restoration; closing it during the session minimizes it. Leave skipping off for multiplayer until checked. Background play is not implemented for DiRT 3." & vbCrLf & vbCrLf &

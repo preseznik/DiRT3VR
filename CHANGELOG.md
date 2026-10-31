@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — F10 recenter
+
+- Move VR recentering from F9 to F10 to match the other VR projects. It still applies only while DiRT 3 is the foreground application. Update the launcher help text and README.
+
 ## 0.1.19 — startup logo option
 
 - Add an experimental, opt-in startup logo skip for desktop and VR launches. Keep copyright, Press Start and other game movies.
