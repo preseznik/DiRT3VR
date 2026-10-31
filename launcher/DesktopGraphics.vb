@@ -64,7 +64,6 @@ Public Module DesktopGraphics
         SafeFiles.NoLinks(context.GraphicsPath)
         If Not File.Exists(context.GraphicsPath) Then Throw New IOException("Run DiRT 3 once with desktop options set to Use game setting, then choose your desktop graphics settings.")
         If New FileInfo(context.GraphicsPath).Length > 1024 * 1024 Then Throw New IOException("The game graphics file is too large; it was preserved.")
-        If (File.GetAttributes(context.GraphicsPath) And FileAttributes.ReadOnly) <> 0 Then Throw New UnauthorizedAccessException("The game graphics file is read-only; it was preserved.")
         Dim original = File.ReadAllBytes(context.GraphicsPath), applied = Transform(original, settings, monitor)
         If original.SequenceEqual(applied) Then Return
         Dim hash = SafeFiles.HashBytes(original)

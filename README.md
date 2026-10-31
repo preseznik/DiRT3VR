@@ -142,6 +142,8 @@ restriction files for DX11, native stereo off and serial rendering. It journals
 the original bytes and restores owned files after the session. Externally edited
 files are preserved and reported as a recovery conflict. Keep the launcher
 running until the session ends. UAC may be needed to write the Steam folder.
+Read-only game files are supported: the launcher changes them, they stay
+read-only during play, and restoration puts back the original read-only flag.
 
 The desktop launcher runs on 64-bit Windows. The game, graphics proxy and runtime
 probe are 32-bit. Choose **VDXR** or **SteamVR** in Settings. VDXR uses Virtual

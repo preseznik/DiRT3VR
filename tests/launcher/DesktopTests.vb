@@ -42,6 +42,14 @@ Module DesktopTests
         check(File.ReadAllBytes(backup).SequenceEqual(Fixture), "desktop change has an exact original backup")
         DesktopGraphics.Apply(context, saved, Size.Empty)
         check(Directory.GetFiles(Path.GetDirectoryName(backup)).Length = 1 AndAlso File.ReadAllBytes(context.GraphicsPath).SequenceEqual(applied), "reapplying matching choices makes no write or extra backup")
+        ' A read-only graphics file (players use this to stop the game resetting it) is changed and stays read-only.
+        SafeFiles.SetReadOnly(context.GraphicsPath, True)
+        Dim lockedChoice As New LauncherSettings With {.DesktopWidth = 1920, .DesktopHeight = 1080, .DesktopDisplayMode = "windowed", .DesktopVSync = "off"}
+        DesktopGraphics.Apply(context, lockedChoice, Size.Empty)
+        check(ReadResolution(File.ReadAllBytes(context.GraphicsPath)).Attribute("fullscreen").Value = "false" AndAlso SafeFiles.IsReadOnly(context.GraphicsPath), "desktop choices apply to a read-only graphics file and keep it read-only")
+        SafeFiles.SetReadOnly(context.GraphicsPath, False)
+        DesktopGraphics.Apply(context, saved, Size.Empty)
+        check(ExperimentalFiles.SameXml(File.ReadAllBytes(context.GraphicsPath), applied) AndAlso Not SafeFiles.IsReadOnly(context.GraphicsPath), "desktop choices reapply after the read-only check")
         For Each mode In {"game", "windowed", "fullscreen", "borderless"}
             For Each vsync In {"game", "off", "on"}
                 Dim choice As New LauncherSettings With {.DesktopDisplayMode = mode, .DesktopVSync = vsync}
