@@ -91,10 +91,11 @@ Public Module VrRuntime
         Return headset.Summary(settings.VrRenderScale) & Environment.NewLine & "No game or VR session was started."
     End Function
 
-    Public Async Function ReadHeadsetAsync(context As InstallContext, settings As LauncherSettings, Optional cancellation As CancellationToken = Nothing, Optional selectedRuntime As RuntimeInfo = Nothing) As Task(Of HeadsetResolution)
+    Public Async Function ReadHeadsetAsync(context As InstallContext, settings As LauncherSettings, Optional cancellation As CancellationToken = Nothing, Optional selectedRuntime As RuntimeInfo = Nothing, Optional layers As IReadOnlyList(Of VrLayerBypass) = Nothing) As Task(Of HeadsetResolution)
         settings.Validate()
         Dim runtime = If(selectedRuntime, Resolve(settings.RuntimeMode, settings.SteamRuntimeManifest, settings.VdxrRuntimeManifest))
-        Dim start = ProbeStartInfo(context, runtime)
+        Dim start = ProbeStartInfo(context, runtime, layers)
+        Dim disabledLayers = If(layers, Array.Empty(Of VrLayerBypass)()).Select(Function(layer) layer.LayerName).ToArray()
         Using child As New Process With {.StartInfo = start}
             If Not child.Start() Then Throw New IOException("The runtime probe could not start.")
             Using cancelled = cancellation.Register(Sub()
@@ -124,29 +125,44 @@ Public Module VrRuntime
                 Try
                     report = ValidateProbeOutput(output, child.ExitCode, errorOutput)
                 Catch ex As IOException
-                    SafeFiles.SaveJson(context.DiagnosticsPath, New With {.schema = 1, .kind = "runtime-probe", .updatedUtc = DateTime.UtcNow, .runtime = runtime.Mode, .report = New With {.success = False, .error = ex.Message, .exitCode = child.ExitCode, .stereo = False}})
-                    Throw
+                    SafeFiles.SaveJson(context.DiagnosticsPath, New With {.schema = 1, .kind = "runtime-probe", .updatedUtc = DateTime.UtcNow, .runtime = runtime.Mode, .disabledApiLayers = disabledLayers, .report = New With {.success = False, .error = ex.Message, .exitCode = child.ExitCode, .stereo = False}})
+                    ' Keep the full output: it names an OpenXR add-on that failed to load.
+                    Throw New RuntimeProbeException(ex.Message, child.ExitCode, output & Environment.NewLine & errorOutput, ex)
                 End Try
-                SafeFiles.SaveJson(context.DiagnosticsPath, New With {.schema = 1, .kind = "runtime-probe", .updatedUtc = DateTime.UtcNow, .runtime = runtime.Mode, .report = report})
+                SafeFiles.SaveJson(context.DiagnosticsPath, New With {.schema = 1, .kind = "runtime-probe", .updatedUtc = DateTime.UtcNow, .runtime = runtime.Mode, .disabledApiLayers = disabledLayers, .report = report})
                 Return HeadsetResolution.FromReport(report, runtime.Mode)
             End Using
         End Using
     End Function
 
-    Public Function ProbeStartInfo(context As InstallContext, runtime As RuntimeInfo) As ProcessStartInfo
+    Public Function ProbeStartInfo(context As InstallContext, runtime As RuntimeInfo, Optional layers As IReadOnlyList(Of VrLayerBypass) = Nothing) As ProcessStartInfo
         Dim executable = IO.Path.Combine(context.PackageRoot, "payload", "DiRT3VR.RuntimeProbe.exe")
         SafeFiles.NoLinks(executable)
         If Not File.Exists(executable) Then Throw New IOException("The x86 runtime probe is not included in this build. The selected manifest is valid; headset availability has not been checked.")
         Dim start As New ProcessStartInfo(executable) With {.UseShellExecute = False, .CreateNoWindow = True, .RedirectStandardOutput = True, .RedirectStandardError = True, .WorkingDirectory = context.PackageRoot}
         start.ArgumentList.Add("--runtime-json") : start.ArgumentList.Add(runtime.ManifestPath)
         start.Environment("XR_RUNTIME_JSON") = runtime.ManifestPath
+        ' Loader warnings name an OpenXR add-on whose library failed to load. Keep a more detailed level.
+        Dim verbosity As String = Nothing
+        start.Environment.TryGetValue("XR_LOADER_DEBUG", verbosity)
+        If Not {"warn", "info", "verbose", "all"}.Contains(verbosity) Then start.Environment("XR_LOADER_DEBUG") = "warn"
+        VrApiLayers.Configure(start, layers)
         Return start
+    End Function
+
+    ' The probe writes one JSON line; with XR_LOADER_DEBUG the OpenXR loader adds its own lines.
+    Public Function ProbeJson(output As String) As String
+        Dim trimmed = output.Trim()
+        If trimmed.StartsWith("{"c) AndAlso trimmed.EndsWith("}"c) AndAlso Not trimmed.Contains(ControlChars.Lf) Then Return trimmed
+        Dim lines = output.Split({vbCrLf, vbLf}, StringSplitOptions.None)
+        Dim report = lines.LastOrDefault(Function(line) line.TrimStart().StartsWith("{""schema"":", StringComparison.Ordinal))
+        Return If(report, trimmed).Trim()
     End Function
 
     Public Function ValidateProbeOutput(output As String, exitCode As Integer, errors As String) As JsonElement
         If output.Length > 1024 * 1024 Then Throw New IOException("Runtime probe returned too much output.")
         Try
-            Using document = JsonDocument.Parse(output)
+            Using document = JsonDocument.Parse(ProbeJson(output))
                 Dim success As JsonElement, stereo As JsonElement
                 Dim root = document.RootElement
                 If root.ValueKind <> JsonValueKind.Object OrElse Not root.TryGetProperty("success", success) OrElse (success.ValueKind <> JsonValueKind.True AndAlso success.ValueKind <> JsonValueKind.False) Then Throw New IOException("The runtime probe returned an invalid report.")

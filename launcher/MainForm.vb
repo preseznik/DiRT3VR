@@ -18,6 +18,7 @@ Public Class MainForm
     Private ReadOnly skipStartupMovies As New CheckBox With {.Name = "SkipStartupMovies", .Text = "Skip startup logo movies (experimental)", .AutoSize = True}
     Private ReadOnly recenterButton As New Button With {.Name = "RecenterKey", .AutoSize = True, .AccessibleName = "Recenter key"}
     Private ReadOnly updateNotice As New Button With {.Name = "UpdateAvailable", .AutoSize = True, .Visible = False, .Margin = New Padding(0, 4, 8, 0)}
+    Private ReadOnly layerSummary As New Label With {.Name = "LayerSummary", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12)}
     Private availableUpdate As ReleaseUpdate
     Private ReadOnly recenterHint As New Label With {.Name = "RecenterHint", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12)}
     Private recenterKey As Integer = RecenterShortcut.DefaultKey, recenterModifiers As Integer
@@ -152,7 +153,8 @@ Public Class MainForm
                                                                   Return
                                                               End If
                                                               Dim selected = CurrentSettings()
-                                                              interactive = Await InteractiveSession.StartAsync(context, selected)
+                                                              interactive = Await InteractiveSession.StartAsync(context, selected, AddressOf ConfirmLayerBypass)
+                                                              UpdateLayerSummary()
                                                               settings = selected
                                                               RememberSavedSettings()
                                                               launchProgress = New LaunchProgressMonitor(Me, interactive.Game, context, vr:=True)
@@ -320,7 +322,11 @@ Public Class MainForm
                               InvalidateHeadset()
                               resolutionSummary.Text = "Reading connected headset resolution…"
                               Try
-                                  headsetResolution = Await VrRuntime.ReadHeadsetAsync(context, CurrentSettings(), lifetime.Token)
+                                  Dim current = CurrentSettings()
+                                  Dim preflight = Await VrLayerPreflight.ReadHeadsetAsync(context, Function(layers) VrRuntime.ReadHeadsetAsync(context, current, lifetime.Token, layers:=layers), AddressOf ConfirmLayerBypass)
+                                  headsetResolution = preflight.Headset
+                                  If preflight.Warning <> "" Then notice.Text = preflight.Warning
+                                  UpdateLayerSummary()
                                   UpdateResolutionLabels()
                                   probeStatus.Text = "Headset resolution detected. No game or VR session was started."
                                   LoadDiagnostics()
@@ -434,6 +440,15 @@ Public Class MainForm
                                         End Sub
         runtimes.Controls.Add(Info("For VDXR, connect through Virtual Desktop. SteamVR runtime checks remain available, but interactive SteamVR launch is awaiting orientation validation. The selected 32-bit runtime is used only by the launched process; your system OpenXR default stays unchanged."))
         runtimes.Controls.Add(probe) : runtimes.Controls.Add(probeStatus)
+        Dim addOns As New Button With {.Name = "VrCompatibility", .Text = "OpenXR add-ons…", .AutoSize = True}
+        runtimes.Controls.Add(addOns) : runtimes.Controls.Add(layerSummary)
+        AddHandler addOns.Click, Sub()
+                                     Using dialog As New VrCompatibilityForm(context)
+                                         dialog.ShowDialog(Me)
+                                     End Using
+                                     UpdateLayerSummary()
+                                 End Sub
+        UpdateLayerSummary()
         Dim options = Section(content, "Diagnostics")
         options.Controls.Add(Info("Startup results and failures are always recorded in Open logs."))
     End Sub
@@ -648,6 +663,17 @@ Public Class MainForm
         If changed AndAlso Not IsDisposed Then
             Dim recheck = StartupUpdateCheckAsync()
         End If
+    End Sub
+
+    ' Asks before turning an OpenXR add-on off for DiRT 3 when it stops VR from starting.
+    Private Function ConfirmLayerBypass(request As VrLayerRecoveryRequest) As VrLayerRecoveryChoice
+        Return VrLayerRecoveryForm.Confirm(request, Me)
+    End Function
+
+    Private Sub UpdateLayerSummary()
+        Dim names = VrLayerPreferences.Load(context).Bypasses.Select(Function(layer) layer.DisplayName).ToArray()
+        layerSummary.Text = If(names.Length = 0, "OpenXR add-ons (such as ReShade or the OBS mirror) that stop VR from starting can be turned off for DiRT 3 when you launch VR. None are turned off now.",
+                               "Turned off for DiRT 3: " & String.Join(", ", names) & ". Other apps still use them.")
     End Sub
 
     ' Setup needs DiRT 3 closed and the original files back.
