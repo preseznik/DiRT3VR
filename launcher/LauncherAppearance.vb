@@ -97,6 +97,11 @@ End Module
 
 Public Class LauncherForm
     Inherits Form
+    ' Wheel scrolling over sliders and closed dropdowns moves the page, not the value.
+    Private ReadOnly wheelGuard As SettingsWheelGuard
+    Public Sub New()
+        wheelGuard = New SettingsWheelGuard(Me)
+    End Sub
     Protected Overrides Sub OnLoad(e As EventArgs)
         LauncherAppearance.Apply(Me)
         AddHandler SystemEvents.UserPreferenceChanged, AddressOf PreferencesChanged
@@ -116,6 +121,10 @@ Public Class LauncherForm
     Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
         RemoveHandler SystemEvents.UserPreferenceChanged, AddressOf PreferencesChanged
         MyBase.OnFormClosed(e)
+    End Sub
+    Protected Overrides Sub Dispose(disposing As Boolean)
+        If disposing Then wheelGuard.Dispose()
+        MyBase.Dispose(disposing)
     End Sub
 End Class
 
