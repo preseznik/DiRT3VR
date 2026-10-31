@@ -50,11 +50,15 @@ Public Class MainForm
     Private ReadOnly diagnostics As New TextBox With {.Name = "Diagnostics", .ReadOnly = True, .Multiline = True, .ScrollBars = ScrollBars.Vertical, .Height = 230}
     Private ReadOnly desktop As New Button With {.Name = "LaunchDesktop", .Text = "Launch", .AutoSize = True}
     Private ReadOnly vr As New Button With {.Name = "LaunchVR", .Text = "Launch VR", .AutoSize = True, .Enabled = False}
+    Private ReadOnly stopVrButton As New Button With {.Name = "StopVR", .Text = "Stop VR", .AutoSize = True, .Visible = False}
     Private ReadOnly save As New Button With {.Name = "SaveSettings", .Text = "Save settings", .AutoSize = True}
     Private ReadOnly recover As New Button With {.Name = "RestoreFiles", .Text = "Restore original files", .AutoSize = True}
     Private ReadOnly logs As New Button With {.Name = "OpenLogs", .Text = "Open logs", .AutoSize = True}
     Private ReadOnly tips As New ToolTip With {.AutoPopDelay = 20000}
     Private ReadOnly timer As New Timer With {.Interval = 1500}
+    Private ReadOnly background As BackgroundHost
+    Private ReadOnly exitTimer As New Timer With {.Interval = 6000}
+    Private actionFailed As Boolean
     Private ReadOnly lifetime As New System.Threading.CancellationTokenSource()
     Private ReadOnly headers As New List(Of SectionHeader)
     Private collapsedSectionTitles As String
@@ -69,6 +73,12 @@ Public Class MainForm
         End Try
         LauncherAppearance.Modern = settings.ModernInterface
         Text = "DiRT3VR " & BuildVersion & " — Research build"
+        background = New BackgroundHost(Me, AddressOf ShowFromBackground, AddressOf StopVrKeepPlaying, AddressOf EndSession,
+                                        Function() If(interactive Is Nothing, CType(Nothing, Boolean?), Not interactive.VrStopped))
+        AddHandler exitTimer.Tick, Sub()
+                                       exitTimer.Stop()
+                                       If background.Active AndAlso Not SessionActive() Then Close()
+                                   End Sub
         Font = New Font("Segoe UI", 10)
         AutoScaleMode = AutoScaleMode.Dpi
         MinimumSize = New Size(560, 540)
@@ -102,7 +112,7 @@ Public Class MainForm
         Next
         ApplyCollapsedSections(WindowPreferences.Load(context).CollapsedSections)
         layout.Controls.Add(notice, 0, 3)
-        layout.Controls.Add(New LauncherFooter(desktop, vr, save, recover, logs), 0, 4)
+        layout.Controls.Add(New LauncherFooter(desktop, vr, save, recover, logs, stopVrButton), 0, 4)
         Controls.Add(layout)
         ApplySettings()
         RememberSavedSettings()
@@ -140,7 +150,7 @@ Public Class MainForm
                                                                                                                  notice.Text = message
                                                                                                                  RefreshState()
                                                                                                              End Sub
-                                                                       notice.Text = If(desktopStartup Is Nothing, "Starting DiRT 3… Closing this launcher leaves the game running.", "Starting DiRT 3… Keep the launcher open for startup file restoration after exit.")
+                                                                       notice.Text = If(desktopStartup Is Nothing, "Starting DiRT 3… Closing this launcher leaves the game running.", "Starting DiRT 3… The original startup file is restored after exit, even if you close this window.")
                                                                        launchProgress.Start()
                                                                    Finally
                                                                        If desktopStartup IsNot Nothing Then ObserveDesktopStartup()
@@ -174,10 +184,11 @@ Public Class MainForm
                                                                                                         End If
                                                                                                         RefreshState()
                                                                                                     End Sub
-                                                              notice.Text = "Starting experimental VR. The launcher stays open to restore original files when you quit."
+                                                              notice.Text = "Starting experimental VR. Original files are restored when DiRT 3 closes, even if you close this window."
                                                               launchProgress.Start()
                                                               ObserveInteractive()
                                                           End Function)
+        AddHandler stopVrButton.Click, Sub() StopVrKeepPlaying()
         AddHandler recover.Click, Async Sub() Await ActionAsync(Async Function()
                                                                    Using lease = InteractiveSession.AcquireLease(context)
                                                                    Dim restored = Await RecoveryWorker.RecoverAsync(context)
@@ -216,9 +227,10 @@ Public Class MainForm
         AddHandler Shown, Sub() FitInitialWindow()
         AddHandler Shown, Async Sub() Await StartupUpdateCheckAsync()
         tips.SetToolTip(desktop, "Start the game with your desktop graphics choices and saved driving controls. No headset is required.")
+        tips.SetToolTip(stopVrButton, "Turn VR off and keep playing DiRT 3 on the monitor. Original files are restored when DiRT 3 closes.")
         tips.SetToolTip(save, "Keep the current controls as the launcher's settings for next time, as Launch does. Settings profiles are not changed.")
         tips.SetToolTip(probe, "Check OpenXR and headset access without starting DiRT 3. This does not validate stereoscopic game rendering.")
-        tips.SetToolTip(skipStartupMovies, "Skips the AMD and DiRT 3 logo movies in desktop and VR launches. Copyright and Press Start remain. Keep this launcher open until the game exits so the original startup file can be restored.")
+        tips.SetToolTip(skipStartupMovies, "Skips the AMD and DiRT 3 logo movies in desktop and VR launches. Copyright and Press Start remain. The original startup file is restored when the game exits; closing this window keeps DiRT3VR running in the notification area until then.")
         UpdateResolutionLabels()
         RefreshState() : LoadDiagnostics()
         timer.Start()
@@ -284,7 +296,7 @@ Public Class MainForm
         launch.Controls.Add(Info("Choose your career, event, car and track in DiRT 3. Launch uses the original desktop game and its saved settings."))
         Dim startup = Section(columns.First, "Startup")
         startup.Controls.Add(skipStartupMovies)
-        startup.Controls.Add(Info("Applies to Launch and Launch VR. Copyright and Press Start remain. Keep the launcher open until the game closes; it restores the original startup file. Leave this option off for multiplayer until compatibility is checked."))
+        startup.Controls.Add(Info("Applies to Launch and Launch VR. Copyright and Press Start remain. DiRT3VR restores the original startup file when the game closes, also when you close this window (it stays in the notification area until then). Leave this option off for multiplayer until compatibility is checked."))
         Dim availability = Section(columns.Second, "VR availability")
         availability.Controls.Add(Info("Experimental VR is available with VDXR when enabled in Advanced. All rendered 3D camera views use stereo and headset tracking, including cockpit, bonnet, bumper, chase and replay. Loading screens and movies use a virtual screen."))
         availability.Controls.Add(Info("Interactive play and camera transitions are still being validated. SteamVR interactive launch is unavailable pending orientation validation."))
@@ -351,7 +363,7 @@ Public Class MainForm
     Private Sub BuildControls()
         Dim content = Page("Controls")
         Dim general = Section(content, "General")
-        general.Controls.Add(Info("Use your existing keyboard, controller or wheel bindings in DiRT 3. During experimental VR, closing this launcher minimizes it until the game exits and original files are restored."))
+        general.Controls.Add(Info("Use your existing keyboard, controller or wheel bindings in DiRT 3. During experimental VR, closing this window keeps DiRT3VR running in the notification area until the game exits and original files are restored."))
         Dim liveInput As New Button With {.Name = "LiveInput", .Text = "Live input and force feedback…", .AutoSize = True}
         general.Controls.Add(liveInput)
         general.Controls.Add(Info("Shows your wheel, pedals, shifter and controllers as Windows sees them, and tests rumble or force feedback. It doesn't change DiRT 3's controls."))
@@ -505,7 +517,7 @@ Public Class MainForm
         Dim capability = Section(content, "Implementation status")
         capability.Controls.Add(experimental)
         capability.Controls.Add(Info("Opt in to the experimental VDXR session. Version 0.1.5 has user-confirmed interactive VR with cockpit and external views. Full camera, effects and sustained-driving validation is still in progress. A runtime check alone does not establish game support."))
-        capability.Controls.Add(Info("Keep the launcher open during VR. Use Stop VR / quit or quit in the game; original files are restored after the game closes."))
+        capability.Controls.Add(Info("Stop VR turns the headset off and keeps DiRT 3 running on the monitor. End session, or quitting in the game, closes DiRT 3; original files are restored after it closes. You can close this window meanwhile: DiRT3VR stays in the notification area and quits once the files are back."))
         capability.Controls.Add(Info("Supported executable SHA-256: " & InstallContext.SupportedHash))
         Dim status = Section(content, "Latest diagnostic report")
         status.Controls.Add(diagnostics)
@@ -578,11 +590,15 @@ Public Class MainForm
         Dim reason = RuntimeCapabilities.ExperimentalReason(context, CurrentSettings())
         state.Text = If(busy, "Working…", If(interactive IsNot Nothing, InteractiveSession.OutputStatus(interactive.ReadNativeTail()), If(launchProgress IsNot Nothing, "Starting DiRT 3…", If(pending, "Recovery pending — close DiRT 3, then restore original files.", If(running, "DiRT 3 is running.", If(reason = "", "Ready · experimental VDXR enabled", reason))))))
         If Not busy AndAlso desktopStartup IsNot Nothing Then state.Text = "DiRT 3 startup session · original startup files will be restored after exit."
+        If Not busy AndAlso interactive IsNot Nothing AndAlso interactive.VrStopped Then state.Text = "VR stopped · DiRT 3 runs on the monitor · original files will be restored after exit."
+        If background.Active Then background.UpdateStatus(state.Text)
         desktop.Text = If(running AndAlso launchProgress Is Nothing, "Show game", "Launch")
         desktop.Enabled = Not busy AndAlso launchProgress Is Nothing AndAlso (running OrElse Not pending)
-        vr.Text = If(interactive IsNot Nothing, "Stop VR / quit", "Launch VR")
+        vr.Text = If(interactive IsNot Nothing, "End session", "Launch VR")
         vr.Enabled = Not busy AndAlso (interactive IsNot Nothing OrElse (Not running AndAlso Not pending AndAlso reason = ""))
-        tips.SetToolTip(vr, If(reason = "", "Start a temporary experimental VDXR session.", reason))
+        tips.SetToolTip(vr, If(interactive IsNot Nothing, "Close DiRT 3 and restore the original files.", If(reason = "", "Start a temporary experimental VDXR session.", reason)))
+        stopVrButton.Visible = interactive IsNot Nothing
+        stopVrButton.Enabled = Not busy AndAlso interactive IsNot Nothing AndAlso Not interactive.VrStopped
         save.Enabled = Not busy : recover.Enabled = Not busy AndAlso Not running
         tabs.Enabled = Not busy AndAlso interactive Is Nothing AndAlso desktopStartup Is Nothing
         probe.Enabled = Not busy AndAlso Not running
@@ -591,25 +607,30 @@ Public Class MainForm
 
     Private Async Sub ObserveInteractive()
         Dim owned = interactive
+        Dim failed = False
         Try
             notice.Text = Await owned.WaitAndRestoreAsync()
         Catch ex As Exception
             notice.Text = "DiRT 3 closed. Recovery is pending: " & ex.Message
+            failed = True
         Finally
             recenterWatcher?.Dispose() : recenterWatcher = Nothing
             launchProgress?.Dispose() : launchProgress = Nothing
             interactive = Nothing
             RefreshState() : LoadDiagnostics()
         End Try
+        FinishBackground(failed)
     End Sub
 
     Private Async Sub ObserveDesktopStartup()
         Dim owned = desktopStartup
         Dim message As String
+        Dim failed = False
         Try
             message = Await owned.WaitAndRestoreAsync()
         Catch ex As Exception
             message = "DiRT 3 closed. Startup file recovery is pending: " & ex.Message
+            failed = True
         Finally
             launchProgress?.Dispose() : launchProgress = Nothing
             desktopStartup = Nothing
@@ -617,22 +638,86 @@ Public Class MainForm
         If Not IsDisposed Then
             notice.Text = message
             RefreshState() : LoadDiagnostics()
+            FinishBackground(failed)
         End If
     End Sub
 
+    ' A game session with temporary file changes, or a file operation, is in progress.
+    Private Function SessionActive() As Boolean
+        Return interactive IsNot Nothing OrElse desktopStartup IsNot Nothing OrElse busy
+    End Function
+
     Protected Overrides Sub OnFormClosing(e As FormClosingEventArgs)
-        If interactive IsNot Nothing OrElse desktopStartup IsNot Nothing OrElse busy Then
+        If BackgroundHost.KeepsRunningOnClose(SessionActive(), e.CloseReason) Then
+            ' DiRT3VR keeps the session and restores the files after the game closes, without its window.
             e.Cancel = True
-            WindowState = FormWindowState.Minimized
-            notice.Text = "The launcher stays open until this operation and file recovery finish."
+            SaveWindowPreferences()
+            Dim explanation = If(interactive IsNot Nothing OrElse desktopStartup IsNot Nothing,
+                                 "DiRT3VR restores the original game files when DiRT 3 closes, then quits.",
+                                 "DiRT3VR finishes the current task, then quits.")
+            background.Enter(state.Text, explanation)
             Return
         End If
         MyBase.OnFormClosing(e)
-        If Not e.Cancel AndAlso windowReady Then
-            Dim normal = If(WindowState = FormWindowState.Normal, Size, RestoreBounds.Size)
-            Dim preferences = WindowPreferences.Capture(normal, DeviceDpi, lastWindowState = FormWindowState.Maximized)
-            preferences.CollapsedSections = collapsedSectionTitles
-            preferences.Save(context)
+        If Not e.Cancel Then SaveWindowPreferences()
+    End Sub
+
+    Private Sub SaveWindowPreferences()
+        If Not windowReady Then Return
+        Dim normal = If(WindowState = FormWindowState.Normal, Size, RestoreBounds.Size)
+        Dim preferences = WindowPreferences.Capture(normal, DeviceDpi, lastWindowState = FormWindowState.Maximized)
+        preferences.CollapsedSections = collapsedSectionTitles
+        preferences.Save(context)
+    End Sub
+
+    ' Brings the window back from the notification area, or to the front (also when DiRT3VR is
+    ' started again from the Start menu). Public for the second launcher's signal and the tests.
+    Public Sub ShowFromBackground()
+        If IsDisposed Then Return
+        exitTimer.Stop()
+        If background.Active Then
+            background.Leave()
+        Else
+            Show()
+            If WindowState = FormWindowState.Minimized Then WindowState = If(lastWindowState = FormWindowState.Maximized, FormWindowState.Maximized, FormWindowState.Normal)
+            Activate()
+        End If
+    End Sub
+
+    ' The session ended while the window was hidden: quit once the files are back, or show the problem.
+    Private Sub FinishBackground(failed As Boolean)
+        If IsDisposed OrElse Not background.Active OrElse SessionActive() Then Return
+        Dim pending = True
+        Try
+            pending = New OwnedFileTransaction(context).Pending
+        Catch ex As Exception When TypeOf ex Is IOException OrElse TypeOf ex Is UnauthorizedAccessException
+            ' Unknown: show the window.
+        End Try
+        If BackgroundHost.QuitsAfterSession(pending, failed) Then
+            background.Finish(notice.Text)
+            exitTimer.Start()
+        Else
+            background.Leave()
+        End If
+    End Sub
+
+    ' Stop VR: the headset turns off and DiRT 3 keeps running on the monitor until it is closed.
+    Private Sub StopVrKeepPlaying()
+        If interactive Is Nothing OrElse busy Then Return
+        SafeAction(Sub() notice.Text = interactive.StopVr())
+        RefreshState()
+    End Sub
+
+    ' End session from the notification area: close DiRT 3; the files are restored afterwards.
+    Private Async Sub EndSession()
+        If busy Then Return
+        If interactive IsNot Nothing Then
+            Dim owned = interactive
+            Await ActionAsync(Async Function()
+                                  notice.Text = Await owned.StopAsync()
+                              End Function)
+        ElseIf desktopStartup IsNot Nothing Then
+            SafeAction(Sub() notice.Text = desktopStartup.RequestExit())
         End If
     End Sub
 
@@ -653,10 +738,11 @@ Public Class MainForm
 
     Private Async Function ActionAsync(action As Func(Of Task)) As Task
         If busy Then Return
-        busy = True : RefreshState()
+        busy = True : actionFailed = False : RefreshState()
         Try
             Await action()
         Catch ex As Exception
+            actionFailed = True
             If Not IsDisposed Then
                 notice.Text = ex.Message
                 probeStatus.Text = If(probeStatus.Text.StartsWith("Checking", StringComparison.Ordinal), "Runtime check did not finish: " & ex.Message, probeStatus.Text)
@@ -665,6 +751,8 @@ Public Class MainForm
         Finally
             busy = False : RefreshState()
         End Try
+        ' Closed while working (for example during Launch VR): continue, show the error, or quit.
+        FinishBackground(actionFailed)
     End Function
 
     Private Sub SafeAction(action As Action)
@@ -694,9 +782,10 @@ Public Class MainForm
             "Advanced → Enable experimental VR enables the VDXR session when supported by this package. All rendered 3D camera views use stereo and tracking. Loading screens and movies use a virtual screen. Camera transitions remain experimental. " & RecenterShortcut.Describe(recenterKey, recenterModifiers) & " recenters while the game is foreground; change the key under Controls." & vbCrLf & vbCrLf &
             "Settings → Check runtime and headset runs an x86 OpenXR probe without starting the game. Choose VDXR or SteamVR explicitly; the selected runtime is used for that process only, independently of the system OpenXR default. VDXR and SteamVR require separate checks. Browse to the selected runtime file if it is installed elsewhere." & vbCrLf & vbCrLf &
             "Settings → Settings profiles keeps named presets of desktop, VR, startup, appearance and logging choices. Save as new profile and Overwrite profile store the current controls in a profile without saving the launcher's settings. Save settings (or Launch) keeps the current controls as the launcher's settings and never changes a profile. Load copies a profile into the controls and asks before replacing unsaved edits. Import adds a profile without loading it, and Export writes the selected saved profile. Game saves and local paths are excluded." & vbCrLf & vbCrLf &
-            "Launcher → Skip startup logo movies temporarily replaces the two startup movie states for desktop or VR. Copyright and Press Start remain. Keep the launcher open until game exit for restoration; closing it during the session minimizes it. Leave skipping off for multiplayer until checked. Background play is not implemented for DiRT 3." & vbCrLf & vbCrLf &
+            "Launcher → Skip startup logo movies temporarily replaces the two startup movie states for desktop or VR. Copyright and Press Start remain. The original startup file is restored when the game exits. Leave skipping off for multiplayer until checked." & vbCrLf & vbCrLf &
+            "During a session, Stop VR turns the headset off and keeps DiRT 3 running on the monitor; End session closes DiRT 3. Closing this window keeps DiRT3VR in the notification area (next to the clock) until DiRT 3 closes and the original files are restored; it then quits by itself. Right-click its icon to open the window, stop VR or end the session. Starting DiRT3VR again opens the running window." & vbCrLf & vbCrLf &
             ExperimentalFiles.ProfileDescription & vbCrLf & vbCrLf &
-            "Restore original files only handles this launcher's recorded changes. Foreign mods and real settings changes are preserved. Keep the launcher open until the game exits and recovery finishes." & vbCrLf & vbCrLf &
+            "Restore original files only handles this launcher's recorded changes. Foreign mods and real settings changes are preserved. If Windows shuts down during a session, use it on the next start." & vbCrLf & vbCrLf &
             "Preferences and diagnostics: " & context.UserRoot & vbCrLf & vbCrLf &
             "The native WinForms layout and appearance are adapted from DiRT2VR, with yellow DiRT3VR accents. Modern / Classic follows Windows light, dark and high-contrast preferences."
     End Function
@@ -716,6 +805,7 @@ Public Class MainForm
 
     ' Asks before turning an OpenXR add-on off for DiRT 3 when it stops VR from starting.
     Private Function ConfirmLayerBypass(request As VrLayerRecoveryRequest) As VrLayerRecoveryChoice
+        If background.Active Then background.Leave() ' The question needs the window, also when it was closed during Launch VR.
         Return VrLayerRecoveryForm.Confirm(request, Me)
     End Function
 
@@ -764,6 +854,7 @@ Public Class MainForm
             resourcesDisposed = True
             lifetime.Cancel() : lifetime.Dispose()
             timer.Dispose() : tips.Dispose() : launchProgress?.Dispose() : recenterWatcher?.Dispose()
+            exitTimer.Dispose() : background.Dispose()
         End If
         MyBase.Dispose(disposing)
     End Sub

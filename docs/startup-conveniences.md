@@ -50,7 +50,9 @@ only graphics retains the existing formatting-equivalence rule.
 
 Desktop logo skipping holds the existing session lease through process exit and
 recovery. The progress monitor leaves the process handle with that owner. Closing
-the launcher minimizes it until recovery completes. Preparation/launch failure
+the launcher window keeps DiRT3VR in the notification area until recovery
+completes; it then quits (it minimized before this change, after 0.1.20).
+Preparation/launch failure
 recovers staged changes; forced termination or power loss leaves a pending journal
 for Restore original files in 0.1.19 or later. Conflicting external edits preserve
 both current files and backups. Ordinary desktop mode still uses its original

@@ -142,15 +142,34 @@ Public Class InteractiveSession
         End Try
     End Function
 
+    ' True once the launcher asked the renderer to end VR (Stop VR or End session).
+    Public ReadOnly Property VrStopped As Boolean
+        Get
+            Return stopRequested
+        End Get
+    End Property
+
+    Private Sub RequestXrStop()
+        If stopRequested Then Return
+        SafeFiles.NoLinks(StopPath)
+        Using stream As New FileStream(StopPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read)
+            stream.Write(Encoding.UTF8.GetBytes("launcher-requested shutdown" & vbLf)) : stream.Flush(True)
+        End Using
+        stopRequested = True
+    End Sub
+
+    ' Ends VR but leaves DiRT 3 running on the monitor. The renderer releases the headset and the
+    ' game draws normally; the temporary files stay until DiRT 3 closes, then they are restored.
+    Public Function StopVr() As String
+        If HasExited() Then Return "DiRT 3 has exited; restoring session files."
+        RequestXrStop()
+        Return "VR stopped. DiRT 3 keeps running on the monitor with the VR graphics settings; original files are restored when it closes."
+    End Function
+
+    ' Ends VR, then asks DiRT 3 to close.
     Public Async Function StopAsync() As Task(Of String)
         If HasExited() Then Return "DiRT 3 has exited; restoring session files."
-        If Not stopRequested Then
-            SafeFiles.NoLinks(StopPath)
-            Using stream As New FileStream(StopPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read)
-                stream.Write(Encoding.UTF8.GetBytes("launcher-requested shutdown" & vbLf)) : stream.Flush(True)
-            End Using
-            stopRequested = True
-        End If
+        RequestXrStop()
         Dim deadline = Stopwatch.StartNew()
         While Not HasExited() AndAlso Not ReadNativeTail().Contains("XR prototype shutdown complete", StringComparison.Ordinal) AndAlso deadline.Elapsed < TimeSpan.FromSeconds(3)
             Await Task.Delay(100)

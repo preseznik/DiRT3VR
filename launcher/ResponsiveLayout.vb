@@ -243,12 +243,14 @@ End Class
 
 Public Class LauncherFooter
     Inherits Panel
-    Private ReadOnly launch As Button, vr As Button, save As Button, recover As Button, logs As Button
+    Private ReadOnly launch As Button, vr As Button, save As Button, recover As Button, logs As Button, stopVr As Button
     Private arranging As Boolean
-    Public Sub New(desktop As Button, headset As Button, settings As Button, restore As Button, openLogs As Button)
-        launch = desktop : vr = headset : save = settings : recover = restore : logs = openLogs
+    ' stopHeadset, when given, sits right of the VR button and only takes space while visible.
+    Public Sub New(desktop As Button, headset As Button, settings As Button, restore As Button, openLogs As Button, Optional stopHeadset As Button = Nothing)
+        launch = desktop : vr = headset : save = settings : recover = restore : logs = openLogs : stopVr = stopHeadset
         Dock = DockStyle.Fill : Margin = New Padding(0, 12, 0, 0)
         Controls.AddRange({launch, vr, save, recover, logs})
+        If stopVr IsNot Nothing Then Controls.Add(stopVr)
         For Each button In Controls.OfType(Of Button)()
             AddHandler button.VisibleChanged, Sub() PerformLayout()
         Next
@@ -263,13 +265,17 @@ Public Class LauncherFooter
                 button.Size = button.GetPreferredSize(Size.Empty)
             Next
             Dim rowHeight = Controls.OfType(Of Button)().Max(Function(b) b.Height)
-            Dim leftWidth = If(launch.Visible, launch.Width + vr.Width + gap, 0)
+            Dim showStop = stopVr IsNot Nothing AndAlso stopVr.Visible
+            Dim leftWidth = If(launch.Visible, launch.Width + vr.Width + gap, 0) + If(showStop, stopVr.Width + gap, 0)
             Dim utilityWidth = save.Width + recover.Width + logs.Width + gap * 2
             Dim compact = Width < leftWidth + utilityWidth + gap * 2
             launch.Location = New Point(0, 0) : vr.Location = New Point(launch.Right + gap, 0)
+            If showStop Then stopVr.Location = New Point(vr.Right + gap, 0)
             logs.Location = New Point(Width - logs.Width, If(compact, rowHeight + gap, 0))
             recover.Location = New Point(logs.Left - gap - recover.Width, logs.Top)
-            save.Location = New Point(If(compact, Width - save.Width, recover.Left - gap - save.Width), 0)
+            ' In two rows, Save settings joins the second row when the session buttons fill the first.
+            Dim crowded = compact AndAlso leftWidth + save.Width + gap > Width
+            save.Location = If(crowded, New Point(recover.Left - gap - save.Width, logs.Top), New Point(If(compact, Width - save.Width, recover.Left - gap - save.Width), 0))
             Height = rowHeight * If(compact, 2, 1) + If(compact, gap, 0) + Px(Me, 4)
         Finally
             arranging = False

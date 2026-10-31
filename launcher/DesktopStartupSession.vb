@@ -43,6 +43,16 @@ Public NotInheritable Class DesktopStartupSession
         Throw failure
     End Function
 
+    ' End session from the notification area: ask DiRT 3 to close, as its window's close button does.
+    Public Function RequestExit() As String
+        Try
+            If Not Game.HasExited Then Game.CloseMainWindow()
+        Catch ex As InvalidOperationException
+            ' Already exited; the restore below still runs.
+        End Try
+        Return "Exit requested. Original startup files are restored after DiRT 3 closes."
+    End Function
+
     Public Async Function WaitAndRestoreAsync() As Task(Of String)
         Try
             Await Game.WaitForExitAsync()
