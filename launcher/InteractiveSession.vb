@@ -61,6 +61,9 @@ Public Class InteractiveSession
         Try
             context.RequireClosed() : context.ValidateGame()
             If transaction.Pending Then Throw New IOException("Restore pending session files before launching.")
+            ' DiRT 3 inherits the launcher's image-load rule; refuse before staging anything if it would skip DiRT3VR's d3d11.dll.
+            Dim blocked = RendererLoad.LaunchBlock(context)
+            If blocked <> "" Then Throw New IOException(blocked)
             Dim runtime = VrRuntime.Resolve(settings.RuntimeMode, settings.SteamRuntimeManifest, settings.VdxrRuntimeManifest)
             ' Always re-query the selected runtime before staging; UI results may be stale.
             ' An OpenXR add-on that blocks the probe can be turned off for DiRT 3 with the player's approval.

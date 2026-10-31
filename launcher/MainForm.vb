@@ -161,6 +161,12 @@ Public Class MainForm
                                                               AddHandler launchProgress.Completed, Sub(message As String)
                                                                                                         launchProgress = Nothing
                                                                                                         notice.Text = message
+                                                                                                        ' Once DiRT 3's window exists, say plainly if it loaded Windows' d3d11.dll instead of DiRT3VR's.
+                                                                                                        Dim session = interactive
+                                                                                                        If session IsNot Nothing AndAlso Not session.Game.HasExited Then
+                                                                                                            Dim renderer = RendererLoad.Diagnose(context, session.Game.Id, session.LogDirectory)
+                                                                                                            If renderer.Message IsNot Nothing Then notice.Text = renderer.Message
+                                                                                                        End If
                                                                                                         RefreshState()
                                                                                                     End Sub
                                                               notice.Text = "Starting experimental VR. The launcher stays open to restore original files when you quit."

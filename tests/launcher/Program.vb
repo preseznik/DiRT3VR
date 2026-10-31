@@ -24,6 +24,7 @@ Module Program
             DrivingInputTests.Run(root, AddressOf Check)
             UpdateTests.Run(root, AddressOf Check)
             VrLayerTests.Run(root, AddressOf Check)
+            RendererLoadTests.Run(root, AddressOf Check)
             StartupTests.Run(root, AddressOf Check)
             InstallerTests.Run(root, AddressOf Check)
             TestHeadsetResolution(root)
