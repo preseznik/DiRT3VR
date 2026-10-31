@@ -317,6 +317,8 @@ them unchanged. The inventory now also matches `.ui_osd_2d_`; `hud_shaders.h`
 classifies the three as dedicated two-dimensional HUD shaders. The shipped-pack
 contract test and shader-hook test verify the regenerated list.
 
-The OSD textures were not captured, so the rectangle's colours are not confirmed
-offline. A VR race must confirm that it moves onto the HUD panel or disappears.
-If anything remains, F8 while it is visible records its exact draw.
+Confirmed: in the attended 0.1.20 VDXR session on 2026-10-31 (PID 3872, LA
+Coliseum rallycross) the log tagged all three vertex shaders as HUD (`kind=1`) and
+the user reported that the rectangle is gone. That session's racing HUD uses
+cyan-and-black OSD elements (position list highlight, boost meter), consistent
+with this cause.
