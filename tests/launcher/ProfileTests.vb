@@ -22,6 +22,53 @@ Module ProfileTests
         Return New InstallContext(game, Path.Combine(root, "profile-users"), Path.Combine(game, "graphics.xml"), root)
     End Function
 
+    Private Function Ancestors(control As Control) As IEnumerable(Of Control)
+        Dim chain As New List(Of Control)
+        Dim current = control
+        While current IsNot Nothing
+            chain.Add(current) : current = current.Parent
+        End While
+        Return chain
+    End Function
+
+    ' Visible and Enabled already include every parent, so the topmost hidden or
+    ' disabled control in the chain is the one that blocks the click.
+    Private Function Blocker(control As Control) As String
+        For Each item In Ancestors(control).Reverse()
+            Dim description = If(String.IsNullOrEmpty(item.Name), item.GetType().Name, item.Name) & If(TypeOf item Is TabPage, " (" & item.Text & " tab)", "")
+            If Not item.Visible Then Return description & " is hidden"
+            If Not item.Enabled Then Return description & " is disabled"
+        Next
+        Return "nothing hidden or disabled"
+    End Function
+
+    ' Button.PerformClick silently does nothing unless the button can be selected: its
+    ' tab page must be showing and every parent visible and enabled. A skipped click
+    ' used to surface only later, as "Sequence contains no elements" from the store.
+    ' Bring the button's tab forward, give the form a bounded moment to settle, then
+    ' fail with the blocking control instead of clicking into nothing.
+    Private Sub ClickButton(form As Form, buttonName As String, check As Action(Of Boolean, String))
+        Dim button = DirectCast(form.Controls.Find(buttonName, True).Single(), Button)
+        Dim page = Ancestors(button).OfType(Of TabPage)().FirstOrDefault()
+        Dim deadline = Environment.TickCount64 + 2000
+        Dim firstBlocker As String = Nothing
+        Do
+            Dim tabs = TryCast(page?.Parent, TabControl)
+            If tabs IsNot Nothing AndAlso tabs.SelectedTab IsNot page Then tabs.SelectedTab = page
+            Application.DoEvents()
+            If button.CanSelect OrElse Environment.TickCount64 >= deadline Then Exit Do
+            If firstBlocker Is Nothing Then firstBlocker = Blocker(button)
+            System.Threading.Thread.Sleep(20)
+        Loop
+        If firstBlocker IsNot Nothing AndAlso button.CanSelect Then Console.WriteLine($"Note: {buttonName} became clickable after a wait; at first {firstBlocker}.")
+        check(button.CanSelect, $"{buttonName} can be clicked ({Blocker(button)})")
+        button.PerformClick()
+    End Sub
+
+    Private Function PanelMessage(form As Form) As String
+        Return DirectCast(form.Controls.Find("SettingsProfileMessage", True).Single(), Label).Text
+    End Function
+
     Public Sub Run(root As String, check As Action(Of Boolean, String))
         Dim ctx = Context(root, "profiles"), other = Context(root, "profiles-other")
         Dim store As New SettingsProfileStore(ctx)
@@ -117,13 +164,17 @@ Module ProfileTests
             Dim modern = DirectCast(form.Controls.Find("ModernInterface", True).Single(), CheckBox)
             check(Not form.HasUnsavedSettings(), "initial settings controls match the saved baseline")
             scale.Value = 150 : name.Text = "Desk and VR"
-            DirectCast(form.Controls.Find("CreateSettingsProfile", True).Single(), Button).PerformClick()
-            Dim store As New SettingsProfileStore(ctx), entry = store.List().Single()
+            ClickButton(form, "CreateSettingsProfile", check)
+            Dim store As New SettingsProfileStore(ctx), listed = store.List()
+            ' The handler reports store errors in the panel instead of throwing, so show that text.
+            check(listed.Count = 1, $"Save as new profile creates exactly one profile through the actual button handler (found {listed.Count}; panel says: {PanelMessage(form)})")
+            Dim entry = listed(0)
             check(entry.Profile.Settings.VrRenderScale = 150 AndAlso choices.Items.Count = 1, "Save as new captures unsaved controls through actual button handler")
             check(SafeFiles.Hash(ctx.PreferencesPath) = before AndAlso form.HasUnsavedSettings(), "saving a named profile does not silently save current preferences")
+            check(PanelMessage(form).Contains("launcher's settings were not changed"), "Save as new profile says the launcher's settings were not saved")
             name.Text = "Renamed"
-            DirectCast(form.Controls.Find("RenameSettingsProfile", True).Single(), Button).PerformClick()
-            check(store.Read(entry.Id).Profile.Name = "Renamed", "rename button persists the new display name")
+            ClickButton(form, "RenameSettingsProfile", check)
+            check(store.Read(entry.Id).Profile.Name = "Renamed", $"rename button persists the new display name (panel says: {PanelMessage(form)})")
             Dim replacement = store.Create("Low resolution", New ProfileValues With {.ModernInterface = False, .VrRenderScale = 75, .DesktopWidth = 1280, .DesktopHeight = 720, .DesktopDisplayMode = "windowed", .DesktopVSync = "off"})
             Dim asked = 0
             check(Not form.LoadSettingsProfile(replacement.Profile, Function()
@@ -137,12 +188,15 @@ Module ProfileTests
             check(current.VdxrRuntimeManifest = initial.VdxrRuntimeManifest AndAlso tabs.SelectedIndex = 3, "profile load retains local paths and selected tab")
             check(DirectCast(form.Controls.Find("Notice", True).Single(), Label).Text.Contains("Use Save settings"), "loaded profile replaces stale saved-status text")
             check(SafeFiles.Hash(ctx.PreferencesPath) = before AndAlso form.HasUnsavedSettings(), "load remains unsaved until explicit Save settings")
-            DirectCast(form.Controls.Find("SaveSettings", True).Single(), Button).PerformClick()
+            Dim profileFiles = Directory.GetFiles(store.Folder).Select(Function(filename) SafeFiles.Hash(filename)).OrderBy(Function(hash) hash).ToArray()
+            ClickButton(form, "SaveSettings", check)
             check(Not form.HasUnsavedSettings() AndAlso LauncherSettings.Load(ctx).VrRenderScale = 75, "Save settings persists a loaded profile and resets dirty state")
+            check(Directory.GetFiles(store.Folder).Select(Function(filename) SafeFiles.Hash(filename)).OrderBy(Function(hash) hash).SequenceEqual(profileFiles), "Save settings leaves every settings profile unchanged")
+            check(DirectCast(form.Controls.Find("Notice", True).Single(), Label).Text.Contains("profiles were not changed"), "Save settings says profiles were not changed")
             Dim panel = DirectCast(form.Controls.Find("SettingsProfiles", True).Single(), SettingsProfilePanel)
             panel.Reload(entry.Id)
-            DirectCast(form.Controls.Find("LoadSettingsProfile", True).Single(), Button).PerformClick()
-            check(scale.Value = 150 AndAlso LauncherSettings.Load(ctx).VrRenderScale = 75, "Load button updates controls without saving preferences")
+            ClickButton(form, "LoadSettingsProfile", check)
+            check(scale.Value = 150 AndAlso LauncherSettings.Load(ctx).VrRenderScale = 75, $"Load button updates controls without saving preferences (panel says: {PanelMessage(form)})")
             form.LoadSettingsProfile(replacement.Profile, Function() True)
             For Each style In {False, True}
                 modern.Checked = style
