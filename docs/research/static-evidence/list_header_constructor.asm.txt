@@ -1,0 +1,173 @@
+
+C:\Program Files (x86)\Steam\steamapps\common\DiRT 3 Complete Edition\dirt3_game.exe:     file format pei-i386
+
+
+Disassembly of section .text:
+
+0096e9a0 <.text+0x56d9a0>:
+  96e9a0:	55                   	push   ebp
+  96e9a1:	8b ec                	mov    ebp,esp
+  96e9a3:	53                   	push   ebx
+  96e9a4:	56                   	push   esi
+  96e9a5:	8b f1                	mov    esi,ecx
+  96e9a7:	57                   	push   edi
+  96e9a8:	8b 7d 08             	mov    edi,DWORD PTR [ebp+0x8]
+  96e9ab:	33 db                	xor    ebx,ebx
+  96e9ad:	56                   	push   esi
+  96e9ae:	8d 4f 08             	lea    ecx,[edi+0x8]
+  96e9b1:	89 1e                	mov    DWORD PTR [esi],ebx
+  96e9b3:	89 5e 04             	mov    DWORD PTR [esi+0x4],ebx
+  96e9b6:	e8 85 4a f3 ff       	call   0x8a3440
+  96e9bb:	56                   	push   esi
+  96e9bc:	8d 4f 10             	lea    ecx,[edi+0x10]
+  96e9bf:	89 46 08             	mov    DWORD PTR [esi+0x8],eax
+  96e9c2:	e8 09 7e f5 ff       	call   0x8c67d0
+  96e9c7:	56                   	push   esi
+  96e9c8:	8d 4f 28             	lea    ecx,[edi+0x28]
+  96e9cb:	89 46 0c             	mov    DWORD PTR [esi+0xc],eax
+  96e9ce:	e8 6d 4a f3 ff       	call   0x8a3440
+  96e9d3:	56                   	push   esi
+  96e9d4:	8d 4f 30             	lea    ecx,[edi+0x30]
+  96e9d7:	89 46 10             	mov    DWORD PTR [esi+0x10],eax
+  96e9da:	e8 f1 7d f5 ff       	call   0x8c67d0
+  96e9df:	56                   	push   esi
+  96e9e0:	8d 4f 78             	lea    ecx,[edi+0x78]
+  96e9e3:	89 46 14             	mov    DWORD PTR [esi+0x14],eax
+  96e9e6:	e8 e5 7d f5 ff       	call   0x8c67d0
+  96e9eb:	56                   	push   esi
+  96e9ec:	8d 4f 60             	lea    ecx,[edi+0x60]
+  96e9ef:	89 46 18             	mov    DWORD PTR [esi+0x18],eax
+  96e9f2:	e8 d9 7d f5 ff       	call   0x8c67d0
+  96e9f7:	56                   	push   esi
+  96e9f8:	8d 8f 90 00 00 00    	lea    ecx,[edi+0x90]
+  96e9fe:	89 46 1c             	mov    DWORD PTR [esi+0x1c],eax
+  96ea01:	e8 ca 7d f5 ff       	call   0x8c67d0
+  96ea06:	56                   	push   esi
+  96ea07:	8d 8f a8 00 00 00    	lea    ecx,[edi+0xa8]
+  96ea0d:	89 86 80 00 00 00    	mov    DWORD PTR [esi+0x80],eax
+  96ea13:	e8 b8 7d f5 ff       	call   0x8c67d0
+  96ea18:	56                   	push   esi
+  96ea19:	8d 8f c0 00 00 00    	lea    ecx,[edi+0xc0]
+  96ea1f:	89 86 84 00 00 00    	mov    DWORD PTR [esi+0x84],eax
+  96ea25:	e8 a6 7d f5 ff       	call   0x8c67d0
+  96ea2a:	56                   	push   esi
+  96ea2b:	8d 8f d8 00 00 00    	lea    ecx,[edi+0xd8]
+  96ea31:	89 86 88 00 00 00    	mov    DWORD PTR [esi+0x88],eax
+  96ea37:	89 9e 8c 00 00 00    	mov    DWORD PTR [esi+0x8c],ebx
+  96ea3d:	89 9e 90 00 00 00    	mov    DWORD PTR [esi+0x90],ebx
+  96ea43:	e8 f8 49 f3 ff       	call   0x8a3440
+  96ea48:	56                   	push   esi
+  96ea49:	8d 8f e0 00 00 00    	lea    ecx,[edi+0xe0]
+  96ea4f:	89 86 94 00 00 00    	mov    DWORD PTR [esi+0x94],eax
+  96ea55:	e8 e6 49 f3 ff       	call   0x8a3440
+  96ea5a:	56                   	push   esi
+  96ea5b:	8d 8f e8 00 00 00    	lea    ecx,[edi+0xe8]
+  96ea61:	89 86 98 00 00 00    	mov    DWORD PTR [esi+0x98],eax
+  96ea67:	e8 d4 49 f3 ff       	call   0x8a3440
+  96ea6c:	56                   	push   esi
+  96ea6d:	8d 8f f0 00 00 00    	lea    ecx,[edi+0xf0]
+  96ea73:	89 86 9c 00 00 00    	mov    DWORD PTR [esi+0x9c],eax
+  96ea79:	e8 c2 49 f3 ff       	call   0x8a3440
+  96ea7e:	56                   	push   esi
+  96ea7f:	8d 8f c0 01 00 00    	lea    ecx,[edi+0x1c0]
+  96ea85:	89 86 a0 00 00 00    	mov    DWORD PTR [esi+0xa0],eax
+  96ea8b:	e8 b0 49 f3 ff       	call   0x8a3440
+  96ea90:	56                   	push   esi
+  96ea91:	8d 8f 28 01 00 00    	lea    ecx,[edi+0x128]
+  96ea97:	89 86 a4 00 00 00    	mov    DWORD PTR [esi+0xa4],eax
+  96ea9d:	e8 9e 49 f3 ff       	call   0x8a3440
+  96eaa2:	56                   	push   esi
+  96eaa3:	8d 8f 30 01 00 00    	lea    ecx,[edi+0x130]
+  96eaa9:	89 86 a8 00 00 00    	mov    DWORD PTR [esi+0xa8],eax
+  96eaaf:	e8 8c 49 f3 ff       	call   0x8a3440
+  96eab4:	56                   	push   esi
+  96eab5:	8d 8f 38 01 00 00    	lea    ecx,[edi+0x138]
+  96eabb:	89 86 ac 00 00 00    	mov    DWORD PTR [esi+0xac],eax
+  96eac1:	e8 7a 49 f3 ff       	call   0x8a3440
+  96eac6:	56                   	push   esi
+  96eac7:	8d 8f 40 01 00 00    	lea    ecx,[edi+0x140]
+  96eacd:	89 86 b0 00 00 00    	mov    DWORD PTR [esi+0xb0],eax
+  96ead3:	e8 68 49 f3 ff       	call   0x8a3440
+  96ead8:	56                   	push   esi
+  96ead9:	8d 8f 48 01 00 00    	lea    ecx,[edi+0x148]
+  96eadf:	89 86 b4 00 00 00    	mov    DWORD PTR [esi+0xb4],eax
+  96eae5:	e8 56 49 f3 ff       	call   0x8a3440
+  96eaea:	56                   	push   esi
+  96eaeb:	8d 8f 50 01 00 00    	lea    ecx,[edi+0x150]
+  96eaf1:	89 86 b8 00 00 00    	mov    DWORD PTR [esi+0xb8],eax
+  96eaf7:	e8 44 49 f3 ff       	call   0x8a3440
+  96eafc:	56                   	push   esi
+  96eafd:	8d 4f 48             	lea    ecx,[edi+0x48]
+  96eb00:	89 86 bc 00 00 00    	mov    DWORD PTR [esi+0xbc],eax
+  96eb06:	e8 c5 7c f5 ff       	call   0x8c67d0
+  96eb0b:	56                   	push   esi
+  96eb0c:	8d 8f 70 01 00 00    	lea    ecx,[edi+0x170]
+  96eb12:	89 86 c0 00 00 00    	mov    DWORD PTR [esi+0xc0],eax
+  96eb18:	e8 b3 7c f5 ff       	call   0x8c67d0
+  96eb1d:	56                   	push   esi
+  96eb1e:	8d 8f 58 01 00 00    	lea    ecx,[edi+0x158]
+  96eb24:	89 86 c4 00 00 00    	mov    DWORD PTR [esi+0xc4],eax
+  96eb2a:	e8 a1 7c f5 ff       	call   0x8c67d0
+  96eb2f:	56                   	push   esi
+  96eb30:	8d 8f 88 01 00 00    	lea    ecx,[edi+0x188]
+  96eb36:	89 86 c8 00 00 00    	mov    DWORD PTR [esi+0xc8],eax
+  96eb3c:	e8 8f 7c f5 ff       	call   0x8c67d0
+  96eb41:	56                   	push   esi
+  96eb42:	8d 8f a0 01 00 00    	lea    ecx,[edi+0x1a0]
+  96eb48:	89 86 cc 00 00 00    	mov    DWORD PTR [esi+0xcc],eax
+  96eb4e:	89 9e d0 00 00 00    	mov    DWORD PTR [esi+0xd0],ebx
+  96eb54:	89 9e d4 00 00 00    	mov    DWORD PTR [esi+0xd4],ebx
+  96eb5a:	e8 e1 48 f3 ff       	call   0x8a3440
+  96eb5f:	56                   	push   esi
+  96eb60:	8d 8f a8 01 00 00    	lea    ecx,[edi+0x1a8]
+  96eb66:	89 86 d8 00 00 00    	mov    DWORD PTR [esi+0xd8],eax
+  96eb6c:	89 9e dc 00 00 00    	mov    DWORD PTR [esi+0xdc],ebx
+  96eb72:	89 9e e0 00 00 00    	mov    DWORD PTR [esi+0xe0],ebx
+  96eb78:	e8 53 7c f5 ff       	call   0x8c67d0
+  96eb7d:	56                   	push   esi
+  96eb7e:	8d 8f f8 00 00 00    	lea    ecx,[edi+0xf8]
+  96eb84:	89 86 e4 00 00 00    	mov    DWORD PTR [esi+0xe4],eax
+  96eb8a:	89 9e e8 00 00 00    	mov    DWORD PTR [esi+0xe8],ebx
+  96eb90:	e8 3b 7c f5 ff       	call   0x8c67d0
+  96eb95:	56                   	push   esi
+  96eb96:	8d 8f 10 01 00 00    	lea    ecx,[edi+0x110]
+  96eb9c:	89 86 ec 00 00 00    	mov    DWORD PTR [esi+0xec],eax
+  96eba2:	e8 29 7c f5 ff       	call   0x8c67d0
+  96eba7:	56                   	push   esi
+  96eba8:	8d 8f 58 02 00 00    	lea    ecx,[edi+0x258]
+  96ebae:	89 86 f0 00 00 00    	mov    DWORD PTR [esi+0xf0],eax
+  96ebb4:	89 9e f4 00 00 00    	mov    DWORD PTR [esi+0xf4],ebx
+  96ebba:	e8 81 48 f3 ff       	call   0x8a3440
+  96ebbf:	89 9e fc 00 00 00    	mov    DWORD PTR [esi+0xfc],ebx
+  96ebc5:	89 9e 00 01 00 00    	mov    DWORD PTR [esi+0x100],ebx
+  96ebcb:	89 9e 04 01 00 00    	mov    DWORD PTR [esi+0x104],ebx
+  96ebd1:	89 86 f8 00 00 00    	mov    DWORD PTR [esi+0xf8],eax
+  96ebd7:	66 0f ef c0          	pxor   xmm0,xmm0
+  96ebdb:	66 0f d6 46 20       	movq   QWORD PTR [esi+0x20],xmm0
+  96ebe0:	66 0f d6 46 28       	movq   QWORD PTR [esi+0x28],xmm0
+  96ebe5:	66 0f d6 46 30       	movq   QWORD PTR [esi+0x30],xmm0
+  96ebea:	66 0f ef c0          	pxor   xmm0,xmm0
+  96ebee:	66 0f d6 46 50       	movq   QWORD PTR [esi+0x50],xmm0
+  96ebf3:	66 0f d6 46 58       	movq   QWORD PTR [esi+0x58],xmm0
+  96ebf8:	66 0f d6 46 60       	movq   QWORD PTR [esi+0x60],xmm0
+  96ebfd:	66 0f ef c0          	pxor   xmm0,xmm0
+  96ec01:	66 0f d6 46 68       	movq   QWORD PTR [esi+0x68],xmm0
+  96ec06:	66 0f d6 46 70       	movq   QWORD PTR [esi+0x70],xmm0
+  96ec0b:	66 0f d6 46 78       	movq   QWORD PTR [esi+0x78],xmm0
+  96ec10:	8d 5e 38             	lea    ebx,[esi+0x38]
+  96ec13:	81 c7 c8 01 00 00    	add    edi,0x1c8
+  96ec19:	c7 45 08 06 00 00 00 	mov    DWORD PTR [ebp+0x8],0x6
+  96ec20:	56                   	push   esi
+  96ec21:	8b cf                	mov    ecx,edi
+  96ec23:	e8 a8 7b f5 ff       	call   0x8c67d0
+  96ec28:	89 03                	mov    DWORD PTR [ebx],eax
+  96ec2a:	83 c7 18             	add    edi,0x18
+  96ec2d:	83 c3 04             	add    ebx,0x4
+  96ec30:	ff 4d 08             	dec    DWORD PTR [ebp+0x8]
+  96ec33:	75 eb                	jne    0x96ec20
+  96ec35:	5f                   	pop    edi
+  96ec36:	8b c6                	mov    eax,esi
+  96ec38:	5e                   	pop    esi
+  96ec39:	5b                   	pop    ebx
+  96ec3a:	5d                   	pop    ebp
+  96ec3b:	c2 04 00             	ret    0x4

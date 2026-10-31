@@ -1,0 +1,116 @@
+
+C:\Program Files (x86)\Steam\steamapps\common\DiRT 3 Complete Edition\dirt3_game.exe:     file format pei-i386
+
+
+Disassembly of section .text:
+
+00732a70 <.text+0x331a70>:
+  732a70:	55                   	push   ebp
+  732a71:	8b ec                	mov    ebp,esp
+  732a73:	83 ec 10             	sub    esp,0x10
+  732a76:	53                   	push   ebx
+  732a77:	33 db                	xor    ebx,ebx
+  732a79:	56                   	push   esi
+  732a7a:	8b f1                	mov    esi,ecx
+  732a7c:	c7 06 a8 a3 ec 00    	mov    DWORD PTR [esi],0xeca3a8
+  732a82:	89 5e 04             	mov    DWORD PTR [esi+0x4],ebx
+  732a85:	89 5e 08             	mov    DWORD PTR [esi+0x8],ebx
+  732a88:	88 9e 90 00 00 00    	mov    BYTE PTR [esi+0x90],bl
+  732a8e:	89 9e a0 00 00 00    	mov    DWORD PTR [esi+0xa0],ebx
+  732a94:	b9 3c 6b e7 00       	mov    ecx,0xe76b3c
+  732a99:	ba 01 00 00 00       	mov    edx,0x1
+  732a9e:	89 9e b8 00 00 00    	mov    DWORD PTR [esi+0xb8],ebx
+  732aa4:	8d 86 c0 00 00 00    	lea    eax,[esi+0xc0]
+  732aaa:	89 8e b4 00 00 00    	mov    DWORD PTR [esi+0xb4],ecx
+  732ab0:	89 9e b0 00 00 00    	mov    DWORD PTR [esi+0xb0],ebx
+  732ab6:	89 96 bc 00 00 00    	mov    DWORD PTR [esi+0xbc],edx
+  732abc:	c7 00 d0 c2 ea 00    	mov    DWORD PTR [eax],0xeac2d0
+  732ac2:	57                   	push   edi
+  732ac3:	39 9e b8 00 00 00    	cmp    DWORD PTR [esi+0xb8],ebx
+  732ac9:	75 06                	jne    0x732ad1
+  732acb:	89 86 b8 00 00 00    	mov    DWORD PTR [esi+0xb8],eax
+  732ad1:	89 8e 14 01 00 00    	mov    DWORD PTR [esi+0x114],ecx
+  732ad7:	89 9e 10 01 00 00    	mov    DWORD PTR [esi+0x110],ebx
+  732add:	89 9e 18 01 00 00    	mov    DWORD PTR [esi+0x118],ebx
+  732ae3:	89 9e 1c 01 00 00    	mov    DWORD PTR [esi+0x11c],ebx
+  732ae9:	c7 86 20 01 00 00 58 	mov    DWORD PTR [esi+0x120],0xec8258
+  732af0:	82 ec 00 
+  732af3:	89 9e 48 01 00 00    	mov    DWORD PTR [esi+0x148],ebx
+  732af9:	8d 86 50 01 00 00    	lea    eax,[esi+0x150]
+  732aff:	89 8e 44 01 00 00    	mov    DWORD PTR [esi+0x144],ecx
+  732b05:	89 9e 40 01 00 00    	mov    DWORD PTR [esi+0x140],ebx
+  732b0b:	89 96 4c 01 00 00    	mov    DWORD PTR [esi+0x14c],edx
+  732b11:	c7 00 60 bb ea 00    	mov    DWORD PTR [eax],0xeabb60
+  732b17:	39 9e 48 01 00 00    	cmp    DWORD PTR [esi+0x148],ebx
+  732b1d:	75 06                	jne    0x732b25
+  732b1f:	89 86 48 01 00 00    	mov    DWORD PTR [esi+0x148],eax
+  732b25:	89 9e 78 01 00 00    	mov    DWORD PTR [esi+0x178],ebx
+  732b2b:	8d 86 80 01 00 00    	lea    eax,[esi+0x180]
+  732b31:	89 8e 74 01 00 00    	mov    DWORD PTR [esi+0x174],ecx
+  732b37:	89 9e 70 01 00 00    	mov    DWORD PTR [esi+0x170],ebx
+  732b3d:	89 96 7c 01 00 00    	mov    DWORD PTR [esi+0x17c],edx
+  732b43:	c7 00 60 bb ea 00    	mov    DWORD PTR [eax],0xeabb60
+  732b49:	39 9e 78 01 00 00    	cmp    DWORD PTR [esi+0x178],ebx
+  732b4f:	75 06                	jne    0x732b57
+  732b51:	89 86 78 01 00 00    	mov    DWORD PTR [esi+0x178],eax
+  732b57:	89 9e a8 01 00 00    	mov    DWORD PTR [esi+0x1a8],ebx
+  732b5d:	8d 86 b0 01 00 00    	lea    eax,[esi+0x1b0]
+  732b63:	89 8e a4 01 00 00    	mov    DWORD PTR [esi+0x1a4],ecx
+  732b69:	89 9e a0 01 00 00    	mov    DWORD PTR [esi+0x1a0],ebx
+  732b6f:	89 96 ac 01 00 00    	mov    DWORD PTR [esi+0x1ac],edx
+  732b75:	c7 00 60 bb ea 00    	mov    DWORD PTR [eax],0xeabb60
+  732b7b:	39 9e a8 01 00 00    	cmp    DWORD PTR [esi+0x1a8],ebx
+  732b81:	75 06                	jne    0x732b89
+  732b83:	89 86 a8 01 00 00    	mov    DWORD PTR [esi+0x1a8],eax
+  732b89:	a1 78 3f 0b 01       	mov    eax,ds:0x10b3f78
+  732b8e:	f3 0f 10 05 34 5f e8 	movss  xmm0,DWORD PTR ds:0xe85f34
+  732b95:	00 
+  732b96:	f3 0f 10 0d 38 61 e7 	movss  xmm1,DWORD PTR ds:0xe76138
+  732b9d:	00 
+  732b9e:	89 86 d0 01 00 00    	mov    DWORD PTR [esi+0x1d0],eax
+  732ba4:	8b 0d 7c 3f 0b 01    	mov    ecx,DWORD PTR ds:0x10b3f7c
+  732baa:	52                   	push   edx
+  732bab:	f3 0f 11 86 d8 01 00 	movss  DWORD PTR [esi+0x1d8],xmm0
+  732bb2:	00 
+  732bb3:	f3 0f 11 86 e0 01 00 	movss  DWORD PTR [esi+0x1e0],xmm0
+  732bba:	00 
+  732bbb:	0f 57 c0             	xorps  xmm0,xmm0
+  732bbe:	68 94 a3 ec 00       	push   0xeca394
+  732bc3:	89 8e d4 01 00 00    	mov    DWORD PTR [esi+0x1d4],ecx
+  732bc9:	89 9e 94 00 00 00    	mov    DWORD PTR [esi+0x94],ebx
+  732bcf:	f3 0f 11 8e dc 01 00 	movss  DWORD PTR [esi+0x1dc],xmm1
+  732bd6:	00 
+  732bd7:	f3 0f 11 86 e4 01 00 	movss  DWORD PTR [esi+0x1e4],xmm0
+  732bde:	00 
+  732bdf:	e8 7c 14 e5 ff       	call   0x584060
+  732be4:	8b 50 0c             	mov    edx,DWORD PTR [eax+0xc]
+  732be7:	8b 48 08             	mov    ecx,DWORD PTR [eax+0x8]
+  732bea:	8b be d4 01 00 00    	mov    edi,DWORD PTR [esi+0x1d4]
+  732bf0:	89 55 fc             	mov    DWORD PTR [ebp-0x4],edx
+  732bf3:	8b 96 d0 01 00 00    	mov    edx,DWORD PTR [esi+0x1d0]
+  732bf9:	8b c2                	mov    eax,edx
+  732bfb:	89 7d f4             	mov    DWORD PTR [ebp-0xc],edi
+  732bfe:	23 7d fc             	and    edi,DWORD PTR [ebp-0x4]
+  732c01:	23 c1                	and    eax,ecx
+  732c03:	83 c4 08             	add    esp,0x8
+  732c06:	3b c1                	cmp    eax,ecx
+  732c08:	75 05                	jne    0x732c0f
+  732c0a:	3b 7d fc             	cmp    edi,DWORD PTR [ebp-0x4]
+  732c0d:	74 14                	je     0x732c23
+  732c0f:	8b 45 f4             	mov    eax,DWORD PTR [ebp-0xc]
+  732c12:	0b d1                	or     edx,ecx
+  732c14:	0b 45 fc             	or     eax,DWORD PTR [ebp-0x4]
+  732c17:	89 96 d0 01 00 00    	mov    DWORD PTR [esi+0x1d0],edx
+  732c1d:	89 86 d4 01 00 00    	mov    DWORD PTR [esi+0x1d4],eax
+  732c23:	89 b6 30 01 00 00    	mov    DWORD PTR [esi+0x130],esi
+  732c29:	39 9e 18 01 00 00    	cmp    DWORD PTR [esi+0x118],ebx
+  732c2f:	75 0c                	jne    0x732c3d
+  732c31:	8d 86 20 01 00 00    	lea    eax,[esi+0x120]
+  732c37:	89 86 18 01 00 00    	mov    DWORD PTR [esi+0x118],eax
+  732c3d:	5f                   	pop    edi
+  732c3e:	8b c6                	mov    eax,esi
+  732c40:	5e                   	pop    esi
+  732c41:	5b                   	pop    ebx
+  732c42:	8b e5                	mov    esp,ebp
+  732c44:	5d                   	pop    ebp
+  732c45:	c3                   	ret

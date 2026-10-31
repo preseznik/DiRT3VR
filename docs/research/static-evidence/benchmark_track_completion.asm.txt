@@ -1,0 +1,56 @@
+
+C:\Program Files (x86)\Steam\steamapps\common\DiRT 3 Complete Edition\dirt3_game.exe:     file format pei-i386
+
+
+Disassembly of section .text:
+
+006a8720 <.text+0x2a7720>:
+  6a8720:	55                   	push   ebp
+  6a8721:	8b ec                	mov    ebp,esp
+  6a8723:	51                   	push   ecx
+  6a8724:	56                   	push   esi
+  6a8725:	8b f1                	mov    esi,ecx
+  6a8727:	80 be 80 00 00 00 00 	cmp    BYTE PTR [esi+0x80],0x0
+  6a872e:	74 34                	je     0x6a8764
+  6a8730:	80 be 8e 00 00 00 00 	cmp    BYTE PTR [esi+0x8e],0x0
+  6a8737:	74 30                	je     0x6a8769
+  6a8739:	ff 86 fc 0e 00 00    	inc    DWORD PTR [esi+0xefc]
+  6a873f:	8b 86 fc 0e 00 00    	mov    eax,DWORD PTR [esi+0xefc]
+  6a8745:	3b 86 f8 0e 00 00    	cmp    eax,DWORD PTR [esi+0xef8]
+  6a874b:	75 0a                	jne    0x6a8757
+  6a874d:	c7 86 f8 0e 00 00 00 	mov    DWORD PTR [esi+0xef8],0x0
+  6a8754:	00 00 00 
+  6a8757:	ff 86 14 0f 00 00    	inc    DWORD PTR [esi+0xf14]
+  6a875d:	c6 86 8c 00 00 00 00 	mov    BYTE PTR [esi+0x8c],0x0
+  6a8764:	5e                   	pop    esi
+  6a8765:	8b e5                	mov    esp,ebp
+  6a8767:	5d                   	pop    ebp
+  6a8768:	c3                   	ret
+  6a8769:	80 be 8c 00 00 00 00 	cmp    BYTE PTR [esi+0x8c],0x0
+  6a8770:	74 e5                	je     0x6a8757
+  6a8772:	8b 8e fc 0e 00 00    	mov    ecx,DWORD PTR [esi+0xefc]
+  6a8778:	db 86 00 0f 00 00    	fild   DWORD PTR [esi+0xf00]
+  6a877e:	8b c1                	mov    eax,ecx
+  6a8780:	69 c0 70 01 00 00    	imul   eax,eax,0x170
+  6a8786:	41                   	inc    ecx
+  6a8787:	89 8e fc 0e 00 00    	mov    DWORD PTR [esi+0xefc],ecx
+  6a878d:	8b 8e 00 0f 00 00    	mov    ecx,DWORD PTR [esi+0xf00]
+  6a8793:	8d 84 30 90 00 00 00 	lea    eax,[eax+esi*1+0x90]
+  6a879a:	85 c9                	test   ecx,ecx
+  6a879c:	79 06                	jns    0x6a87a4
+  6a879e:	d8 05 94 69 e7 00    	fadd   DWORD PTR ds:0xe76994
+  6a87a4:	d8 b6 04 0f 00 00    	fdiv   DWORD PTR [esi+0xf04]
+  6a87aa:	d9 98 68 01 00 00    	fstp   DWORD PTR [eax+0x168]
+  6a87b0:	8b 96 00 0f 00 00    	mov    edx,DWORD PTR [esi+0xf00]
+  6a87b6:	89 90 6c 01 00 00    	mov    DWORD PTR [eax+0x16c],edx
+  6a87bc:	d9 86 10 0f 00 00    	fld    DWORD PTR [esi+0xf10]
+  6a87c2:	d9 98 64 01 00 00    	fstp   DWORD PTR [eax+0x164]
+  6a87c8:	8b 86 fc 0e 00 00    	mov    eax,DWORD PTR [esi+0xefc]
+  6a87ce:	3b 86 f8 0e 00 00    	cmp    eax,DWORD PTR [esi+0xef8]
+  6a87d4:	75 81                	jne    0x6a8757
+  6a87d6:	8b ce                	mov    ecx,esi
+  6a87d8:	e8 f3 eb ff ff       	call   0x6a73d0
+  6a87dd:	80 be 81 00 00 00 00 	cmp    BYTE PTR [esi+0x81],0x0
+  6a87e4:	0f 84 6d ff ff ff    	je     0x6a8757
+  6a87ea:	6a 00                	push   0x0
+  6a87ec:	ff 15 9c 11 e0 00    	call   DWORD PTR ds:0xe0119c

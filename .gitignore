@@ -1,0 +1,8 @@
+.deps/
+build/
+artifacts/
+**/bin/
+**/obj/
+__pycache__/
+*.user
+*.log

@@ -1,0 +1,59 @@
+
+C:\Program Files (x86)\Steam\steamapps\common\DiRT 3 Complete Edition\dirt3_game.exe:     file format pei-i386
+
+
+Disassembly of section .text:
+
+0096e410 <.text+0x56d410>:
+  96e410:	55                   	push   ebp
+  96e411:	8b ec                	mov    ebp,esp
+  96e413:	56                   	push   esi
+  96e414:	57                   	push   edi
+  96e415:	8b 7d 08             	mov    edi,DWORD PTR [ebp+0x8]
+  96e418:	d9 87 e8 00 00 00    	fld    DWORD PTR [edi+0xe8]
+  96e41e:	8b f1                	mov    esi,ecx
+  96e420:	80 7e 50 00          	cmp    BYTE PTR [esi+0x50],0x0
+  96e424:	d9 9e a4 00 00 00    	fstp   DWORD PTR [esi+0xa4]
+  96e42a:	d9 87 ec 00 00 00    	fld    DWORD PTR [edi+0xec]
+  96e430:	d9 9e a8 00 00 00    	fstp   DWORD PTR [esi+0xa8]
+  96e436:	74 4f                	je     0x96e487
+  96e438:	8b 4e 2c             	mov    ecx,DWORD PTR [esi+0x2c]
+  96e43b:	85 c9                	test   ecx,ecx
+  96e43d:	74 48                	je     0x96e487
+  96e43f:	8b 96 8c 00 00 00    	mov    edx,DWORD PTR [esi+0x8c]
+  96e445:	8b 01                	mov    eax,DWORD PTR [ecx]
+  96e447:	8b 40 38             	mov    eax,DWORD PTR [eax+0x38]
+  96e44a:	53                   	push   ebx
+  96e44b:	52                   	push   edx
+  96e44c:	8b 96 88 00 00 00    	mov    edx,DWORD PTR [esi+0x88]
+  96e452:	52                   	push   edx
+  96e453:	ff d0                	call   eax
+  96e455:	8b 46 28             	mov    eax,DWORD PTR [esi+0x28]
+  96e458:	8b 4e 2c             	mov    ecx,DWORD PTR [esi+0x2c]
+  96e45b:	8b 5d 0c             	mov    ebx,DWORD PTR [ebp+0xc]
+  96e45e:	8b 11                	mov    edx,DWORD PTR [ecx]
+  96e460:	8b 52 44             	mov    edx,DWORD PTR [edx+0x44]
+  96e463:	50                   	push   eax
+  96e464:	53                   	push   ebx
+  96e465:	57                   	push   edi
+  96e466:	ff d2                	call   edx
+  96e468:	8b 4d 10             	mov    ecx,DWORD PTR [ebp+0x10]
+  96e46b:	8b 06                	mov    eax,DWORD PTR [esi]
+  96e46d:	8b 50 2c             	mov    edx,DWORD PTR [eax+0x2c]
+  96e470:	51                   	push   ecx
+  96e471:	53                   	push   ebx
+  96e472:	57                   	push   edi
+  96e473:	8b ce                	mov    ecx,esi
+  96e475:	ff d2                	call   edx
+  96e477:	8b 4e 2c             	mov    ecx,DWORD PTR [esi+0x2c]
+  96e47a:	8b 56 28             	mov    edx,DWORD PTR [esi+0x28]
+  96e47d:	8b 01                	mov    eax,DWORD PTR [ecx]
+  96e47f:	8b 40 50             	mov    eax,DWORD PTR [eax+0x50]
+  96e482:	52                   	push   edx
+  96e483:	57                   	push   edi
+  96e484:	ff d0                	call   eax
+  96e486:	5b                   	pop    ebx
+  96e487:	5f                   	pop    edi
+  96e488:	5e                   	pop    esi
+  96e489:	5d                   	pop    ebp
+  96e48a:	c2 0c 00             	ret    0xc

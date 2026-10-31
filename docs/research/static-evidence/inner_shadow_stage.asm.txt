@@ -1,0 +1,59 @@
+
+C:\Program Files (x86)\Steam\steamapps\common\DiRT 3 Complete Edition\dirt3_game.exe:     file format pei-i386
+
+
+Disassembly of section .text:
+
+0096e510 <.text+0x56d510>:
+  96e510:	55                   	push   ebp
+  96e511:	8b ec                	mov    ebp,esp
+  96e513:	56                   	push   esi
+  96e514:	8b f1                	mov    esi,ecx
+  96e516:	80 7e 51 00          	cmp    BYTE PTR [esi+0x51],0x0
+  96e51a:	0f 84 81 00 00 00    	je     0x96e5a1
+  96e520:	83 7e 30 00          	cmp    DWORD PTR [esi+0x30],0x0
+  96e524:	74 7b                	je     0x96e5a1
+  96e526:	83 be 90 00 00 00 00 	cmp    DWORD PTR [esi+0x90],0x0
+  96e52d:	74 72                	je     0x96e5a1
+  96e52f:	83 be 8c 00 00 00 00 	cmp    DWORD PTR [esi+0x8c],0x0
+  96e536:	74 69                	je     0x96e5a1
+  96e538:	80 7e 50 00          	cmp    BYTE PTR [esi+0x50],0x0
+  96e53c:	74 63                	je     0x96e5a1
+  96e53e:	8b 96 b0 00 00 00    	mov    edx,DWORD PTR [esi+0xb0]
+  96e544:	8b 4e 30             	mov    ecx,DWORD PTR [esi+0x30]
+  96e547:	8b 01                	mov    eax,DWORD PTR [ecx]
+  96e549:	8b 40 5c             	mov    eax,DWORD PTR [eax+0x5c]
+  96e54c:	52                   	push   edx
+  96e54d:	8b 55 14             	mov    edx,DWORD PTR [ebp+0x14]
+  96e550:	52                   	push   edx
+  96e551:	ff d0                	call   eax
+  96e553:	0f b6 46 53          	movzx  eax,BYTE PTR [esi+0x53]
+  96e557:	f3 0f 10 86 a8 00 00 	movss  xmm0,DWORD PTR [esi+0xa8]
+  96e55e:	00 
+  96e55f:	8b 4e 30             	mov    ecx,DWORD PTR [esi+0x30]
+  96e562:	8b 11                	mov    edx,DWORD PTR [ecx]
+  96e564:	8b 52 2c             	mov    edx,DWORD PTR [edx+0x2c]
+  96e567:	50                   	push   eax
+  96e568:	8b 45 0c             	mov    eax,DWORD PTR [ebp+0xc]
+  96e56b:	83 ec 08             	sub    esp,0x8
+  96e56e:	f3 0f 11 44 24 04    	movss  DWORD PTR [esp+0x4],xmm0
+  96e574:	f3 0f 10 86 a4 00 00 	movss  xmm0,DWORD PTR [esi+0xa4]
+  96e57b:	00 
+  96e57c:	f3 0f 11 04 24       	movss  DWORD PTR [esp],xmm0
+  96e581:	50                   	push   eax
+  96e582:	8b 45 10             	mov    eax,DWORD PTR [ebp+0x10]
+  96e585:	50                   	push   eax
+  96e586:	8b 45 08             	mov    eax,DWORD PTR [ebp+0x8]
+  96e589:	50                   	push   eax
+  96e58a:	8b 86 ac 00 00 00    	mov    eax,DWORD PTR [esi+0xac]
+  96e590:	50                   	push   eax
+  96e591:	ff d2                	call   edx
+  96e593:	8b 4e 30             	mov    ecx,DWORD PTR [esi+0x30]
+  96e596:	8b 01                	mov    eax,DWORD PTR [ecx]
+  96e598:	8b 50 5c             	mov    edx,DWORD PTR [eax+0x5c]
+  96e59b:	6a 00                	push   0x0
+  96e59d:	6a 00                	push   0x0
+  96e59f:	ff d2                	call   edx
+  96e5a1:	5e                   	pop    esi
+  96e5a2:	5d                   	pop    ebp
+  96e5a3:	c2 10 00             	ret    0x10

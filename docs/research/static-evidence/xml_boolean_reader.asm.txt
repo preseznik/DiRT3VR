@@ -1,0 +1,33 @@
+
+C:\Program Files (x86)\Steam\steamapps\common\DiRT 3 Complete Edition\dirt3_game.exe:     file format pei-i386
+
+
+Disassembly of section .text:
+
+00cd2cf0 <.text+0x8d1cf0>:
+  cd2cf0:	55                   	push   ebp
+  cd2cf1:	8b ec                	mov    ebp,esp
+  cd2cf3:	8b 49 04             	mov    ecx,DWORD PTR [ecx+0x4]
+  cd2cf6:	32 c0                	xor    al,al
+  cd2cf8:	85 c9                	test   ecx,ecx
+  cd2cfa:	74 30                	je     0xcd2d2c
+  cd2cfc:	8b 45 08             	mov    eax,DWORD PTR [ebp+0x8]
+  cd2cff:	50                   	push   eax
+  cd2d00:	e8 4b fc ff ff       	call   0xcd2950
+  cd2d05:	85 c0                	test   eax,eax
+  cd2d07:	74 21                	je     0xcd2d2a
+  cd2d09:	8b 40 38             	mov    eax,DWORD PTR [eax+0x38]
+  cd2d0c:	68 7c 86 e7 00       	push   0xe7867c
+  cd2d11:	50                   	push   eax
+  cd2d12:	e8 fd 1b 07 00       	call   0xd44914
+  cd2d17:	8b 55 0c             	mov    edx,DWORD PTR [ebp+0xc]
+  cd2d1a:	83 c4 08             	add    esp,0x8
+  cd2d1d:	85 c0                	test   eax,eax
+  cd2d1f:	0f 94 c1             	sete   cl
+  cd2d22:	88 0a                	mov    BYTE PTR [edx],cl
+  cd2d24:	b0 01                	mov    al,0x1
+  cd2d26:	5d                   	pop    ebp
+  cd2d27:	c2 08 00             	ret    0x8
+  cd2d2a:	32 c0                	xor    al,al
+  cd2d2c:	5d                   	pop    ebp
+  cd2d2d:	c2 08 00             	ret    0x8

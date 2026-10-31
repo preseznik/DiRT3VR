@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<hardware_settings_restrictions>
+
+    <cpu>
+        <restrict_info>
+            <restrict_if name="cores" op="int_eq" value="2">
+                <restrict_add>
+                    <threadStrategy parallelUpdateRender="true"  workerMapFile="system/workerMap2Core.xml"  forceFeedbackProcessor="1" dvdStorageProcessor="1" dataSetMonitorProcessor="0" renderProcessor="0" updateProcessor="1" fileStreamProcessor="1" />
+                </restrict_add>
+            </restrict_if>
+            <restrict_if name="cores" op="int_eq" value="3">
+                <restrict_add>
+                    <threadStrategy parallelUpdateRender="true"  workerMapFile="system/workerMap3Core.xml"  forceFeedbackProcessor="2" dvdStorageProcessor="2" dataSetMonitorProcessor="0" renderProcessor="0" updateProcessor="1" fileStreamProcessor="1" />
+                </restrict_add>
+            </restrict_if>
+            <restrict_if name="cores" op="int_eq" value="4">
+                <restrict_add>
+                    <threadStrategy parallelUpdateRender="true"  workerMapFile="system/workerMap4Core.xml"  forceFeedbackProcessor="3" dvdStorageProcessor="3" dataSetMonitorProcessor="1" renderProcessor="0" updateProcessor="2" fileStreamProcessor="3" />
+                </restrict_add>
+            </restrict_if>
+            <restrict_if name="cores" op="int_eq" value="6">
+                <restrict_add>
+                    <threadStrategy parallelUpdateRender="true"  workerMapFile="system/workerMap6Core.xml"  forceFeedbackProcessor="4" dvdStorageProcessor="5" dataSetMonitorProcessor="1" renderProcessor="0" updateProcessor="2" fileStreamProcessor="3" />
+                </restrict_add>
+            </restrict_if>
+            <restrict_if name="cores" op="int_ge" value="8">
+                <restrict_add>
+                    <threadStrategy parallelUpdateRender="true"  workerMapFile="system/workerMap8Core.xml"  forceFeedbackProcessor="6" dvdStorageProcessor="7" dataSetMonitorProcessor="4" renderProcessor="0" updateProcessor="2" fileStreamProcessor="5" />
+                </restrict_add>
+            </restrict_if>
+            <restrict_if name="hyperThreading" op="bo_eq" value="true">
+                <restrict_add>
+                    <threadStrategy parallelUpdateRender="true"  workerMapFile="system/workerMap2Core.xml"  forceFeedbackProcessor="1" dvdStorageProcessor="1" dataSetMonitorProcessor="0" renderProcessor="0" updateProcessor="1" fileStreamProcessor="1" />
+                </restrict_add>
+            </restrict_if>
+            <restrict_else>
+                <restrict_add>
+                    <threadStrategy parallelUpdateRender="false" workerMapFile="system/workerMap.xml"       forceFeedbackProcessor="0" dvdStorageProcessor="0" dataSetMonitorProcessor="0" renderProcessor="0" updateProcessor="0" fileStreamProcessor="0" />
+                </restrict_add>
+            </restrict_else>
+        </restrict_info>
+    </cpu>
+    
+    <audio_card>
+        <audio>
+            <restrict_set name="mixing" default="rapture3D">
+                 <allowed value="software" />
+                 <allowed value="hardware" />
+                 <allowed value="rapture3D" />
+            </restrict_set>
+        </audio>
+    </audio_card>
+    
+    <graphics_card>
+  
+        <resolution>
+           <!-- Minimum resolution -->
+           <restrict_logical>
+                <restrict_if name="width" op="int_le" value="639">
+                    <restrict_set name="width" default="640" />
+                    <restrict_set name="height" default="480" />
+                </restrict_if>
+                <restrict_if name="height" op="int_le" value="479">
+                    <restrict_set name="width" default="640" />
+                    <restrict_set name="height" default="480" />
+                </restrict_if>
+            </restrict_logical>
+        
+            <!-- Aspect Ratio -->      
+            <restrict_set name="aspect" default="auto">
+                <allowed value="4:3" />
+                <allowed value="5:4" />
+                <allowed value="16:9" />
+                <allowed value="16:10" />
+                <allowed value="5:3" />
+            </restrict_set>
+            
+        </resolution>
+        
+        <gamma>
+            <restrict_float_range name="level" default="1.0" min="0.5" max="2.5" />
+        </gamma>
+
+        <textures>
+            <restrict_int_range name="lod" default="0" min="0" />
+        </textures>
+        
+    </graphics_card>
+    
+    <shadows>
+    
+        <restrict_set name="size" default="1024">
+            <allowed value="128" />
+            <allowed value="256" />
+            <allowed value="512" />
+            <allowed value="768" />
+            <allowed value="1024" />
+            <allowed value="1536" />
+            <allowed value="2048" />
+            <allowed value="4096" />
+        </restrict_set>
+        <restrict_int_range name="maskQuality" default="1" min="0" max="2" />
+    </shadows>
+    
+    <headlights>
+      <restrict_int_range name="headlightQuality" default="1" min="0" max="2" />
+    </headlights>
+
+    <crowd>
+        <restrict_bool name="enabled" default="true" />
+    </crowd>
+
+    <cloth>
+        <restrict_bool name="enabled" default="true" />
+    </cloth>
+
+	<physics>
+		<restrict_bool name="environmentalDamage" default="true" />
+		<restrict_bool name="vehicleDamage" default="true" />
+	</physics>
+
+    <vehicles>
+        <restrict_int_range name="characterQuality" default="2" min="0" max="4" />
+    </vehicles>
+
+  <water>
+    <restrict_int_range name="detail" default="1" min="0" max="2" />
+  </water>
+
+  <input>
+      <restrict_set name="device_type" default="auto">
+        <allowed value="pad" />
+        <allowed value="wheel" />
+      </restrict_set>
+    </input>
+    
+</hardware_settings_restrictions>

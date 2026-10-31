@@ -1,0 +1,68 @@
+
+C:\Program Files (x86)\Steam\steamapps\common\DiRT 3 Complete Edition\dirt3_game.exe:     file format pei-i386
+
+
+Disassembly of section .text:
+
+008d8bd0 <.text+0x4d7bd0>:
+  8d8bd0:	53                   	push   ebx
+  8d8bd1:	33 db                	xor    ebx,ebx
+  8d8bd3:	56                   	push   esi
+  8d8bd4:	8b f1                	mov    esi,ecx
+  8d8bd6:	88 5e 04             	mov    BYTE PTR [esi+0x4],bl
+  8d8bd9:	89 35 1c 40 0b 01    	mov    DWORD PTR ds:0x10b401c,esi
+  8d8bdf:	c7 06 b8 6a f0 00    	mov    DWORD PTR [esi],0xf06ab8
+  8d8be5:	89 5e 0c             	mov    DWORD PTR [esi+0xc],ebx
+  8d8be8:	89 5e 10             	mov    DWORD PTR [esi+0x10],ebx
+  8d8beb:	89 5e 14             	mov    DWORD PTR [esi+0x14],ebx
+  8d8bee:	89 5e 18             	mov    DWORD PTR [esi+0x18],ebx
+  8d8bf1:	89 5e 1c             	mov    DWORD PTR [esi+0x1c],ebx
+  8d8bf4:	89 5e 20             	mov    DWORD PTR [esi+0x20],ebx
+  8d8bf7:	89 5e 24             	mov    DWORD PTR [esi+0x24],ebx
+  8d8bfa:	c7 46 28 01 00 00 00 	mov    DWORD PTR [esi+0x28],0x1
+  8d8c01:	ff 15 6c 12 e0 00    	call   DWORD PTR ds:0xe0126c
+  8d8c07:	8d 4e 58             	lea    ecx,[esi+0x58]
+  8d8c0a:	89 46 2c             	mov    DWORD PTR [esi+0x2c],eax
+  8d8c0d:	89 5e 30             	mov    DWORD PTR [esi+0x30],ebx
+  8d8c10:	89 5e 34             	mov    DWORD PTR [esi+0x34],ebx
+  8d8c13:	89 5e 38             	mov    DWORD PTR [esi+0x38],ebx
+  8d8c16:	e8 25 b5 ff ff       	call   0x8d4140
+  8d8c1b:	f3 0f 10 05 f0 67 e7 	movss  xmm0,DWORD PTR ds:0xe767f0
+  8d8c22:	00 
+  8d8c23:	89 9e b4 01 00 00    	mov    DWORD PTR [esi+0x1b4],ebx
+  8d8c29:	89 9e b8 01 00 00    	mov    DWORD PTR [esi+0x1b8],ebx
+  8d8c2f:	89 9e bc 01 00 00    	mov    DWORD PTR [esi+0x1bc],ebx
+  8d8c35:	88 9e c0 01 00 00    	mov    BYTE PTR [esi+0x1c0],bl
+  8d8c3b:	89 9e c4 01 00 00    	mov    DWORD PTR [esi+0x1c4],ebx
+  8d8c41:	8d 8e 44 0b 00 00    	lea    ecx,[esi+0xb44]
+  8d8c47:	89 9e 28 0b 00 00    	mov    DWORD PTR [esi+0xb28],ebx
+  8d8c4d:	89 9e 2c 0b 00 00    	mov    DWORD PTR [esi+0xb2c],ebx
+  8d8c53:	89 9e 30 0b 00 00    	mov    DWORD PTR [esi+0xb30],ebx
+  8d8c59:	89 9e 34 0b 00 00    	mov    DWORD PTR [esi+0xb34],ebx
+  8d8c5f:	89 9e 38 0b 00 00    	mov    DWORD PTR [esi+0xb38],ebx
+  8d8c65:	89 9e 3c 0b 00 00    	mov    DWORD PTR [esi+0xb3c],ebx
+  8d8c6b:	f3 0f 11 86 40 0b 00 	movss  DWORD PTR [esi+0xb40],xmm0
+  8d8c72:	00 
+  8d8c73:	e8 68 d9 ff ff       	call   0x8d65e0
+  8d8c78:	6a 40                	push   0x40
+  8d8c7a:	8d 86 04 4d 00 00    	lea    eax,[esi+0x4d04]
+  8d8c80:	53                   	push   ebx
+  8d8c81:	50                   	push   eax
+  8d8c82:	c7 86 ec 4c 00 00 0b 	mov    DWORD PTR [esi+0x4cec],0xb
+  8d8c89:	00 00 00 
+  8d8c8c:	89 9e f0 4c 00 00    	mov    DWORD PTR [esi+0x4cf0],ebx
+  8d8c92:	89 9e f4 4c 00 00    	mov    DWORD PTR [esi+0x4cf4],ebx
+  8d8c98:	89 9e f8 4c 00 00    	mov    DWORD PTR [esi+0x4cf8],ebx
+  8d8c9e:	89 9e fc 4c 00 00    	mov    DWORD PTR [esi+0x4cfc],ebx
+  8d8ca4:	89 9e 00 4d 00 00    	mov    DWORD PTR [esi+0x4d00],ebx
+  8d8caa:	88 9e 54 4d 00 00    	mov    BYTE PTR [esi+0x4d54],bl
+  8d8cb0:	89 9e 58 4d 00 00    	mov    DWORD PTR [esi+0x4d58],ebx
+  8d8cb6:	89 9e 5c 4d 00 00    	mov    DWORD PTR [esi+0x4d5c],ebx
+  8d8cbc:	89 9e 60 4d 00 00    	mov    DWORD PTR [esi+0x4d60],ebx
+  8d8cc2:	89 9e 64 4d 00 00    	mov    DWORD PTR [esi+0x4d64],ebx
+  8d8cc8:	89 9e 68 4d 00 00    	mov    DWORD PTR [esi+0x4d68],ebx
+  8d8cce:	89 9e 6c 4d 00 00    	mov    DWORD PTR [esi+0x4d6c],ebx
+  8d8cd4:	89 9e 70 4d 00 00    	mov    DWORD PTR [esi+0x4d70],ebx
+  8d8cda:	66 c7 86 74 4d 00 00 	mov    WORD PTR [esi+0x4d74],0x1
+  8d8ce1:	01 00 
+  8d8ce3:	89 9e 78 4d 00 00    	mov    DWORD PTR [esi+0x4d78],ebx
