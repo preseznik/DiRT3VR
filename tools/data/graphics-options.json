@@ -1,0 +1,749 @@
+{
+  "schema": 1,
+  "game": "DiRT 3 Complete Edition (Steam)",
+  "sourceOptionsSha256": "adaf210398394a0057ffe7b8487c0bc997f804a31aaaf16cefdfd105c00cf8f0",
+  "policy": "Quality settings only, written to Documents\\My Games\\DiRT3\\hardwaresettings\\hardware_settings_config.xml as element@attribute. Values are DirectX 11 (DiRT3VR forces forcedx9=false). Display, multisampling, stereo, audio, CPU and physics (damage) are not quality settings and are listed per preset under \"other\" only. A choice sets only the attributes the game itself sets; others stay unchanged. Defaults are the game default preset (medium).",
+  "categories": [
+    {
+      "field": "NightLighting",
+      "gameCategory": "night_lighting",
+      "label": "Night lighting",
+      "default": "medium",
+      "choices": [
+        {
+          "id": "low",
+          "label": "Low",
+          "attributes": {
+            "night_lighting@volumes": "false",
+            "night_lighting@lights": "150",
+            "night_lighting@shadows": "false"
+          }
+        },
+        {
+          "id": "medium",
+          "label": "Medium",
+          "attributes": {
+            "night_lighting@volumes": "true",
+            "night_lighting@lights": "0",
+            "night_lighting@shadows": "false"
+          }
+        },
+        {
+          "id": "high",
+          "label": "High",
+          "attributes": {
+            "night_lighting@volumes": "true",
+            "night_lighting@lights": "0",
+            "night_lighting@shadows": "true"
+          }
+        }
+      ]
+    },
+    {
+      "field": "Shadows",
+      "gameCategory": "shadows",
+      "label": "Shadows",
+      "default": "medium",
+      "choices": [
+        {
+          "id": "ultralow",
+          "label": "Ultra Low",
+          "attributes": {
+            "shadows@enabled": "false",
+            "shadows@size": "512",
+            "shadows@maskQuality": "1"
+          }
+        },
+        {
+          "id": "low",
+          "label": "Low",
+          "attributes": {
+            "shadows@enabled": "true",
+            "shadows@size": "768",
+            "shadows@maskQuality": "1"
+          }
+        },
+        {
+          "id": "medium",
+          "label": "Medium",
+          "attributes": {
+            "shadows@enabled": "true",
+            "shadows@size": "1024",
+            "shadows@maskQuality": "1"
+          }
+        },
+        {
+          "id": "high",
+          "label": "High",
+          "attributes": {
+            "shadows@enabled": "true",
+            "shadows@size": "2048",
+            "shadows@maskQuality": "1"
+          }
+        },
+        {
+          "id": "ultra",
+          "label": "Ultra",
+          "attributes": {
+            "shadows@enabled": "true",
+            "shadows@size": "2048",
+            "shadows@maskQuality": "2"
+          },
+          "dx11Only": true
+        }
+      ]
+    },
+    {
+      "field": "Particles",
+      "gameCategory": "particles",
+      "label": "Particles",
+      "default": "medium",
+      "choices": [
+        {
+          "id": "off",
+          "label": "Off",
+          "attributes": {
+            "particles@enabled": "false",
+            "particles@wind": "false",
+            "particles@dynamicRes": "true"
+          }
+        },
+        {
+          "id": "low",
+          "label": "Low",
+          "attributes": {
+            "particles@enabled": "true",
+            "particles@wind": "false",
+            "particles@dynamicRes": "true"
+          }
+        },
+        {
+          "id": "medium",
+          "label": "Medium",
+          "attributes": {
+            "particles@enabled": "true",
+            "particles@wind": "true",
+            "particles@dynamicRes": "true"
+          }
+        },
+        {
+          "id": "high",
+          "label": "High",
+          "attributes": {
+            "particles@enabled": "true",
+            "particles@wind": "true",
+            "particles@dynamicRes": "false"
+          }
+        }
+      ]
+    },
+    {
+      "field": "Mirrors",
+      "gameCategory": "mirrors",
+      "label": "Mirrors",
+      "default": "medium",
+      "choices": [
+        {
+          "id": "off",
+          "label": "Off",
+          "attributes": {
+            "mirrors@enabled": "false",
+            "mirrors@forceBilinear": "true",
+            "mirrors@width": "192",
+            "mirrors@height": "64",
+            "mirrors@car_maxlod": "4",
+            "mirrors@car_culldist": "0.0"
+          }
+        },
+        {
+          "id": "low",
+          "label": "Low",
+          "attributes": {
+            "mirrors@enabled": "true",
+            "mirrors@forceBilinear": "true",
+            "mirrors@width": "192",
+            "mirrors@height": "64",
+            "mirrors@car_maxlod": "4",
+            "mirrors@car_culldist": "100.0"
+          }
+        },
+        {
+          "id": "medium",
+          "label": "Medium",
+          "attributes": {
+            "mirrors@enabled": "true",
+            "mirrors@forceBilinear": "true",
+            "mirrors@width": "384",
+            "mirrors@height": "128",
+            "mirrors@car_maxlod": "3",
+            "mirrors@car_culldist": "200.0"
+          }
+        },
+        {
+          "id": "high",
+          "label": "High",
+          "attributes": {
+            "mirrors@enabled": "true",
+            "mirrors@forceBilinear": "true",
+            "mirrors@width": "768",
+            "mirrors@height": "256",
+            "mirrors@car_maxlod": "1",
+            "mirrors@car_culldist": "300.0"
+          }
+        },
+        {
+          "id": "ultra",
+          "label": "Ultra",
+          "attributes": {
+            "mirrors@enabled": "true",
+            "mirrors@forceBilinear": "false",
+            "mirrors@width": "1536",
+            "mirrors@height": "512",
+            "mirrors@car_maxlod": "0",
+            "mirrors@car_culldist": "500.0"
+          }
+        }
+      ]
+    },
+    {
+      "field": "Crowd",
+      "gameCategory": "crowd",
+      "label": "Crowd",
+      "default": "low",
+      "choices": [
+        {
+          "id": "off",
+          "label": "Off",
+          "attributes": {
+            "crowd@enabled": "false"
+          }
+        },
+        {
+          "id": "low",
+          "label": "Low",
+          "attributes": {
+            "crowd@enabled": "true",
+            "crowd@detail": "0"
+          }
+        },
+        {
+          "id": "high",
+          "label": "High",
+          "attributes": {
+            "crowd@enabled": "true",
+            "crowd@detail": "1"
+          }
+        },
+        {
+          "id": "ultra",
+          "label": "Ultra",
+          "attributes": {
+            "crowd@enabled": "true",
+            "crowd@detail": "2"
+          },
+          "dx11Only": true
+        }
+      ]
+    },
+    {
+      "field": "Cloth",
+      "gameCategory": "cloth",
+      "label": "Cloth",
+      "default": "high",
+      "choices": [
+        {
+          "id": "off",
+          "label": "Off",
+          "attributes": {
+            "cloth@enabled": "false",
+            "cloth@tessellation": "false"
+          }
+        },
+        {
+          "id": "low",
+          "label": "Low",
+          "attributes": {
+            "cloth@enabled": "true",
+            "cloth@tessellation": "false"
+          },
+          "dx11Only": true
+        },
+        {
+          "id": "high",
+          "label": "High",
+          "attributes": {
+            "cloth@enabled": "true",
+            "cloth@tessellation": "true"
+          }
+        }
+      ]
+    },
+    {
+      "field": "AmbientOcclusion",
+      "gameCategory": "dynamic_ambient_occ",
+      "label": "Ambient occlusion",
+      "default": "high",
+      "choices": [
+        {
+          "id": "low",
+          "label": "Low",
+          "attributes": {
+            "dynamic_ambient_occ@enabled": "true",
+            "dynamic_ambient_occ@quality": "0"
+          }
+        },
+        {
+          "id": "high",
+          "label": "High",
+          "attributes": {
+            "dynamic_ambient_occ@enabled": "true",
+            "dynamic_ambient_occ@quality": "1"
+          }
+        },
+        {
+          "id": "ultra",
+          "label": "Ultra",
+          "attributes": {
+            "dynamic_ambient_occ@enabled": "true",
+            "dynamic_ambient_occ@quality": "2"
+          }
+        }
+      ]
+    },
+    {
+      "field": "GroundCover",
+      "gameCategory": "groundCover",
+      "label": "Ground cover",
+      "default": "high",
+      "choices": [
+        {
+          "id": "off",
+          "label": "Off",
+          "attributes": {
+            "groundcover@mode": "off",
+            "groundcover@clutter": "false"
+          }
+        },
+        {
+          "id": "low",
+          "label": "Low",
+          "attributes": {
+            "groundcover@mode": "atoc",
+            "groundcover@clutter": "false"
+          }
+        },
+        {
+          "id": "high",
+          "label": "High",
+          "attributes": {
+            "groundcover@mode": "blended",
+            "groundcover@clutter": "true"
+          }
+        }
+      ]
+    },
+    {
+      "field": "Vehicles",
+      "gameCategory": "vehicles",
+      "label": "Vehicle detail",
+      "default": "medium",
+      "choices": [
+        {
+          "id": "low",
+          "label": "Low",
+          "attributes": {
+            "vehicles@lodQuality": "0",
+            "vehicles@characterQuality": "0"
+          }
+        },
+        {
+          "id": "medium",
+          "label": "Medium",
+          "attributes": {
+            "vehicles@lodQuality": "1",
+            "vehicles@characterQuality": "1"
+          }
+        },
+        {
+          "id": "high",
+          "label": "High",
+          "attributes": {
+            "vehicles@lodQuality": "2",
+            "vehicles@characterQuality": "2"
+          }
+        }
+      ]
+    },
+    {
+      "field": "Trees",
+      "gameCategory": "trees",
+      "label": "Trees",
+      "default": "medium",
+      "choices": [
+        {
+          "id": "ultralow",
+          "label": "Ultra Low",
+          "attributes": {
+            "trees@lod": "0.5",
+            "trees@maxlod": "1"
+          }
+        },
+        {
+          "id": "low",
+          "label": "Low",
+          "attributes": {
+            "trees@lod": "0.75",
+            "trees@maxlod": "1"
+          }
+        },
+        {
+          "id": "medium",
+          "label": "Medium",
+          "attributes": {
+            "trees@lod": "1.0",
+            "trees@maxlod": "0"
+          }
+        },
+        {
+          "id": "high",
+          "label": "High",
+          "attributes": {
+            "trees@lod": "1.25",
+            "trees@maxlod": "0"
+          }
+        },
+        {
+          "id": "ultra",
+          "label": "Ultra",
+          "attributes": {
+            "trees@lod": "1.5",
+            "trees@maxlod": "0"
+          }
+        }
+      ]
+    },
+    {
+      "field": "Objects",
+      "gameCategory": "objects",
+      "label": "Objects",
+      "default": "medium",
+      "choices": [
+        {
+          "id": "ultralow",
+          "label": "Ultra Low",
+          "attributes": {
+            "objects@lod": "0.5",
+            "objects@maxlod": "1"
+          }
+        },
+        {
+          "id": "low",
+          "label": "Low",
+          "attributes": {
+            "objects@lod": "0.75",
+            "objects@maxlod": "1"
+          }
+        },
+        {
+          "id": "medium",
+          "label": "Medium",
+          "attributes": {
+            "objects@lod": "1.0",
+            "objects@maxlod": "0"
+          }
+        },
+        {
+          "id": "high",
+          "label": "High",
+          "attributes": {
+            "objects@lod": "1.25",
+            "objects@maxlod": "0"
+          }
+        },
+        {
+          "id": "ultra",
+          "label": "Ultra",
+          "attributes": {
+            "objects@lod": "1.5",
+            "objects@maxlod": "0"
+          }
+        }
+      ]
+    },
+    {
+      "field": "CarReflections",
+      "gameCategory": "car_reflection",
+      "label": "Car reflections",
+      "default": "medium",
+      "choices": [
+        {
+          "id": "low",
+          "label": "Low",
+          "attributes": {
+            "envmap@faces": "0",
+            "envmap@size": "256",
+            "envmap@forceBilinear": "true"
+          }
+        },
+        {
+          "id": "medium",
+          "label": "Medium",
+          "attributes": {
+            "envmap@faces": "6",
+            "envmap@size": "256",
+            "envmap@forceBilinear": "true"
+          }
+        },
+        {
+          "id": "high",
+          "label": "High",
+          "attributes": {
+            "envmap@faces": "6",
+            "envmap@size": "512",
+            "envmap@forceBilinear": "true"
+          }
+        },
+        {
+          "id": "ultra",
+          "label": "Ultra",
+          "attributes": {
+            "envmap@faces": "6",
+            "envmap@size": "1024",
+            "envmap@forceBilinear": "false"
+          }
+        }
+      ]
+    },
+    {
+      "field": "Water",
+      "gameCategory": "water",
+      "label": "Water",
+      "default": "medium",
+      "choices": [
+        {
+          "id": "low",
+          "label": "Low",
+          "attributes": {
+            "water@update": "false",
+            "water@detail": "0",
+            "water@tessellation": "false"
+          }
+        },
+        {
+          "id": "medium",
+          "label": "Medium",
+          "attributes": {
+            "water@update": "true",
+            "water@detail": "1",
+            "water@tessellation": "true"
+          }
+        },
+        {
+          "id": "high",
+          "label": "High",
+          "attributes": {
+            "water@update": "true",
+            "water@detail": "2",
+            "water@tessellation": "true"
+          }
+        }
+      ]
+    },
+    {
+      "field": "PostProcessing",
+      "gameCategory": "post",
+      "label": "Post-processing",
+      "default": "medium",
+      "choices": [
+        {
+          "id": "low",
+          "label": "Low",
+          "attributes": {
+            "postprocess@quality": "0"
+          }
+        },
+        {
+          "id": "medium",
+          "label": "Medium",
+          "attributes": {
+            "postprocess@quality": "1"
+          }
+        },
+        {
+          "id": "high",
+          "label": "High",
+          "attributes": {
+            "postprocess@quality": "2"
+          },
+          "dx11Only": true
+        }
+      ]
+    },
+    {
+      "field": "Skidmarks",
+      "gameCategory": "skidmarks",
+      "label": "Skidmarks",
+      "default": "on",
+      "choices": [
+        {
+          "id": "off",
+          "label": "Off",
+          "attributes": {
+            "skidmarks@enabled": "false"
+          }
+        },
+        {
+          "id": "on",
+          "label": "On",
+          "attributes": {
+            "skidmarks@enabled": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "id": "ultralow",
+      "label": "Ultra Low",
+      "values": {
+        "NightLighting": "low",
+        "Shadows": "ultralow",
+        "Particles": "off",
+        "Mirrors": "off",
+        "Crowd": "off",
+        "Cloth": "off",
+        "AmbientOcclusion": "low",
+        "GroundCover": "off",
+        "Vehicles": "low",
+        "Trees": "ultralow",
+        "Objects": "ultralow",
+        "CarReflections": "low",
+        "Water": "low",
+        "PostProcessing": "low",
+        "Skidmarks": "off"
+      },
+      "other": {
+        "multisampling": "2xmsaa",
+        "physics": "high"
+      },
+      "graphicsDetailLevel": "ultralow"
+    },
+    {
+      "id": "low",
+      "label": "Low",
+      "values": {
+        "NightLighting": "low",
+        "Shadows": "low",
+        "Particles": "low",
+        "Mirrors": "low",
+        "Crowd": "off",
+        "Cloth": "low",
+        "AmbientOcclusion": "low",
+        "GroundCover": "low",
+        "Vehicles": "low",
+        "Trees": "low",
+        "Objects": "low",
+        "CarReflections": "low",
+        "Water": "low",
+        "PostProcessing": "low",
+        "Skidmarks": "off"
+      },
+      "other": {
+        "multisampling": "2xmsaa",
+        "physics": "high"
+      },
+      "graphicsDetailLevel": "low",
+      "dx9Differences": {
+        "Cloth": "off"
+      }
+    },
+    {
+      "id": "medium",
+      "label": "Medium",
+      "values": {
+        "NightLighting": "medium",
+        "Shadows": "medium",
+        "Particles": "medium",
+        "Mirrors": "medium",
+        "Crowd": "low",
+        "Cloth": "high",
+        "AmbientOcclusion": "high",
+        "GroundCover": "high",
+        "Vehicles": "medium",
+        "Trees": "medium",
+        "Objects": "medium",
+        "CarReflections": "medium",
+        "Water": "medium",
+        "PostProcessing": "medium",
+        "Skidmarks": "on"
+      },
+      "other": {
+        "multisampling": "2xmsaa",
+        "physics": "high"
+      },
+      "graphicsDetailLevel": "medium",
+      "gameDefault": true
+    },
+    {
+      "id": "high",
+      "label": "High",
+      "values": {
+        "NightLighting": "high",
+        "Shadows": "high",
+        "Particles": "high",
+        "Mirrors": "high",
+        "Crowd": "high",
+        "Cloth": "high",
+        "AmbientOcclusion": "high",
+        "GroundCover": "high",
+        "Vehicles": "high",
+        "Trees": "high",
+        "Objects": "high",
+        "CarReflections": "high",
+        "Water": "high",
+        "PostProcessing": "high",
+        "Skidmarks": "on"
+      },
+      "other": {
+        "multisampling": "4xmsaa",
+        "physics": "high"
+      },
+      "graphicsDetailLevel": "high",
+      "dx9Differences": {
+        "PostProcessing": "medium"
+      }
+    },
+    {
+      "id": "ultra",
+      "label": "Ultra",
+      "values": {
+        "NightLighting": "high",
+        "Shadows": "ultra",
+        "Particles": "high",
+        "Mirrors": "ultra",
+        "Crowd": "ultra",
+        "Cloth": "high",
+        "AmbientOcclusion": "ultra",
+        "GroundCover": "high",
+        "Vehicles": "high",
+        "Trees": "ultra",
+        "Objects": "ultra",
+        "CarReflections": "ultra",
+        "Water": "high",
+        "PostProcessing": "high",
+        "Skidmarks": "on"
+      },
+      "other": {
+        "multisampling": "4xmsaa",
+        "physics": "high"
+      },
+      "graphicsDetailLevel": "ultra",
+      "dx9Differences": {
+        "Shadows": "high",
+        "Crowd": "high",
+        "PostProcessing": "medium"
+      }
+    }
+  ]
+}
