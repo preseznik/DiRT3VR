@@ -100,6 +100,10 @@ Public Class LauncherForm
     ' Wheel scrolling over sliders and closed dropdowns moves the page, not the value.
     Private ReadOnly wheelGuard As SettingsWheelGuard
     Public Sub New()
+        ' The same artwork as the executable, setup and shortcuts (assets\DiRT3VR.ico).
+        Using stream = GetType(LauncherForm).Assembly.GetManifestResourceStream("DiRT3VR.ico"), appIcon As New Icon(stream)
+            Icon = DirectCast(appIcon.Clone(), Icon)
+        End Using
         wheelGuard = New SettingsWheelGuard(Me)
     End Sub
     Protected Overrides Sub OnLoad(e As EventArgs)
@@ -123,7 +127,7 @@ Public Class LauncherForm
         MyBase.OnFormClosed(e)
     End Sub
     Protected Overrides Sub Dispose(disposing As Boolean)
-        If disposing Then wheelGuard.Dispose()
+        If disposing Then wheelGuard.Dispose() : Icon?.Dispose()
         MyBase.Dispose(disposing)
     End Sub
 End Class

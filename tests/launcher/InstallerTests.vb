@@ -1,5 +1,7 @@
 Imports DiRT3VR
+Imports System.Drawing
 Imports System.IO
+Imports System.Windows.Forms
 
 ' Command-line contract used by installer/DiRT3VR.iss.
 Module InstallerTests
@@ -28,5 +30,21 @@ Module InstallerTests
             check(DiRT3VR.Program.Main({"--check-uninstall", "--game", game, "--error-log", uninstallError}) = 0 AndAlso Not File.Exists(uninstallError),
                   "uninstall is allowed without a running game or pending recovery")
         End If
+        Using stream = GetType(LauncherForm).Assembly.GetManifestResourceStream("DiRT3VR.ico")
+            check(stream IsNot Nothing AndAlso stream.Length > 0, "launcher embeds the DiRT3VR icon")
+        End Using
     End Sub
+
+    ' Windows may be created only after the UI phase configures text rendering.
+    Public Sub RunUi(check As Action(Of Boolean, String))
+        Using branded As New LauncherForm(), plain As New Form()
+            check(Not Pixels(branded.Icon).SequenceEqual(Pixels(plain.Icon)), "launcher windows use the DiRT3VR icon, not the default")
+        End Using
+    End Sub
+
+    Private Function Pixels(icon As Icon) As Integer()
+        Using bitmap = icon.ToBitmap()
+            Return Enumerable.Range(0, bitmap.Width * bitmap.Height).Select(Function(i) bitmap.GetPixel(i Mod bitmap.Width, i \ bitmap.Width).ToArgb()).ToArray()
+        End Using
+    End Function
 End Module
