@@ -44,6 +44,26 @@ Some Windows sandbox configurations deny MSVC debug helpers or atomic file
 replacement even under temporary directories; run those checks in the authorized
 normal build environment without weakening the implementation's checks.
 
+## Releases and update checks
+
+The launcher's update check (`launcher/Updates.vb`, adapted from DiRT2VR) reads
+the GitHub Releases of `preseznik/DiRT3VR`, so it finds nothing until the
+repository is public; a 404 is shown as "no public releases yet" and the startup
+check stays silent. Only installed packages (with `package.json`) check at
+startup; development and test builds check only when asked.
+
+For a release to be offered:
+
+- Tag it `vX.Y.Z` matching `<Version>` in `launcher/DiRT3VR.vbproj`. Mark
+  experimental releases as a GitHub prerelease, or use a prerelease version such
+  as `0.2.0-beta.1`; those are offered only to players who opt in.
+- Attach `DiRT3VR-X.Y.Z-Setup.exe` from `tools/package.ps1` unchanged. The
+  launcher accepts only that exact asset URL in this repository and verifies the
+  download against the SHA-256 digest GitHub records for the asset (shown on the
+  release page), at most 512 MiB.
+- Setup runs with `/DIR=<game folder>` after the launcher has restored any
+  pending game files; the launcher then closes so Setup's running check passes.
+
 ## Bounded desktop diagnostic
 
 `python tools/run_benchmark.py` is read-only preflight. With `--run`, it stages

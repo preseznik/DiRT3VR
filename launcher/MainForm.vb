@@ -17,6 +17,8 @@ Public Class MainForm
     Private desktopStartup As DesktopStartupSession
     Private ReadOnly skipStartupMovies As New CheckBox With {.Name = "SkipStartupMovies", .Text = "Skip startup logo movies (experimental)", .AutoSize = True}
     Private ReadOnly recenterButton As New Button With {.Name = "RecenterKey", .AutoSize = True, .AccessibleName = "Recenter key"}
+    Private ReadOnly updateNotice As New Button With {.Name = "UpdateAvailable", .AutoSize = True, .Visible = False, .Margin = New Padding(0, 4, 8, 0)}
+    Private availableUpdate As ReleaseUpdate
     Private ReadOnly recenterHint As New Label With {.Name = "RecenterHint", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12)}
     Private recenterKey As Integer = RecenterShortcut.DefaultKey, recenterModifiers As Integer
     Private capturingRecenter As Boolean
@@ -80,7 +82,10 @@ Public Class MainForm
         header.Controls.Add(New Label With {.Text = "DiRT 3 VR", .Font = New Font(Font.FontFamily, 20, FontStyle.Bold), .AutoSize = True}, 0, 0)
         Dim help As New Button With {.Name = "HelpAbout", .Text = "?", .AccessibleName = "Help / About", .Size = New Size(36, 36)}
         AddHandler help.Click, Sub() ShowHelp()
-        header.Controls.Add(help, 1, 0)
+        AddHandler updateNotice.Click, Sub() ShowHelp()
+        Dim headerActions As New FlowLayoutPanel With {.AutoSize = True, .WrapContents = False, .Margin = New Padding(0), .Anchor = AnchorStyles.Top Or AnchorStyles.Right}
+        headerActions.Controls.AddRange({updateNotice, help})
+        header.Controls.Add(headerActions, 1, 0)
         layout.Controls.Add(header, 0, 0)
         state.Margin = New Padding(0, 0, 0, 12)
         layout.Controls.Add(state, 0, 1)
@@ -196,6 +201,7 @@ Public Class MainForm
                                If windowReady AndAlso WindowState <> FormWindowState.Minimized Then lastWindowState = WindowState
                            End Sub
         AddHandler Shown, Sub() FitInitialWindow()
+        AddHandler Shown, Async Sub() Await StartupUpdateCheckAsync()
         tips.SetToolTip(desktop, "Start the game with your desktop graphics choices and saved driving controls. No headset is required.")
         tips.SetToolTip(save, "Keep the current controls as the launcher's settings for next time, as Launch does. Settings profiles are not changed.")
         tips.SetToolTip(probe, "Check OpenXR and headset access without starting DiRT 3. This does not validate stereoscopic game rendering.")
@@ -618,22 +624,65 @@ Public Class MainForm
         Next
     End Sub
 
+    Private Function HelpText() As String
+        Return "DiRT3VR " & BuildVersion & " — Research build" & vbCrLf & vbCrLf &
+            "Launch starts DiRT 3 Complete Edition with the desktop choices under Graphics. Use game setting preserves each existing option. Desktop changes remain in the game graphics file; exact backups are kept in desktop-backups under the preferences folder below. Save settings only saves launcher preferences. Steam must be running with access to the game. Driving controls and saves remain managed by DiRT 3." & vbCrLf & vbCrLf &
+            "Advanced → Enable experimental VR enables the VDXR session when supported by this package. All rendered 3D camera views use stereo and tracking. Loading screens and movies use a virtual screen. Camera transitions remain experimental. " & RecenterShortcut.Describe(recenterKey, recenterModifiers) & " recenters while the game is foreground; change the key under Controls." & vbCrLf & vbCrLf &
+            "Settings → Check runtime and headset runs an x86 OpenXR probe without starting the game. Choose VDXR or SteamVR explicitly; the selected runtime is used for that process only, independently of the system OpenXR default. VDXR and SteamVR require separate checks. Browse to the selected runtime file if it is installed elsewhere." & vbCrLf & vbCrLf &
+            "Settings → Settings profiles keeps named presets of desktop, VR, startup, appearance and logging choices. Save as new profile and Overwrite profile store the current controls in a profile without saving the launcher's settings. Save settings (or Launch) keeps the current controls as the launcher's settings and never changes a profile. Load copies a profile into the controls and asks before replacing unsaved edits. Import adds a profile without loading it, and Export writes the selected saved profile. Game saves and local paths are excluded." & vbCrLf & vbCrLf &
+            "Launcher → Skip startup logo movies temporarily replaces the two startup movie states for desktop or VR. Copyright and Press Start remain. Keep the launcher open until game exit for restoration; closing it during the session minimizes it. Leave skipping off for multiplayer until checked. Background play is not implemented for DiRT 3." & vbCrLf & vbCrLf &
+            ExperimentalFiles.ProfileDescription & vbCrLf & vbCrLf &
+            "Restore original files only handles this launcher's recorded changes. Foreign mods and real settings changes are preserved. Keep the launcher open until the game exits and recovery finishes." & vbCrLf & vbCrLf &
+            "Preferences and diagnostics: " & context.UserRoot & vbCrLf & vbCrLf &
+            "The native WinForms layout and appearance are adapted from DiRT2VR, with yellow DiRT3VR accents. Modern / Classic follows Windows light, dark and high-contrast preferences."
+    End Function
+
     Private Sub ShowHelp()
-        Using form As New LauncherForm With {.Text = "DiRT3VR — About and instructions", .Font = Font, .StartPosition = FormStartPosition.CenterParent, .Size = New Size(650, 500), .MinimumSize = New Size(500, 350)}
-            Dim text As New TextBox With {.ReadOnly = True, .Multiline = True, .ScrollBars = ScrollBars.Vertical, .Dock = DockStyle.Fill, .BorderStyle = BorderStyle.None}
-            text.Text = "DiRT3VR " & BuildVersion & " — Research build" & vbCrLf & vbCrLf &
-                "Launch starts DiRT 3 Complete Edition with the desktop choices under Graphics. Use game setting preserves each existing option. Desktop changes remain in the game graphics file; exact backups are kept in desktop-backups under the preferences folder below. Save settings only saves launcher preferences. Steam must be running with access to the game. Driving controls and saves remain managed by DiRT 3." & vbCrLf & vbCrLf &
-                "Advanced → Enable experimental VR enables the VDXR session when supported by this package. All rendered 3D camera views use stereo and tracking. Loading screens and movies use a virtual screen. Camera transitions remain experimental. " & RecenterShortcut.Describe(recenterKey, recenterModifiers) & " recenters while the game is foreground; change the key under Controls." & vbCrLf & vbCrLf &
-                "Settings → Check runtime and headset runs an x86 OpenXR probe without starting the game. Choose VDXR or SteamVR explicitly; the selected runtime is used for that process only, independently of the system OpenXR default. VDXR and SteamVR require separate checks. Browse to the selected runtime file if it is installed elsewhere." & vbCrLf & vbCrLf &
-                "Settings → Settings profiles keeps named presets of desktop, VR, startup, appearance and logging choices. Save as new profile and Overwrite profile store the current controls in a profile without saving the launcher's settings. Save settings (or Launch) keeps the current controls as the launcher's settings and never changes a profile. Load copies a profile into the controls and asks before replacing unsaved edits. Import adds a profile without loading it, and Export writes the selected saved profile. Game saves and local paths are excluded." & vbCrLf & vbCrLf &
-                "Launcher → Skip startup logo movies temporarily replaces the two startup movie states for desktop or VR. Copyright and Press Start remain. Keep the launcher open until game exit for restoration; closing it during the session minimizes it. Leave skipping off for multiplayer until checked. Background play is not implemented for DiRT 3." & vbCrLf & vbCrLf &
-                ExperimentalFiles.ProfileDescription & vbCrLf & vbCrLf &
-                "Restore original files only handles this launcher's recorded changes. Foreign mods and real settings changes are preserved. Keep the launcher open until the game exits and recovery finishes." & vbCrLf & vbCrLf &
-                "Preferences and diagnostics: " & context.UserRoot & vbCrLf & vbCrLf &
-                "The native WinForms layout and appearance are adapted from DiRT2VR, with yellow DiRT3VR accents. Modern / Classic follows Windows light, dark and high-contrast preferences."
-            form.Padding = New Padding(20) : form.Controls.Add(text) : form.ShowDialog(Me)
+        Dim changed = False
+        Using form As New AboutForm(context, HelpText(), availableUpdate, blocker:=AddressOf UpdateBlocker) With {.Font = Font}
+            AddHandler form.UpdatePreferenceChanged, Sub()
+                                                         changed = True : availableUpdate = Nothing : updateNotice.Visible = False
+                                                     End Sub
+            form.ShowDialog(Me)
         End Using
+        If changed AndAlso Not IsDisposed Then
+            Dim recheck = StartupUpdateCheckAsync()
+        End If
     End Sub
+
+    ' Setup needs DiRT 3 closed and the original files back.
+    Private Function UpdateBlocker() As String
+        If interactive IsNot Nothing OrElse desktopStartup IsNot Nothing OrElse launchProgress IsNot Nothing OrElse busy Then Return "Close DiRT 3 and wait until the launcher has restored the original files, then update."
+        Return ""
+    End Function
+
+    ' Installed packages check GitHub Releases once at startup; development and test builds don't.
+    Private Async Function StartupUpdateCheckAsync() As Task
+        If Not UpdateService.IsInstalledPackage(context) Then Return
+        Await CheckForUpdateAsync(AddressOf CheckReleaseAsync)
+    End Function
+
+    Private Async Function CheckReleaseAsync(token As Threading.CancellationToken) As Task(Of ReleaseUpdate)
+        Using client = UpdateService.CreateClient()
+            Return Await New UpdateService(client).CheckAsync(BuildInfo.Version, UpdatePreferences.Load(context).IncludeExperimentalReleases, token)
+        End Using
+    End Function
+
+    ' Quiet: a failed check, or no public releases yet, shows nothing (public for the launcher tests).
+    Public Async Function CheckForUpdateAsync(check As Func(Of Threading.CancellationToken, Task(Of ReleaseUpdate))) As Task
+        Dim result As ReleaseUpdate
+        Try
+            result = Await check(lifetime.Token)
+        Catch ex As Exception
+            Return
+        End Try
+        If IsDisposed OrElse result Is Nothing Then Return
+        If result.IsExperimental AndAlso Not UpdatePreferences.Load(context).IncludeExperimentalReleases Then Return
+        availableUpdate = result
+        updateNotice.Text = "Update available: " & result.Version.Text
+        updateNotice.Visible = True
+        tips.SetToolTip(updateNotice, result.Describe() & " is available. Click to download and install it.")
+    End Function
 
     Protected Overrides Sub Dispose(disposing As Boolean)
         If disposing AndAlso Not resourcesDisposed Then

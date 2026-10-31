@@ -84,6 +84,12 @@ report is investigated.
    Changes apply on the next VR launch.
 6. Use **Save settings**, **Restore original files**, and **Open logs** from
    the persistent footer when needed.
+7. **?** opens About, updates and instructions. Installed versions check GitHub
+   Releases once at startup and show **Update available** next to **?**.
+   **Download and install** verifies the installer against GitHub's SHA-256
+   before Setup runs, restores any pending game files first, and closes the
+   launcher so Setup can update it. **Include experimental releases** offers
+   test builds too.
 
 Old output-scale preferences start at the new 100% render-scale default; they
 are not reinterpreted as scene scale. Other preferences are preserved.
