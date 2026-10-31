@@ -23,6 +23,10 @@ Public Class MainForm
     Private ReadOnly recenterHint As New Label With {.Name = "RecenterHint", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12)}
     Private recenterKey As Integer = RecenterShortcut.DefaultKey, recenterModifiers As Integer
     Private capturingRecenter As Boolean
+    Private ReadOnly recenterDeviceButton As New Button With {.Name = "RecenterDevice", .AutoSize = True}
+    Private ReadOnly clearRecenterDevice As New Button With {.Name = "ClearRecenterDevice", .Text = "Clear", .AutoSize = True}
+    Private recenterDevice As RecenterDeviceBinding
+    Private recenterWatcher As RecenterDeviceWatcher
     Private ReadOnly experimental As New CheckBox With {.Name = "ExperimentalVR", .Text = "Enable experimental VR (VDXR)", .AutoSize = True}
     Private ReadOnly tabs As New ModernTabs With {.Name = "LauncherTabs", .Dock = DockStyle.Fill}
     Private ReadOnly state As New Label With {.Name = "SessionStatus", .AutoSize = True}
@@ -154,6 +158,7 @@ Public Class MainForm
                                                               End If
                                                               Dim selected = CurrentSettings()
                                                               interactive = Await InteractiveSession.StartAsync(context, selected, AddressOf ConfirmLayerBypass)
+                                                              StartRecenterWatcher(selected.RecenterDevice)
                                                               UpdateLayerSummary()
                                                               settings = selected
                                                               RememberSavedSettings()
@@ -358,6 +363,17 @@ Public Class MainForm
         Dim vrControls = Section(content, "VR and seat controls")
         Field(vrControls, "Recenter key", recenterButton)
         vrControls.Controls.Add(recenterHint)
+        Dim deviceRow As New FlowLayoutPanel With {.AutoSize = True, .WrapContents = True, .Margin = New Padding(0)}
+        deviceRow.Controls.AddRange({recenterDeviceButton, clearRecenterDevice})
+        Field(vrControls, "Controller / wheel button", deviceRow)
+        vrControls.Controls.Add(Info("Optional: a controller, wheel or button-box button (or D-pad / hat direction) that also recenters while DiRT 3 is in front. The launcher reads the device without taking it over and sends nothing to the game."))
+        AddHandler recenterDeviceButton.Click, Sub()
+                                                   Using dialog As New RecenterDeviceForm(DrivingInput.LibraryPath(context))
+                                                       If dialog.ShowDialog(Me) = DialogResult.OK AndAlso dialog.Binding IsNot Nothing Then SetRecenterDevice(dialog.Binding)
+                                                   End Using
+                                               End Sub
+        AddHandler clearRecenterDevice.Click, Sub() SetRecenterDevice(Nothing)
+        UpdateRecenterDeviceLabel()
         vrControls.Controls.Add(Info("Head tracking applies to every rendered 3D camera view, including replay. Per-car seat adjustment is not available yet."))
         AddHandler recenterButton.Click, Sub()
                                              capturingRecenter = True
@@ -370,6 +386,31 @@ Public Class MainForm
                                              End Sub
         tips.SetToolTip(recenterButton, "Click, then press the key or key combination that recenters the headset view while DiRT 3 is in front.")
         UpdateRecenterLabel()
+    End Sub
+
+    ' Public for the launcher tests; the dialog sets it after a button press.
+    Public Sub SetRecenterDevice(value As RecenterDeviceBinding)
+        value?.Validate()
+        recenterDevice = value
+        UpdateRecenterDeviceLabel()
+        notice.Text = If(value Is Nothing, "Controller / wheel recenter cleared.", "Recenter button set to " & value.Describe() & ".") & " Save settings or Launch to keep it."
+    End Sub
+
+    Private Sub UpdateRecenterDeviceLabel()
+        recenterDeviceButton.Text = If(recenterDevice Is Nothing, "Bind a button…", recenterDevice.Describe())
+        clearRecenterDevice.Enabled = recenterDevice IsNot Nothing
+    End Sub
+
+    ' Watches the bound controller/wheel button while this VR session runs.
+    Private Sub StartRecenterWatcher(binding As RecenterDeviceBinding)
+        recenterWatcher?.Dispose() : recenterWatcher = Nothing
+        If binding Is Nothing OrElse interactive Is Nothing Then Return
+        Try
+            recenterWatcher = RecenterDeviceWatcher.ForSession(DrivingInput.LibraryPath(context), Handle, binding, interactive.Game.Id, interactive.RecenterRequestPath)
+            recenterWatcher.Start()
+        Catch ex As IOException
+            notice.Text &= " Controller recenter is unavailable: " & ex.Message
+        End Try
     End Sub
 
     Private Sub UpdateRecenterLabel()
@@ -484,6 +525,7 @@ Public Class MainForm
         experimental.Checked = settings.ExperimentalVrEnabled
         skipStartupMovies.Checked = settings.SkipStartupMovies
         recenterKey = settings.RecenterKey : recenterModifiers = settings.RecenterModifiers : capturingRecenter = False : UpdateRecenterLabel()
+        recenterDevice = settings.RecenterDevice : UpdateRecenterDeviceLabel()
         renderScale.Value = settings.VrRenderScale
         desktopMode.SelectedIndex = Array.IndexOf({"game", "windowed", "fullscreen", "borderless"}, settings.DesktopDisplayMode)
         desktopVSync.SelectedIndex = Array.IndexOf({"game", "off", "on"}, settings.DesktopVSync)
@@ -503,7 +545,7 @@ Public Class MainForm
         Return New LauncherSettings With {.ModernInterface = modern.Checked, .RuntimeMode = If(runtime.SelectedIndex = 1, "steamvr", "vdxr"), .SteamRuntimeManifest = manifest.Text, .VdxrRuntimeManifest = vdxrManifest.Text, .DiagnosticLogging = logging.Checked, .ExperimentalVrEnabled = experimental.Checked, .VrRenderScale = renderScale.Value,
             .DesktopWidth = If(resolution Is Nothing, 0, resolution.Size.Width), .DesktopHeight = If(resolution Is Nothing, 0, resolution.Size.Height),
             .DesktopDisplayMode = {"game", "windowed", "fullscreen", "borderless"}(Math.Max(0, desktopMode.SelectedIndex)), .DesktopVSync = {"game", "off", "on"}(Math.Max(0, desktopVSync.SelectedIndex)), .SkipStartupMovies = skipStartupMovies.Checked,
-            .RecenterKey = recenterKey, .RecenterModifiers = recenterModifiers}
+            .RecenterKey = recenterKey, .RecenterModifiers = recenterModifiers, .RecenterDevice = recenterDevice}
     End Function
 
     Private Sub RememberSavedSettings()
@@ -554,6 +596,7 @@ Public Class MainForm
         Catch ex As Exception
             notice.Text = "DiRT 3 closed. Recovery is pending: " & ex.Message
         Finally
+            recenterWatcher?.Dispose() : recenterWatcher = Nothing
             launchProgress?.Dispose() : launchProgress = Nothing
             interactive = Nothing
             RefreshState() : LoadDiagnostics()
@@ -720,7 +763,7 @@ Public Class MainForm
         If disposing AndAlso Not resourcesDisposed Then
             resourcesDisposed = True
             lifetime.Cancel() : lifetime.Dispose()
-            timer.Dispose() : tips.Dispose() : launchProgress?.Dispose()
+            timer.Dispose() : tips.Dispose() : launchProgress?.Dispose() : recenterWatcher?.Dispose()
         End If
         MyBase.Dispose(disposing)
     End Sub

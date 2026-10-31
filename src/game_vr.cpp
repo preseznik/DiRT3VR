@@ -317,14 +317,35 @@ RecenterShortcut ConfiguredRecenter() {
     RuntimeLog(("XR recenter key="+value.Describe()).c_str());
     return value;
 }
+// The launcher creates this file when a bound controller/wheel button is pressed with DiRT 3 in front.
+const std::wstring& RecenterRequestPath() {
+    static const std::wstring path=[] {
+        const DWORD size=GetEnvironmentVariableW(L"DIRT3VR_RECENTER_REQUEST_FILE",nullptr,0);
+        if(!size || size>32768) return std::wstring{};
+        std::wstring value(size,L'\0');
+        const DWORD copied=GetEnvironmentVariableW(L"DIRT3VR_RECENTER_REQUEST_FILE",value.data(),size);
+        if(!copied || copied>=size) return std::wstring{};
+        value.resize(copied);
+        return std::filesystem::path(value).is_absolute() ? value : std::wstring{};
+    }();
+    return path;
+}
+bool DeviceRecenterRequested() {
+    const auto& path=RecenterRequestPath();
+    return !path.empty() && DeleteFileW(path.c_str())!=FALSE;
+}
 void RecenterKey(PrototypeState& state) {
     static const RecenterShortcut binding=ConfiguredRecenter();
     DWORD process{};
     GetWindowThreadProcessId(GetForegroundWindow(),&process);
     const unsigned modifiers=(GetAsyncKeyState(VK_CONTROL)<0?1u:0u)|(GetAsyncKeyState(VK_MENU)<0?2u:0u)|(GetAsyncKeyState(VK_SHIFT)<0?4u:0u);
     const bool keyDown=GetAsyncKeyState(static_cast<int>(binding.key))<0;
-    if(state.recenter.Update(binding,keyDown,modifiers,process==GetCurrentProcessId())) {
-        state.xr.RequestRecenter(); RuntimeLog(("XR recenter requested key="+binding.Describe()).c_str());
+    // Consume a button request every frame, so a key press in the same frame can't leave it for a second recenter.
+    const bool keyPressed=state.recenter.Update(binding,keyDown,modifiers,process==GetCurrentProcessId());
+    const bool devicePressed=DeviceRecenterRequested();
+    if(keyPressed || devicePressed) {
+        state.xr.RequestRecenter();
+        RuntimeLog((keyPressed ? "XR recenter requested key="+binding.Describe() : std::string("XR recenter requested by controller/wheel button")).c_str());
     }
 }
 }
