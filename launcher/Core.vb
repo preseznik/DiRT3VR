@@ -30,6 +30,22 @@ Public Module SafeFiles
         Return Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant()
     End Function
 
+    Public Function IsReadOnly(path As String) As Boolean
+        Return (File.GetAttributes(path) And FileAttributes.ReadOnly) <> 0
+    End Function
+
+    Public Sub SetReadOnly(path As String, value As Boolean)
+        Dim attributes = File.GetAttributes(path)
+        Dim updated = If(value, attributes Or FileAttributes.ReadOnly, attributes And Not FileAttributes.ReadOnly)
+        If updated <> attributes Then File.SetAttributes(path, updated)
+    End Sub
+
+    ' Attributes that SetFileAttributes accepts; the replacement keeps these from the file it replaces.
+    Private Const CopiedAttributes As FileAttributes = FileAttributes.ReadOnly Or FileAttributes.Hidden Or FileAttributes.System Or FileAttributes.Archive Or FileAttributes.NotContentIndexed
+
+    ' Replacing a file keeps its attributes. Players make game settings read-only on
+    ' purpose, and Windows refuses to replace a read-only file even for administrators,
+    ' so the flag is lifted only for the rename and is back afterwards (adapted from DiRT2VR).
     Public Sub WriteAtomic(path As String, bytes As Byte())
         NoLinks(path)
         Directory.CreateDirectory(IO.Path.GetDirectoryName(IO.Path.GetFullPath(path)))
@@ -38,9 +54,20 @@ Public Module SafeFiles
             Using stream As New FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None)
                 stream.Write(bytes) : stream.Flush(True)
             End Using
-            File.Move(temporary, path, True)
+            Dim existing = File.Exists(path)
+            Dim wasReadOnly = existing AndAlso IsReadOnly(path)
+            If existing Then
+                Dim kept = File.GetAttributes(path) And CopiedAttributes
+                File.SetAttributes(temporary, If(kept = 0, FileAttributes.Normal, kept))
+            End If
+            If wasReadOnly Then SetReadOnly(path, False)
+            Try
+                File.Move(temporary, path, True)
+            Finally
+                If wasReadOnly AndAlso File.Exists(path) Then SetReadOnly(path, True)
+            End Try
         Finally
-            If File.Exists(temporary) Then File.Delete(temporary)
+            If File.Exists(temporary) Then SetReadOnly(temporary, False) : File.Delete(temporary)
         End Try
     End Sub
 

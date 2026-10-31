@@ -366,6 +366,45 @@ Module Program
         RecoveryWorker.ValidateGraphicsPath(Path.Combine(root, "Documents\My Games\DiRT3\hardwaresettings\hardware_settings_config.xml"))
         Check(True, "elevated worker accepts exact DiRT 3 settings suffix")
 
+        ' Players make game settings read-only on purpose. Replacing keeps the flag,
+        ' sessions no longer refuse such files, and recovery puts the recorded flag back.
+        Dim lockedFile = Path.Combine(root, "locked-write.json")
+        File.WriteAllText(lockedFile, "old") : File.SetAttributes(lockedFile, FileAttributes.ReadOnly Or FileAttributes.Hidden)
+        SafeFiles.WriteAtomic(lockedFile, Encoding.UTF8.GetBytes("new"))
+        Check(File.ReadAllText(lockedFile) = "new" AndAlso SafeFiles.IsReadOnly(lockedFile) AndAlso (File.GetAttributes(lockedFile) And FileAttributes.Hidden) <> 0, "atomic replacement of a read-only file keeps its attributes")
+        Check(Directory.GetFiles(root, "locked-write.json.*.tmp").Length = 0, "read-only replacement leaves no temporary file")
+        SafeFiles.SetReadOnly(lockedFile, False)
+        Check(Not SafeFiles.IsReadOnly(lockedFile), "read-only flag can be cleared")
+
+        Dim locked = Context(root, "recover-read-only")
+        File.WriteAllBytes(locked.GraphicsPath, original) : SafeFiles.SetReadOnly(locked.GraphicsPath, True)
+        Dim lockedTransaction As New OwnedFileTransaction(locked)
+        lockedTransaction.Prepare(New Dictionary(Of String, Byte()) From {{"graphics", replacement}, {"proxy", proxy}})
+        Dim lockedJournal = SafeFiles.ReadJson(Of RecoveryJournal)(lockedTransaction.JournalPath)
+        Check(lockedJournal.Entries.Single(Function(e) e.Target = "graphics").OriginalReadOnly AndAlso Not lockedJournal.Entries.Single(Function(e) e.Target = "proxy").OriginalReadOnly, "journal records which originals were read-only")
+        Check(File.ReadAllBytes(locked.GraphicsPath).SequenceEqual(replacement) AndAlso SafeFiles.IsReadOnly(locked.GraphicsPath), "a read-only game file is applied and stays read-only during the session")
+        Check(lockedTransaction.Recover() AndAlso File.ReadAllBytes(locked.GraphicsPath).SequenceEqual(original) AndAlso SafeFiles.IsReadOnly(locked.GraphicsPath), "recovery restores a read-only original with its flag")
+        Check(Not File.Exists(Path.Combine(locked.GameRoot, "d3d11.dll")), "owned proxy removed beside a read-only original")
+
+        Dim unlocked = Context(root, "recover-flag-lost")
+        File.WriteAllBytes(unlocked.GraphicsPath, original) : SafeFiles.SetReadOnly(unlocked.GraphicsPath, True)
+        Dim unlockedTransaction As New OwnedFileTransaction(unlocked)
+        unlockedTransaction.Prepare(New Dictionary(Of String, Byte()) From {{"graphics", replacement}})
+        SafeFiles.SetReadOnly(unlocked.GraphicsPath, False) ' e.g. the game or another tool rewrote the file during play
+        Check(unlockedTransaction.Recover() AndAlso File.ReadAllBytes(unlocked.GraphicsPath).SequenceEqual(original) AndAlso SafeFiles.IsReadOnly(unlocked.GraphicsPath), "recovery puts back a read-only flag lost during the session")
+
+        Dim legacy = Context(root, "recover-legacy-flag")
+        File.WriteAllBytes(legacy.GraphicsPath, original)
+        Dim legacyTransaction As New OwnedFileTransaction(legacy)
+        legacyTransaction.Prepare(New Dictionary(Of String, Byte()) From {{"graphics", replacement}})
+        Dim legacyJson = Nodes.JsonNode.Parse(File.ReadAllText(legacyTransaction.JournalPath))
+        For Each legacyEntry In legacyJson("Entries").AsArray()
+            legacyEntry.AsObject().Remove("OriginalReadOnly")
+        Next
+        File.WriteAllText(legacyTransaction.JournalPath, legacyJson.ToJsonString())
+        Check(Not File.ReadAllText(legacyTransaction.JournalPath).Contains("OriginalReadOnly"), "legacy journal fixture has no read-only field")
+        Check(legacyTransaction.Recover() AndAlso File.ReadAllBytes(legacy.GraphicsPath).SequenceEqual(original) AndAlso Not SafeFiles.IsReadOnly(legacy.GraphicsPath), "journals written before read-only support still recover")
+
         Dim partialContext = Context(root, "partial-preparation")
         File.WriteAllBytes(partialContext.GraphicsPath, original)
         Dim partialTransaction As New OwnedFileTransaction(partialContext)

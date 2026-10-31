@@ -5,6 +5,8 @@ Public Class RecoveryEntry
     Public Property AppliedHash As String = ""
     Public Property OriginalExists As Boolean
     Public Property AppliedBackup As String = ""
+    ' Older journals lack this field; they were only written for files that were not read-only.
+    Public Property OriginalReadOnly As Boolean
 End Class
 
 Public Class RecoveryJournal
@@ -62,7 +64,6 @@ Public Class OwnedFileTransaction
             If pair.Key = "restrictions" AndAlso Not experimental Then Throw New IOException("Restrictions require an experimental session journal.")
             If pair.Key = "proxy" AndAlso File.Exists(target) Then Throw New IOException("An existing d3d11.dll was preserved. Another graphics mod must be removed using its own instructions.")
             If prepared AndAlso pair.Key <> "proxy" AndAlso Not File.Exists(target) Then Throw New IOException("The original settings file is missing: " & target)
-            If File.Exists(target) AndAlso (File.GetAttributes(target) And FileAttributes.ReadOnly) <> 0 Then Throw New UnauthorizedAccessException("The game file is read-only: " & target)
             If prepared Then ValidateApplied(pair.Key, If(File.Exists(target), File.ReadAllBytes(target), Array.Empty(Of Byte)()), pair.Value)
         Next
         For Each pair In changes
@@ -71,7 +72,8 @@ Public Class OwnedFileTransaction
             If pair.Key = "proxy" AndAlso File.Exists(target) Then Throw New IOException("An existing d3d11.dll was preserved. Another graphics mod must be removed using its own instructions.")
             Dim entry As New RecoveryEntry With {.Target = pair.Key, .OriginalExists = File.Exists(target), .AppliedHash = SafeFiles.HashBytes(pair.Value), .Backup = Guid.NewGuid().ToString("N") & ".bin"}
             If entry.OriginalExists Then
-                If (File.GetAttributes(target) And FileAttributes.ReadOnly) <> 0 Then Throw New UnauthorizedAccessException("The game file is read-only: " & target)
+                ' Read-only files stay read-only while applied (WriteAtomic keeps attributes); recovery puts the recorded flag back.
+                entry.OriginalReadOnly = SafeFiles.IsReadOnly(target)
                 Dim bytes = File.ReadAllBytes(target)
                 entry.OriginalHash = SafeFiles.HashBytes(bytes)
                 SafeFiles.WriteAtomic(Path.Combine(Folder, entry.Backup), bytes)
@@ -192,10 +194,12 @@ Public Class OwnedFileTransaction
                     If SafeFiles.Hash(target) <> current Then Throw New IOException("Graphics file changed before restoration; backups preserved.")
                     SafeFiles.WriteAtomic(target, originalBytes)
                 Else
+                    SafeFiles.SetReadOnly(target, False)
                     File.Delete(target)
                 End If
             End If
             If If(File.Exists(target), SafeFiles.Hash(target), "") <> original Then Throw New IOException("Restored file verification failed; recovery evidence retained.")
+            If entry.OriginalExists Then SafeFiles.SetReadOnly(target, entry.OriginalReadOnly)
         Next
         File.Move(JournalPath, Path.Combine(Folder, "restored-" & Guid.NewGuid().ToString("N") & ".json"))
         Return True
