@@ -186,8 +186,19 @@ Public Module Discovery
         Return roots.Distinct(StringComparer.OrdinalIgnoreCase)
     End Function
 
+    ' Setup installs the launcher in a DiRT3VR subfolder of the game; a portable
+    ' copy may also sit in the game folder itself.
+    Public Function GameFolderNear(folder As String) As String
+        Dim own = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder))
+        For Each candidate In {own, Path.GetDirectoryName(own)}
+            If candidate IsNot Nothing AndAlso File.Exists(Path.Combine(candidate, "dirt3_game.exe")) Then Return candidate
+        Next
+        Return Nothing
+    End Function
+
     Public Function GamePath() As String
-        If File.Exists(Path.Combine(AppContext.BaseDirectory, "dirt3_game.exe")) Then Return AppContext.BaseDirectory
+        Dim near = GameFolderNear(AppContext.BaseDirectory)
+        If near IsNot Nothing Then Return near
         For Each root In SteamLibraries()
             Dim candidate = Path.Combine(root, "steamapps\common\DiRT 3 Complete Edition")
             If File.Exists(Path.Combine(candidate, "dirt3_game.exe")) Then Return candidate

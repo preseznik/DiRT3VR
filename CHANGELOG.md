@@ -1,11 +1,13 @@
 # Changelog
 
-## 0.1.20 — F10 recenter, race display panel and safer scrolling
+## 0.1.20 — installer, F10 recenter, race display panel and safer scrolling
+
+- Add `DiRT3VR-0.1.20-Setup.exe`, an Inno Setup installer like DiRT2VR's and GRID2VR's. It detects the DiRT 3 folder, installs the launcher into its `DiRT3VR` subfolder with a Start menu shortcut and changes no game files. Install and uninstall refuse while DiRT3VR or DiRT 3 runs, or while file recovery is pending. The portable ZIP remains available.
 
 - Move three missed race display (OSD) shaders onto the VR HUD panel. They were drawn into both eyes and showed as a head-locked rectangle at the top of the headset view. Needs a VR race to confirm.
 - Move VR recentering from F9 to F10 to match the other VR projects. It still applies only while DiRT 3 is the foreground application. Update the launcher help text and README.
 - Make mouse-wheel scrolling over the VR render scale slider and closed dropdowns scroll the page instead of silently changing settings. Clicking, dragging and keyboard editing still work; an open dropdown keeps wheel selection. Adapted from GRID2VR; every launcher window is protected.
-- 962 launcher checks pass, including high-resolution wheel deltas, Windows scroll settings, nested pages and every slider and dropdown in both appearance styles.
+- 969 launcher checks pass, including the installer commands, high-resolution wheel deltas, Windows scroll settings, nested pages and every slider and dropdown in both appearance styles.
 
 ## 0.1.19 — startup logo option
 

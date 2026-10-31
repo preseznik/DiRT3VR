@@ -21,6 +21,7 @@ Module Program
             DesktopTests.Run(root, AddressOf Check)
             ProfileTests.Run(root, AddressOf Check)
             StartupTests.Run(root, AddressOf Check)
+            InstallerTests.Run(root, AddressOf Check)
             TestHeadsetResolution(root)
             TestWindowPreferences(root)
             TestRecovery(root)

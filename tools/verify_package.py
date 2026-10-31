@@ -39,9 +39,18 @@ def verify(folder):
         assert set(actual) == expected and len(actual) == len(files), 'Archive inventory differs'
         for name, path in files.items():
             assert zipped.read(f'{root.name}/{name}') == path.read_bytes(), f'Archive content differs: {name}'
+    # The Inno Setup installer is built from the same staged folder.
+    setup = root.parent / f"DiRT3VR-{manifest['version']}-Setup.exe"
+    installer = setup.read_bytes()
+    pe = struct.unpack_from('<I', installer, 0x3c)[0]
+    assert installer[:2] == b'MZ' and installer[pe:pe+4] == b'PE\0\0', 'Installer is not a Windows executable'
+    sums = dict(reversed(line.split('  ', 1)) for line in
+                (root.parent / 'SHA256SUMS.txt').read_text(encoding='ascii').splitlines() if line)
+    assert sums == {archive.name: sha(archive.read_bytes()), setup.name: sha(installer)}, 'SHA256SUMS.txt differs'
     result = dict(schema=1, version=manifest['version'], payloadFiles=len(files),
                   nativeSha256=sha(files['payload/d3d11.dll'].read_bytes()),
                   archiveSha256=sha(archive.read_bytes()), archiveBytes=archive.stat().st_size,
+                  installerSha256=sha(installer), installerBytes=len(installer),
                   stereoVerified=False, interactiveLiveAcceptance=False)
     (root.parent / 'validation.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(result, indent=2))

@@ -5,6 +5,11 @@ Public Module Program
     Public Function Main(arguments As String()) As Integer
         Dim context As InstallContext = Nothing
         Try
+            If arguments.Contains("--discover") Then
+                ' Setup asks for the detected game folder before choosing its destination.
+                SafeFiles.WriteAtomic(Argument(arguments, "--discover", Nothing), Text.Encoding.UTF8.GetBytes(Path.TrimEndingDirectorySeparator(Discovery.GamePath())))
+                Return 0
+            End If
             Dim root = Argument(arguments, "--game", Discovery.GamePath())
             Dim worker = arguments.Contains("--recover-worker") OrElse arguments.Contains("--apply-worker")
             If arguments.Contains("--recover-worker") AndAlso arguments.Contains("--apply-worker") Then Throw New IOException("Choose one file-worker operation.")
@@ -21,8 +26,12 @@ Public Module Program
                 End If
                 Return 0
             End If
-            If arguments.Contains("--check-install") Then
-                context.ValidateGame() : Console.WriteLine("Supported DiRT 3 Complete Edition executable. Experimental VDXR requires an explicit launcher opt-in and a matching package; full interactive acceptance is pending.")
+            If arguments.Contains("--check-install") OrElse arguments.Contains("--check-uninstall") Then
+                ' Setup and uninstall must not replace or remove the launcher mid-session or mid-recovery.
+                If arguments.Contains("--check-install") Then context.ValidateGame()
+                If InstallContext.GameRunning() Then Throw New IOException("Close DiRT 3 and let DiRT3VR restore its files first.")
+                If New OwnedFileTransaction(context).Pending Then Throw New IOException("File recovery is pending for this game folder. Open DiRT3VR and use Restore original files first.")
+                If arguments.Contains("--check-install") Then Console.WriteLine("Supported DiRT 3 Complete Edition executable. Experimental VDXR requires an explicit launcher opt-in and a matching package; full interactive acceptance is pending.")
                 Return 0
             End If
             If arguments.Contains("--probe-runtime") Then
@@ -41,9 +50,28 @@ Public Module Program
             Application.SetHighDpiMode(HighDpiMode.PerMonitorV2)
             Application.SetColorMode(SystemColorMode.System)
             Application.EnableVisualStyles()
-            Application.Run(New MainForm(context))
+            ' Setup and uninstall detect a running launcher through this name.
+            Dim running As System.Threading.Mutex = Nothing
+            Try
+                running = New System.Threading.Mutex(False, "Global\DiRT3VR.Session")
+            Catch ex As Exception When TypeOf ex Is UnauthorizedAccessException OrElse TypeOf ex Is System.Threading.WaitHandleCannotBeOpenedException
+                ' Installer detection is optional; the launcher does not depend on it.
+            End Try
+            Try
+                Application.Run(New MainForm(context))
+            Finally
+                running?.Dispose()
+            End Try
             Return 0
         Catch ex As Exception
+            Dim errorLog = Array.IndexOf(arguments, "--error-log")
+            If errorLog >= 0 AndAlso errorLog + 1 < arguments.Length Then
+                Try
+                    SafeFiles.WriteAtomic(arguments(errorLog + 1), Text.Encoding.UTF8.GetBytes(ex.Message))
+                Catch
+                    ' The nonzero exit code still reports the failure to Setup.
+                End Try
+            End If
             If arguments.Contains("--recover-worker") OrElse arguments.Contains("--apply-worker") Then
                 If context IsNot Nothing Then
                     Try
@@ -52,7 +80,7 @@ Public Module Program
                         ' The original nonzero exit remains available when even logging is denied.
                     End Try
                 End If
-            ElseIf arguments.Any(Function(a) a.StartsWith("--check", StringComparison.Ordinal) OrElse a = "--probe-runtime") Then
+            ElseIf arguments.Any(Function(a) a.StartsWith("--check", StringComparison.Ordinal) OrElse a = "--probe-runtime" OrElse a = "--discover") Then
                 Console.Error.WriteLine(ex.Message)
             Else
                 MessageBox.Show(ex.Message, "DiRT3VR", MessageBoxButtons.OK, MessageBoxIcon.Error)

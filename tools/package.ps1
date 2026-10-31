@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([switch]$SkipBuild)
+param([switch]$SkipBuild, [string]$InnoCompiler = "$env:LOCALAPPDATA\Programs\Inno Setup 7\ISCC.exe")
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 if (!$SkipBuild) { & "$PSScriptRoot/build.ps1" }
@@ -36,6 +36,16 @@ Get-ChildItem -LiteralPath $stage -Recurse -File | ForEach-Object {
 }
 $inventory = @{ schema=1; version=$version; builtUtc=[DateTime]::UtcNow.ToString('o'); stereoVerified=$false; files=$files }
 [IO.File]::WriteAllText("$stage/package.json", ($inventory | ConvertTo-Json -Depth 4), $jsonEncoding)
-Compress-Archive -LiteralPath $stage -DestinationPath "$output/DiRT3VR-$version.zip"
+$zip = Join-Path $output "DiRT3VR-$version.zip"
+Compress-Archive -LiteralPath $stage -DestinationPath $zip
+if (!(Test-Path -LiteralPath $InnoCompiler)) { throw "Inno compiler not found: $InnoCompiler. ZIP is at $zip" }
+# The installer packages the same staged folder into <game>\DiRT3VR.
+& $InnoCompiler "/DStage=$stage" "/DPackageVersion=$version" (Join-Path $root 'installer\DiRT3VR.iss')
+if ($LASTEXITCODE) { throw 'Installer compilation failed.' }
+$setup = Join-Path $output "DiRT3VR-$version-Setup.exe"
+Get-Item -LiteralPath $zip, $setup | ForEach-Object {
+    (Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant() + '  ' + $_.Name
+} | Set-Content -LiteralPath (Join-Path $output 'SHA256SUMS.txt') -Encoding ascii
 Write-Output "Portable package: $stage"
-Write-Output "Archive: $output/DiRT3VR-$version.zip"
+Write-Output "Archive: $zip"
+Write-Output "Installer: $setup"

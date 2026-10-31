@@ -1,7 +1,16 @@
 # Development
 
 Requirements: Windows x64, Visual Studio C++ x86 tools with CMake/Ninja,
-Python 3, Git and .NET 10 SDK. Native outputs target x86; the launcher targets x64.
+Python 3, Git, .NET 10 SDK and Inno Setup 7 (`ISCC.exe`, default
+`%LOCALAPPDATA%\Programs\Inno Setup 7`, or pass `-InnoCompiler`). Native outputs
+target x86; the launcher targets x64.
+
+`tools/package.ps1` writes the portable folder, its ZIP, the
+`DiRT3VR-<version>-Setup.exe` installer built from `installer/DiRT3VR.iss` and
+`SHA256SUMS.txt`; `python tools/verify_package.py <package>/DiRT3VR` checks all of
+them. Setup installs the portable layout into `<game>\DiRT3VR`, finds the game
+with `DiRT3VR.exe --discover`, and runs `--check-install` / `--check-uninstall`
+(supported executable, DiRT 3 closed, no pending recovery) before changing files.
 
 ```powershell
 ./tools/bootstrap.ps1

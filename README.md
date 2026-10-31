@@ -28,8 +28,13 @@ report is investigated.
 
 ## Use the launcher
 
-1. Extract the complete portable package to a writable folder.
-2. Open `DiRT3VR.exe` and select your DiRT 3 Complete Edition folder if needed.
+1. Run `DiRT3VR-<version>-Setup.exe`, keep the detected DiRT 3 Complete Edition
+   folder or browse to the one containing `dirt3_game.exe`. Setup installs the
+   launcher into its `DiRT3VR` subfolder and adds a Start menu shortcut; it
+   changes no game files. Close DiRT3VR first and finish any pending
+   **Restore original files** before upgrading or uninstalling. Alternatively,
+   extract the portable ZIP to a writable folder.
+2. Open DiRT3VR and select your DiRT 3 Complete Edition folder if needed.
 3. Use **Launch** for ordinary desktop play through the game's own menus.
    **Startup → Skip startup logo movies** is off by default. When enabled, it
    applies to desktop and VR launches. Closing the launcher during a session
@@ -169,7 +174,7 @@ restricted to VDXR.
 - The diagnostic proxy is not installed by normal desktop launch.
 - Other game editions and modified executables are not validated.
 - Existing graphics proxies and conflicting externally edited files are preserved.
-- No installer, automatic update feed or public release is provided yet.
+- No automatic update feed or public release is provided yet.
 
 Developer build instructions and current measured status are in
 `docs/development.md` and `docs/vr-prototype-status.md` in the source project.
