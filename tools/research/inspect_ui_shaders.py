@@ -81,8 +81,10 @@ def inspect(path):
 
     assert node(at, len(data)) == len(data)
     vertex = [p for p in programs if p['stage'] == 1]
-    two_d = {p['fnv64'] for p in vertex if '.ui_2d_' in p['name']}
-    other = {p['fnv64'] for p in vertex if '.ui_2d_' not in p['name']}
+    # The on-screen display has both ui_2d_osd_* and ui_osd_2d_* programs.
+    is_2d = lambda name: '.ui_2d_' in name or '.ui_osd_2d_' in name
+    two_d = {p['fnv64'] for p in vertex if is_2d(p['name'])}
+    other = {p['fnv64'] for p in vertex if not is_2d(p['name'])}
     return {'source': str(path), 'sha256': hashlib.sha256(data).hexdigest(),
             'programs': programs, 'twoDimensionalVertexHashes': sorted(two_d),
             'exclusiveTwoDimensionalVertexHashes': sorted(two_d-other),

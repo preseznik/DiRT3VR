@@ -10,8 +10,10 @@ inline HudShaderKind ClassifyHudShader(uint64_t hash) noexcept {
     case 0x0ae52f79b03ca080ull:
     case 0x13ae827ac40ce242ull:
     case 0x1406f76ecab9ba8full:
+    case 0x15472d78cb54f392ull:
     case 0x15d77135e29b88b4ull:
     case 0x1ba1ddb867c547ebull:
+    case 0x1d3d792d462f6733ull:
     case 0x1d76a39c30cc7d67ull:
     case 0x23a4703838caa676ull:
     case 0x2422e720984bee76ull:
@@ -39,6 +41,7 @@ inline HudShaderKind ClassifyHudShader(uint64_t hash) noexcept {
     case 0xcce633c8d550a2c4ull:
     case 0xd7b9c3b372420a58ull:
     case 0xebc341f6acd68fc4ull:
+    case 0xf89762721daadb0bull:
     case 0xfc4a9474f16bffa2ull:
         return HudShaderKind::TwoDimensional;
     case 0x10c642b6890fa454ull:
