@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased — F10 recenter
+## Unreleased — F10 recenter and safer scrolling
 
 - Move VR recentering from F9 to F10 to match the other VR projects. It still applies only while DiRT 3 is the foreground application. Update the launcher help text and README.
+- Make mouse-wheel scrolling over the VR render scale slider and closed dropdowns scroll the page instead of silently changing settings. Clicking, dragging and keyboard editing still work; an open dropdown keeps wheel selection. Adapted from GRID2VR; every launcher window is protected.
+- 962 launcher checks pass, including high-resolution wheel deltas, Windows scroll settings, nested pages and every slider and dropdown in both appearance styles.
 
 ## 0.1.19 — startup logo option
 
