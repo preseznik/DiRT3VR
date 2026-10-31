@@ -21,7 +21,7 @@ Public Class InteractiveSession
         End Try
     End Sub
 
-    Public Shared Function StartInfo(context As InstallContext, runtime As RuntimeInfo, directory As String, settings As LauncherSettings, headset As HeadsetResolution) As ProcessStartInfo
+    Public Shared Function StartInfo(context As InstallContext, runtime As RuntimeInfo, directory As String, settings As LauncherSettings, headset As HeadsetResolution, Optional layers As IReadOnlyList(Of VrLayerBypass) = Nothing) As ProcessStartInfo
         If Not Path.IsPathFullyQualified(directory) Then Throw New IOException("The session log path must be absolute.")
         settings.Validate()
         If headset Is Nothing OrElse headset.RuntimeMode <> runtime.Mode Then Throw New IOException("Query the selected headset before launching.")
@@ -39,6 +39,7 @@ Public Class InteractiveSession
         start.Environment("DIRT3VR_LOG_DIR") = directory
         start.Environment("DIRT3VR_XR_STOP_FILE") = Path.Combine(directory, "xr-stop.request")
         start.Environment("XR_RUNTIME_JSON") = runtime.ManifestPath
+        VrApiLayers.Configure(start, layers)
         Return start
     End Function
 
@@ -52,7 +53,7 @@ Public Class InteractiveSession
         End Try
     End Function
 
-    Public Shared Async Function StartAsync(context As InstallContext, settings As LauncherSettings) As Task(Of InteractiveSession)
+    Public Shared Async Function StartAsync(context As InstallContext, settings As LauncherSettings, Optional confirmLayers As Func(Of VrLayerRecoveryRequest, VrLayerRecoveryChoice) = Nothing) As Task(Of InteractiveSession)
         RuntimeCapabilities.RequireExperimental(context, settings)
         Dim lease = AcquireLease(context), game As Process = Nothing
         Dim transaction As New OwnedFileTransaction(context)
@@ -62,7 +63,9 @@ Public Class InteractiveSession
             If transaction.Pending Then Throw New IOException("Restore pending session files before launching.")
             Dim runtime = VrRuntime.Resolve(settings.RuntimeMode, settings.SteamRuntimeManifest, settings.VdxrRuntimeManifest)
             ' Always re-query the selected runtime before staging; UI results may be stale.
-            Dim headset = Await VrRuntime.ReadHeadsetAsync(context, settings, selectedRuntime:=runtime)
+            ' An OpenXR add-on that blocks the probe can be turned off for DiRT 3 with the player's approval.
+            Dim preflight = Await VrLayerPreflight.ReadHeadsetAsync(context, Function(layers) VrRuntime.ReadHeadsetAsync(context, settings, selectedRuntime:=runtime, layers:=layers), confirmLayers)
+            Dim headset = preflight.Headset
             Dim scene = headset.SceneSize(settings.VrRenderScale)
             context.RequireClosed()
             Dim changes = ExperimentalFiles.Changes(context, scene.Width, scene.Height, settings.SkipStartupMovies)
@@ -73,10 +76,10 @@ Public Class InteractiveSession
             staged = True
             Await RecoveryWorker.ApplyAsync(context)
             context.RequireClosed()
-            game = Process.Start(StartInfo(context, runtime, directory, settings, headset))
+            game = Process.Start(StartInfo(context, runtime, directory, settings, headset, preflight.Bypasses))
             If game Is Nothing Then Throw New IOException("DiRT 3 could not start.")
             Dim result As New InteractiveSession(context, game, directory, lease)
-            SafeFiles.SaveJson(Path.Combine(directory, "session.json"), New With {.schema = 1, .mode = "experimental-interactive", .processId = game.Id, .startedUtc = result.StartedUtc, .runtime = runtime.Mode, .vrRenderScale = settings.VrRenderScale, .headsetWidth = headset.Width, .headsetHeight = headset.Height, .sceneWidth = scene.Width, .sceneHeight = scene.Height, .stereoVerified = False})
+            SafeFiles.SaveJson(Path.Combine(directory, "session.json"), New With {.schema = 1, .mode = "experimental-interactive", .processId = game.Id, .startedUtc = result.StartedUtc, .runtime = runtime.Mode, .vrRenderScale = settings.VrRenderScale, .headsetWidth = headset.Width, .headsetHeight = headset.Height, .sceneWidth = scene.Width, .sceneHeight = scene.Height, .stereoVerified = False, .disabledApiLayers = preflight.Bypasses.Select(Function(layer) layer.LayerName).ToArray(), .layerWarning = preflight.Warning})
             Session.WriteLaunchStatus(context, "starting", "Waiting for the game window and native headset output.", game.Id, result.StartedUtc, mode:="experimental-interactive")
             Return result
         Catch ex As Exception

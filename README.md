@@ -103,6 +103,10 @@ skipping off and F10 for recentering where they lack those choices.
 
 For experimental VR, connect the headset through Virtual Desktop, choose VDXR,
 and enable the experimental VR option in Advanced. Close other VR games first.
+If an OpenXR add-on such as ReShade or the OBS mirror stops VR from starting,
+Launch VR names it and offers **Disable and retry**, which turns it off for
+DiRT 3 only (other apps keep it). Remembered choices can be undone under
+**Settings → VR runtime → OpenXR add-ons…**.
 Use **Launch VR** and select any camera through DiRT 3's native controls.
 Rendered 3D scenes use stereo and headset tracking; loading screens, movies and
 frames without a valid 3D scene use a virtual screen. Press
