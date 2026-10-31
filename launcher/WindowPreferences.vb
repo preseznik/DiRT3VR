@@ -7,12 +7,24 @@ Public Class WindowPreferences
     Public Property Width As Integer
     Public Property Height As Integer
     Public Property Maximized As Boolean
+    ' Collapsed launcher section titles joined by "|"; Nothing keeps every section open.
+    Public Property CollapsedSections As String
+
+    Public Shared Function SplitSections(value As String) As HashSet(Of String)
+        Return New HashSet(Of String)(If(value, "").Split("|"c, StringSplitOptions.RemoveEmptyEntries), StringComparer.Ordinal)
+    End Function
+
+    Public Shared Function JoinSections(titles As IEnumerable(Of String)) As String
+        Dim joined = String.Join("|", titles.Distinct().OrderBy(Function(title) title, StringComparer.Ordinal))
+        Return If(joined.Length = 0, Nothing, joined)
+    End Function
 
     Public Shared Function Load(context As InstallContext) As WindowPreferences
         Try
             Dim path = IO.Path.Combine(context.UserRoot, "window-preferences.json")
             If File.Exists(path) Then
                 Dim value = SafeFiles.ReadJson(Of WindowPreferences)(path)
+                If value IsNot Nothing AndAlso value.CollapsedSections IsNot Nothing AndAlso value.CollapsedSections.Length > 2048 Then value.CollapsedSections = Nothing
                 If value IsNot Nothing AndAlso value.Version = 1 AndAlso value.Width >= 100 AndAlso value.Width <= 10000 AndAlso value.Height >= 100 AndAlso value.Height <= 10000 Then Return value
             End If
         Catch ex As Exception When TypeOf ex Is IOException OrElse TypeOf ex Is JsonException OrElse TypeOf ex Is UnauthorizedAccessException

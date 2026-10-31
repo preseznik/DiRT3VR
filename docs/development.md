@@ -18,6 +18,11 @@ background) and `tools/make-launcher-icon.ps1` (16–256 px `DiRT3VR.ico`). The 
 is embedded in the executable and as a resource for launcher windows; Setup uses
 the same ICO.
 
+Launcher sections must be collapsible. Create each one with
+`LauncherLayout.Section`, which adds a `SectionHeader` (▾/▸, click or Space/Enter);
+MainForm stores collapsed titles in `window-preferences.json`. The launcher tests
+fail if a section starts with a plain bold label instead.
+
 ```powershell
 ./tools/bootstrap.ps1
 ./tools/build.ps1

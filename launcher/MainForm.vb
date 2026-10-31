@@ -45,6 +45,8 @@ Public Class MainForm
     Private ReadOnly tips As New ToolTip With {.AutoPopDelay = 20000}
     Private ReadOnly timer As New Timer With {.Interval = 1500}
     Private ReadOnly lifetime As New System.Threading.CancellationTokenSource()
+    Private ReadOnly headers As New List(Of SectionHeader)
+    Private collapsedSectionTitles As String
 
     Public Sub New(value As InstallContext)
         context = value
@@ -80,6 +82,11 @@ Public Class MainForm
         layout.Controls.Add(state, 0, 1)
         layout.Controls.Add(tabs, 0, 2)
         BuildLauncher() : BuildGraphics() : BuildControls() : BuildSettings() : BuildAdvanced()
+        headers.AddRange(FindHeaders(tabs))
+        For Each heading In headers
+            AddHandler heading.CollapsedChanged, Sub() collapsedSectionTitles = WindowPreferences.JoinSections(headers.Where(Function(h) h.Collapsed).Select(Function(h) h.Title))
+        Next
+        ApplyCollapsedSections(WindowPreferences.Load(context).CollapsedSections)
         layout.Controls.Add(notice, 0, 3)
         layout.Controls.Add(New LauncherFooter(desktop, vr, save, recover, logs), 0, 4)
         Controls.Add(layout)
@@ -203,6 +210,35 @@ Public Class MainForm
                                      End Sub
         Return content
     End Function
+
+    Private Shared Iterator Function FindHeaders(parent As Control) As IEnumerable(Of SectionHeader)
+        For Each child As Control In parent.Controls
+            If TypeOf child Is SectionHeader Then Yield DirectCast(child, SectionHeader)
+            For Each nested In FindHeaders(child)
+                Yield nested
+            Next
+        Next
+    End Function
+
+    Public ReadOnly Property SectionHeaders As IReadOnlyList(Of SectionHeader)
+        Get
+            Return headers
+        End Get
+    End Property
+
+    ' Collapsed section titles as saved with the window size; Nothing when all are open.
+    Public ReadOnly Property CollapsedSections As String
+        Get
+            Return collapsedSectionTitles
+        End Get
+    End Property
+
+    Public Sub ApplyCollapsedSections(saved As String)
+        Dim titles = WindowPreferences.SplitSections(saved)
+        For Each header In headers
+            header.Collapsed = titles.Contains(header.Title)
+        Next
+    End Sub
 
     Private Sub FitInitialWindow()
         Dim work = Screen.FromControl(Me).WorkingArea
@@ -465,7 +501,9 @@ Public Class MainForm
         MyBase.OnFormClosing(e)
         If Not e.Cancel AndAlso windowReady Then
             Dim normal = If(WindowState = FormWindowState.Normal, Size, RestoreBounds.Size)
-            WindowPreferences.Capture(normal, DeviceDpi, lastWindowState = FormWindowState.Maximized).Save(context)
+            Dim preferences = WindowPreferences.Capture(normal, DeviceDpi, lastWindowState = FormWindowState.Maximized)
+            preferences.CollapsedSections = collapsedSectionTitles
+            preferences.Save(context)
         End If
     End Sub
 

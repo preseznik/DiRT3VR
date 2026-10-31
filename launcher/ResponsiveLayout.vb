@@ -8,10 +8,12 @@ Public Module LauncherLayout
     Public Function Stack() As VerticalStack
         Return New VerticalStack With {.Dock = DockStyle.Top, .Margin = New Padding(0)}
     End Function
+    ' Create every launcher section through here: its heading collapses the section,
+    ' and MainForm remembers the state. Launcher tests reject plain heading labels.
     Public Function Section(parent As Control, title As String) As VerticalStack
         Dim panel = Stack()
         panel.Margin = New Padding(0, 0, 0, 14)
-        panel.Controls.Add(New Label With {.Text = title, .UseMnemonic = False, .AutoSize = True, .Font = New Font("Segoe UI", 11, FontStyle.Bold), .Margin = New Padding(0, 8, 0, 10)})
+        panel.Controls.Add(New SectionHeader(title) With {.Font = New Font("Segoe UI", 11, FontStyle.Bold), .Margin = New Padding(0, 8, 0, 10)})
         parent.Controls.Add(panel)
         Return panel
     End Function
@@ -58,10 +60,66 @@ Public Module LauncherLayout
     End Function
 End Module
 
+' A focusable section heading (adapted from GRID2VR). Collapsing hides the rows
+' after it in its stack; rows are never removed, recreated or reordered.
+Public Class SectionHeader
+    Inherits Button
+    Private collapsedValue As Boolean, hot As Boolean
+    Public ReadOnly Property Title As String
+    Public Event CollapsedChanged As EventHandler
+    Public Sub New(title As String)
+        Me.Title = title
+        Name = "Section" & New String(title.Where(AddressOf Char.IsLetterOrDigit).ToArray())
+        Tag = "section" : AutoSize = True : TextAlign = ContentAlignment.MiddleLeft : UseMnemonic = False : Cursor = Cursors.Hand
+        Padding = New Padding(0) : FlatStyle = FlatStyle.Flat : FlatAppearance.BorderSize = 0 : AccessibleName = title
+        UpdateText()
+    End Sub
+    ' Painted directly: dark-mode button rendering draws a border even at BorderSize 0.
+    Protected Overrides Sub OnPaint(e As PaintEventArgs)
+        Dim back = If(hot AndAlso Not FlatAppearance.MouseOverBackColor.IsEmpty, FlatAppearance.MouseOverBackColor, BackColor)
+        Using brush As New SolidBrush(back)
+            e.Graphics.FillRectangle(brush, ClientRectangle)
+        End Using
+        TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, If(Enabled, ForeColor, SystemColors.GrayText),
+                              TextFormatFlags.Left Or TextFormatFlags.VerticalCenter Or TextFormatFlags.SingleLine Or TextFormatFlags.NoPrefix)
+        If Focused AndAlso ShowFocusCues Then ControlPaint.DrawFocusRectangle(e.Graphics, ClientRectangle, ForeColor, back)
+    End Sub
+    Protected Overrides Sub OnMouseEnter(e As EventArgs)
+        hot = True : Invalidate()
+        MyBase.OnMouseEnter(e)
+    End Sub
+    Protected Overrides Sub OnMouseLeave(e As EventArgs)
+        hot = False : Invalidate()
+        MyBase.OnMouseLeave(e)
+    End Sub
+    <System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)>
+    Public Property Collapsed As Boolean
+        Get
+            Return collapsedValue
+        End Get
+        Set(value As Boolean)
+            If collapsedValue = value Then Return
+            collapsedValue = value : UpdateText() : Parent?.PerformLayout()
+            RaiseEvent CollapsedChanged(Me, EventArgs.Empty)
+        End Set
+    End Property
+    Protected Overrides Sub OnClick(e As EventArgs)
+        Collapsed = Not Collapsed
+        MyBase.OnClick(e)
+    End Sub
+    Private Sub UpdateText()
+        Text = If(collapsedValue, "▸ ", "▾ ") & Title
+        AccessibleDescription = If(collapsedValue, "Collapsed section; press to expand", "Expanded section; press to collapse")
+    End Sub
+End Class
+
 ' Explicit vertical flow avoids TableLayoutPanel retaining tall row allocations after reflow.
 Public Class VerticalStack
     Inherits Panel
     Private arranging As Boolean
+    ' Rows hidden by a collapsed heading. Launcher rows are otherwise always shown,
+    ' so expanding restores exactly these.
+    Private ReadOnly collapsedHidden As New HashSet(Of Control)
     Protected Overrides Sub OnControlAdded(e As ControlEventArgs)
         e.Control.Dock = DockStyle.None
         AddHandler e.Control.SizeChanged, AddressOf ChildSizeChanged
@@ -69,6 +127,7 @@ Public Class VerticalStack
     End Sub
     Protected Overrides Sub OnControlRemoved(e As ControlEventArgs)
         RemoveHandler e.Control.SizeChanged, AddressOf ChildSizeChanged
+        If collapsedHidden.Remove(e.Control) Then e.Control.Visible = True
         MyBase.OnControlRemoved(e)
     End Sub
     Private Sub ChildSizeChanged(sender As Object, e As EventArgs)
@@ -79,8 +138,16 @@ Public Class VerticalStack
         If arranging Then Return
         arranging = True
         Try
-            Dim y = Padding.Top
+            Dim y = Padding.Top, collapsed = False
             For Each child As Control In Controls
+                Dim header = TryCast(child, SectionHeader)
+                If header IsNot Nothing Then collapsed = header.Collapsed
+                If collapsed AndAlso header Is Nothing Then
+                    ' Hidden rows also leave the tab order.
+                    collapsedHidden.Add(child) : child.Visible = False
+                    Continue For
+                End If
+                If collapsedHidden.Remove(child) Then child.Visible = True
                 Dim width = Math.Max(1, ClientSize.Width - Padding.Horizontal - child.Margin.Horizontal)
                 Dim fixedWidth = TypeOf child Is Button OrElse TypeOf child Is LinkLabel
                 child.SetBounds(Padding.Left + child.Margin.Left, y + child.Margin.Top, If(fixedWidth, Math.Min(width, child.PreferredSize.Width), width), child.Height)
