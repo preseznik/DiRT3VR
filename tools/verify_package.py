@@ -20,7 +20,8 @@ def verify(folder):
         assert sha(files[name].read_bytes()) == expected, f'Changed payload: {name}'
     for name, machine, dll in [('DiRT3VR.exe', 0x8664, False),
                                 ('payload/d3d11.dll', 0x14c, True),
-                                ('payload/DiRT3VR.RuntimeProbe.exe', 0x14c, False)]:
+                                ('payload/DiRT3VR.RuntimeProbe.exe', 0x14c, False),
+                                ('payload/driving_input.dll', 0x8664, True)]:
         data = files[name].read_bytes()
         assert data[:2] == b'MZ', name
         pe = struct.unpack_from('<I', data, 0x3c)[0]

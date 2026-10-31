@@ -329,6 +329,14 @@ Public Class MainForm
         Dim content = Page("Controls")
         Dim general = Section(content, "General")
         general.Controls.Add(Info("Use your existing keyboard, controller or wheel bindings in DiRT 3. During experimental VR, closing this launcher minimizes it until the game exits and original files are restored."))
+        Dim liveInput As New Button With {.Name = "LiveInput", .Text = "Live input and force feedback…", .AutoSize = True}
+        general.Controls.Add(liveInput)
+        general.Controls.Add(Info("Shows your wheel, pedals, shifter and controllers as Windows sees them, and tests rumble or force feedback. It doesn't change DiRT 3's controls."))
+        AddHandler liveInput.Click, Sub()
+                                        Using monitor As New DrivingInputMonitor(DrivingInput.LibraryPath(context))
+                                            monitor.ShowDialog(Me)
+                                        End Using
+                                    End Sub
         Dim vrControls = Section(content, "VR and seat controls")
         Field(vrControls, "Recenter key", recenterButton)
         vrControls.Controls.Add(recenterHint)

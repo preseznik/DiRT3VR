@@ -56,7 +56,11 @@ report is investigated.
    options are preserved. **Restore original files** handles temporary sessions,
    not these saved desktop preferences. VR keeps its own graphics settings and
    restores the saved desktop configuration afterward.
-4. **Settings** provides Modern/Classic appearance and runtime selection.
+4. **Controls → Live input and force feedback** shows your wheel, pedals,
+   shifter and controllers as Windows reports them and tests rumble or force
+   feedback on each one. It reads devices without taking them over and changes
+   no game or Windows setting; close DiRT 3 before testing force feedback.
+   **Settings** provides Modern/Classic appearance and runtime selection.
    **Settings profiles** saves named copies of the current controls per installation.
    Enter a name and choose **Save as new profile**, or explicitly **Overwrite profile**.
    Both change only the profile. **Save settings** in the footer is separate: it
