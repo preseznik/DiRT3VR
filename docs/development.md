@@ -12,6 +12,12 @@ them. Setup installs the portable layout into `<game>\DiRT3VR`, finds the game
 with `DiRT3VR.exe --discover`, and runs `--check-install` / `--check-uninstall`
 (supported executable, DiRT 3 closed, no pending recovery) before changing files.
 
+The badge artwork is `launcher/assets/DiRT3VR.png`. To replace it, run
+`python tools/prepare-launcher-art.py <artwork.png>` (cuts the badge out of a black
+background) and `tools/make-launcher-icon.ps1` (16–256 px `DiRT3VR.ico`). The icon
+is embedded in the executable and as a resource for launcher windows; Setup uses
+the same ICO.
+
 ```powershell
 ./tools/bootstrap.ps1
 ./tools/build.ps1

@@ -29,6 +29,7 @@ WizardStyle=modern
 CloseApplications=no
 AppMutex=Global\DiRT3VR.Session
 SetupLogging=yes
+SetupIconFile=..\launcher\assets\DiRT3VR.ico
 
 [Messages]
 WizardSelectDir=Browse DiRT 3 Installation

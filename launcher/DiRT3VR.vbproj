@@ -11,6 +11,7 @@
     <AssemblyName>DiRT3VR</AssemblyName>
     <Version>0.1.20</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>assets\DiRT3VR.ico</ApplicationIcon>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
@@ -21,5 +22,9 @@
     <Import Include="System.IO" />
     <Import Include="System.Diagnostics" />
     <Import Include="System.Threading.Tasks" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Windows also show the icon; single-file publishing keeps it as a managed resource. -->
+    <EmbeddedResource Include="assets\DiRT3VR.ico" LogicalName="DiRT3VR.ico" />
   </ItemGroup>
 </Project>
