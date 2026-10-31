@@ -64,7 +64,13 @@ Public Module LauncherAppearance
                 root.BackColor = If(Dark AndAlso Not SystemInformation.HighContrast, Color.FromArgb(32, 32, 32), If(inputSurface, SystemColors.Window, SystemColors.Control))
                 root.ForeColor = If(Dark AndAlso Not SystemInformation.HighContrast, Color.White, If(inputSurface, SystemColors.WindowText, SystemColors.ControlText))
             End If
-            If TypeOf root Is Button Then
+            If TypeOf root Is SectionHeader Then
+                ' Headings stay flat text; only hover shows that they toggle.
+                Dim header = DirectCast(root, SectionHeader)
+                header.FlatAppearance.BorderSize = 0
+                header.FlatAppearance.MouseOverBackColor = If(styled, If(Dark, Color.FromArgb(64, 60, 42), Color.FromArgb(255, 243, 203)), Color.Empty)
+                header.FlatAppearance.MouseDownBackColor = header.FlatAppearance.MouseOverBackColor
+            ElseIf TypeOf root Is Button Then
                 Dim button = DirectCast(root, Button)
                 button.FlatStyle = If(styled, FlatStyle.Flat, original.Flat)
                 button.Padding = If(styled AndAlso button.Name <> "HelpAbout", New Padding(Px(root, 9), Px(root, 3), Px(root, 9), Px(root, 3)), original.Padding)

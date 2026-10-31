@@ -443,6 +443,7 @@ Module Program
         ProfileTests.RunUi(root, AddressOf Check)
         WheelGuardTests.Run(root, AddressOf Check)
         InstallerTests.RunUi(AddressOf Check)
+        SectionCollapseTests.Run(root, AddressOf Check)
         Check(LauncherAppearance.AccentFor(True) = Color.FromArgb(255, 213, 74), "dark accent is yellow")
         Check(LauncherAppearance.AccentFor(False) = Color.FromArgb(122, 89, 0), "light accent has readable contrast")
         Dim install = Context(root, "ui")
