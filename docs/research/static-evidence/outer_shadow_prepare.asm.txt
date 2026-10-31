@@ -1,0 +1,50 @@
+
+C:\Program Files (x86)\Steam\steamapps\common\DiRT 3 Complete Edition\dirt3_game.exe:     file format pei-i386
+
+
+Disassembly of section .text:
+
+0096e490 <.text+0x56d490>:
+  96e490:	55                   	push   ebp
+  96e491:	8b ec                	mov    ebp,esp
+  96e493:	56                   	push   esi
+  96e494:	8b 75 14             	mov    esi,DWORD PTR [ebp+0x14]
+  96e497:	8b c1                	mov    eax,ecx
+  96e499:	c6 06 01             	mov    BYTE PTR [esi],0x1
+  96e49c:	80 78 51 00          	cmp    BYTE PTR [eax+0x51],0x0
+  96e4a0:	74 62                	je     0x96e504
+  96e4a2:	83 78 30 00          	cmp    DWORD PTR [eax+0x30],0x0
+  96e4a6:	74 5c                	je     0x96e504
+  96e4a8:	83 b8 90 00 00 00 00 	cmp    DWORD PTR [eax+0x90],0x0
+  96e4af:	74 53                	je     0x96e504
+  96e4b1:	83 b8 8c 00 00 00 00 	cmp    DWORD PTR [eax+0x8c],0x0
+  96e4b8:	74 4a                	je     0x96e504
+  96e4ba:	80 78 50 00          	cmp    BYTE PTR [eax+0x50],0x0
+  96e4be:	74 44                	je     0x96e504
+  96e4c0:	f3 0f 10 80 a8 00 00 	movss  xmm0,DWORD PTR [eax+0xa8]
+  96e4c7:	00 
+  96e4c8:	8b 48 30             	mov    ecx,DWORD PTR [eax+0x30]
+  96e4cb:	8b 11                	mov    edx,DWORD PTR [ecx]
+  96e4cd:	8b 52 28             	mov    edx,DWORD PTR [edx+0x28]
+  96e4d0:	57                   	push   edi
+  96e4d1:	0f b6 78 53          	movzx  edi,BYTE PTR [eax+0x53]
+  96e4d5:	57                   	push   edi
+  96e4d6:	8b 7d 0c             	mov    edi,DWORD PTR [ebp+0xc]
+  96e4d9:	83 ec 08             	sub    esp,0x8
+  96e4dc:	f3 0f 11 44 24 04    	movss  DWORD PTR [esp+0x4],xmm0
+  96e4e2:	f3 0f 10 80 a4 00 00 	movss  xmm0,DWORD PTR [eax+0xa4]
+  96e4e9:	00 
+  96e4ea:	8b 80 ac 00 00 00    	mov    eax,DWORD PTR [eax+0xac]
+  96e4f0:	f3 0f 11 04 24       	movss  DWORD PTR [esp],xmm0
+  96e4f5:	57                   	push   edi
+  96e4f6:	8b 7d 10             	mov    edi,DWORD PTR [ebp+0x10]
+  96e4f9:	57                   	push   edi
+  96e4fa:	8b 7d 08             	mov    edi,DWORD PTR [ebp+0x8]
+  96e4fd:	57                   	push   edi
+  96e4fe:	50                   	push   eax
+  96e4ff:	ff d2                	call   edx
+  96e501:	88 06                	mov    BYTE PTR [esi],al
+  96e503:	5f                   	pop    edi
+  96e504:	5e                   	pop    esi
+  96e505:	5d                   	pop    ebp
+  96e506:	c2 10 00             	ret    0x10

@@ -1,0 +1,41 @@
+
+C:\Program Files (x86)\Steam\steamapps\common\DiRT 3 Complete Edition\dirt3_game.exe:     file format pei-i386
+
+
+Disassembly of section .text:
+
+00574c10 <.text+0x173c10>:
+  574c10:	55                   	push   ebp
+  574c11:	8b ec                	mov    ebp,esp
+  574c13:	8b c1                	mov    eax,ecx
+  574c15:	8b 4d 08             	mov    ecx,DWORD PTR [ebp+0x8]
+  574c18:	0f 28 01             	movaps xmm0,XMMWORD PTR [ecx]
+  574c1b:	0f 29 00             	movaps XMMWORD PTR [eax],xmm0
+  574c1e:	0f 28 41 10          	movaps xmm0,XMMWORD PTR [ecx+0x10]
+  574c22:	0f 29 40 10          	movaps XMMWORD PTR [eax+0x10],xmm0
+  574c26:	0f 28 41 20          	movaps xmm0,XMMWORD PTR [ecx+0x20]
+  574c2a:	0f 29 40 20          	movaps XMMWORD PTR [eax+0x20],xmm0
+  574c2e:	0f 28 41 30          	movaps xmm0,XMMWORD PTR [ecx+0x30]
+  574c32:	0f 29 40 30          	movaps XMMWORD PTR [eax+0x30],xmm0
+  574c36:	0f 28 41 40          	movaps xmm0,XMMWORD PTR [ecx+0x40]
+  574c3a:	0f 29 40 40          	movaps XMMWORD PTR [eax+0x40],xmm0
+  574c3e:	0f 28 41 50          	movaps xmm0,XMMWORD PTR [ecx+0x50]
+  574c42:	0f 29 40 50          	movaps XMMWORD PTR [eax+0x50],xmm0
+  574c46:	0f 28 41 60          	movaps xmm0,XMMWORD PTR [ecx+0x60]
+  574c4a:	0f 29 40 60          	movaps XMMWORD PTR [eax+0x60],xmm0
+  574c4e:	0f 28 41 70          	movaps xmm0,XMMWORD PTR [ecx+0x70]
+  574c52:	0f 29 40 70          	movaps XMMWORD PTR [eax+0x70],xmm0
+  574c56:	0f 28 81 80 00 00 00 	movaps xmm0,XMMWORD PTR [ecx+0x80]
+  574c5d:	0f 29 80 80 00 00 00 	movaps XMMWORD PTR [eax+0x80],xmm0
+  574c64:	0f 28 81 90 00 00 00 	movaps xmm0,XMMWORD PTR [ecx+0x90]
+  574c6b:	0f 29 80 90 00 00 00 	movaps XMMWORD PTR [eax+0x90],xmm0
+  574c72:	0f 28 81 a0 00 00 00 	movaps xmm0,XMMWORD PTR [ecx+0xa0]
+  574c79:	0f 29 80 a0 00 00 00 	movaps XMMWORD PTR [eax+0xa0],xmm0
+  574c80:	0f 28 81 b0 00 00 00 	movaps xmm0,XMMWORD PTR [ecx+0xb0]
+  574c87:	0f 29 80 b0 00 00 00 	movaps XMMWORD PTR [eax+0xb0],xmm0
+  574c8e:	0f 28 81 c0 00 00 00 	movaps xmm0,XMMWORD PTR [ecx+0xc0]
+  574c95:	0f 29 80 c0 00 00 00 	movaps XMMWORD PTR [eax+0xc0],xmm0
+  574c9c:	0f 28 81 d0 00 00 00 	movaps xmm0,XMMWORD PTR [ecx+0xd0]
+  574ca3:	0f 29 80 d0 00 00 00 	movaps XMMWORD PTR [eax+0xd0],xmm0
+  574caa:	5d                   	pop    ebp
+  574cab:	c2 04 00             	ret    0x4

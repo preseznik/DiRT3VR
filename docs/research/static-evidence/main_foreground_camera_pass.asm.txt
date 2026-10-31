@@ -1,0 +1,121 @@
+
+C:\Program Files (x86)\Steam\steamapps\common\DiRT 3 Complete Edition\dirt3_game.exe:     file format pei-i386
+
+
+Disassembly of section .text:
+
+005806c0 <.text+0x17f6c0>:
+  5806c0:	55                   	push   ebp
+  5806c1:	8b ec                	mov    ebp,esp
+  5806c3:	53                   	push   ebx
+  5806c4:	8b 5d 10             	mov    ebx,DWORD PTR [ebp+0x10]
+  5806c7:	83 bb 90 00 00 00 00 	cmp    DWORD PTR [ebx+0x90],0x0
+  5806ce:	56                   	push   esi
+  5806cf:	8b f1                	mov    esi,ecx
+  5806d1:	75 16                	jne    0x5806e9
+  5806d3:	83 bb 8c 00 00 00 00 	cmp    DWORD PTR [ebx+0x8c],0x0
+  5806da:	75 0d                	jne    0x5806e9
+  5806dc:	83 bb dc 00 00 00 00 	cmp    DWORD PTR [ebx+0xdc],0x0
+  5806e3:	0f 84 31 01 00 00    	je     0x58081a
+  5806e9:	8b 4e 28             	mov    ecx,DWORD PTR [esi+0x28]
+  5806ec:	8b 01                	mov    eax,DWORD PTR [ecx]
+  5806ee:	8b 50 44             	mov    edx,DWORD PTR [eax+0x44]
+  5806f1:	57                   	push   edi
+  5806f2:	6a 02                	push   0x2
+  5806f4:	ff d2                	call   edx
+  5806f6:	f3 0f 10 05 e4 6a e7 	movss  xmm0,DWORD PTR ds:0xe76ae4
+  5806fd:	00 
+  5806fe:	8b 45 0c             	mov    eax,DWORD PTR [ebp+0xc]
+  580701:	8b 7d 08             	mov    edi,DWORD PTR [ebp+0x8]
+  580704:	6a 03                	push   0x3
+  580706:	51                   	push   ecx
+  580707:	f3 0f 11 46 40       	movss  DWORD PTR [esi+0x40],xmm0
+  58070c:	f3 0f 10 05 f4 6a e7 	movss  xmm0,DWORD PTR ds:0xe76af4
+  580713:	00 
+  580714:	f3 0f 11 04 24       	movss  DWORD PTR [esp],xmm0
+  580719:	50                   	push   eax
+  58071a:	57                   	push   edi
+  58071b:	8b ce                	mov    ecx,esi
+  58071d:	e8 8e a2 3f 00       	call   0x97a9b0
+  580722:	c6 05 8a 3f 0b 01 01 	mov    BYTE PTR ds:0x10b3f8a,0x1
+  580729:	8b 83 90 00 00 00    	mov    eax,DWORD PTR [ebx+0x90]
+  58072f:	85 c0                	test   eax,eax
+  580731:	74 25                	je     0x580758
+  580733:	8b 0d 7c 3f 0b 01    	mov    ecx,DWORD PTR ds:0x10b3f7c
+  580739:	8b 15 78 3f 0b 01    	mov    edx,DWORD PTR ds:0x10b3f78
+  58073f:	51                   	push   ecx
+  580740:	8b 4e 28             	mov    ecx,DWORD PTR [esi+0x28]
+  580743:	52                   	push   edx
+  580744:	8b 96 b0 00 00 00    	mov    edx,DWORD PTR [esi+0xb0]
+  58074a:	51                   	push   ecx
+  58074b:	57                   	push   edi
+  58074c:	52                   	push   edx
+  58074d:	6a 00                	push   0x0
+  58074f:	50                   	push   eax
+  580750:	e8 5b b2 49 00       	call   0xa1b9b0
+  580755:	83 c4 1c             	add    esp,0x1c
+  580758:	8b 83 8c 00 00 00    	mov    eax,DWORD PTR [ebx+0x8c]
+  58075e:	85 c0                	test   eax,eax
+  580760:	74 25                	je     0x580787
+  580762:	8b 0d 7c 3f 0b 01    	mov    ecx,DWORD PTR ds:0x10b3f7c
+  580768:	8b 15 78 3f 0b 01    	mov    edx,DWORD PTR ds:0x10b3f78
+  58076e:	51                   	push   ecx
+  58076f:	8b 4e 28             	mov    ecx,DWORD PTR [esi+0x28]
+  580772:	52                   	push   edx
+  580773:	8b 96 b0 00 00 00    	mov    edx,DWORD PTR [esi+0xb0]
+  580779:	51                   	push   ecx
+  58077a:	57                   	push   edi
+  58077b:	52                   	push   edx
+  58077c:	6a 00                	push   0x0
+  58077e:	50                   	push   eax
+  58077f:	e8 2c b2 49 00       	call   0xa1b9b0
+  580784:	83 c4 1c             	add    esp,0x1c
+  580787:	b9 40 0f fa 00       	mov    ecx,0xfa0f40
+  58078c:	e8 0f d5 5b 00       	call   0xb3dca0
+  580791:	84 c0                	test   al,al
+  580793:	74 33                	je     0x5807c8
+  580795:	b9 40 0f fa 00       	mov    ecx,0xfa0f40
+  58079a:	e8 e1 d4 5b 00       	call   0xb3dc80
+  58079f:	84 c0                	test   al,al
+  5807a1:	74 25                	je     0x5807c8
+  5807a3:	a1 14 fa f9 00       	mov    eax,ds:0xf9fa14
+  5807a8:	85 c0                	test   eax,eax
+  5807aa:	74 1c                	je     0x5807c8
+  5807ac:	80 78 60 00          	cmp    BYTE PTR [eax+0x60],0x0
+  5807b0:	74 16                	je     0x5807c8
+  5807b2:	8b 4e 28             	mov    ecx,DWORD PTR [esi+0x28]
+  5807b5:	8b 96 a8 09 00 00    	mov    edx,DWORD PTR [esi+0x9a8]
+  5807bb:	8b 01                	mov    eax,DWORD PTR [ecx]
+  5807bd:	8b 80 38 01 00 00    	mov    eax,DWORD PTR [eax+0x138]
+  5807c3:	52                   	push   edx
+  5807c4:	6a 00                	push   0x0
+  5807c6:	ff d0                	call   eax
+  5807c8:	8b 9b dc 00 00 00    	mov    ebx,DWORD PTR [ebx+0xdc]
+  5807ce:	85 db                	test   ebx,ebx
+  5807d0:	74 25                	je     0x5807f7
+  5807d2:	8b 0d 7c 3f 0b 01    	mov    ecx,DWORD PTR ds:0x10b3f7c
+  5807d8:	8b 15 78 3f 0b 01    	mov    edx,DWORD PTR ds:0x10b3f78
+  5807de:	8b 46 28             	mov    eax,DWORD PTR [esi+0x28]
+  5807e1:	51                   	push   ecx
+  5807e2:	8b 8e b0 00 00 00    	mov    ecx,DWORD PTR [esi+0xb0]
+  5807e8:	52                   	push   edx
+  5807e9:	50                   	push   eax
+  5807ea:	57                   	push   edi
+  5807eb:	51                   	push   ecx
+  5807ec:	6a 00                	push   0x0
+  5807ee:	53                   	push   ebx
+  5807ef:	e8 bc b1 49 00       	call   0xa1b9b0
+  5807f4:	83 c4 1c             	add    esp,0x1c
+  5807f7:	c6 05 8a 3f 0b 01 00 	mov    BYTE PTR ds:0x10b3f8a,0x0
+  5807fe:	8b 8e bc 09 00 00    	mov    ecx,DWORD PTR [esi+0x9bc]
+  580804:	85 c9                	test   ecx,ecx
+  580806:	74 11                	je     0x580819
+  580808:	57                   	push   edi
+  580809:	e8 f2 c1 02 00       	call   0x5aca00
+  58080e:	8b 8e bc 09 00 00    	mov    ecx,DWORD PTR [esi+0x9bc]
+  580814:	e8 b7 16 02 00       	call   0x5a1ed0
+  580819:	5f                   	pop    edi
+  58081a:	5e                   	pop    esi
+  58081b:	5b                   	pop    ebx
+  58081c:	5d                   	pop    ebp
+  58081d:	c2 0c 00             	ret    0xc

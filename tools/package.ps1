@@ -1,0 +1,41 @@
+[CmdletBinding()]
+param([switch]$SkipBuild)
+$ErrorActionPreference = 'Stop'
+$root = Split-Path $PSScriptRoot -Parent
+if (!$SkipBuild) { & "$PSScriptRoot/build.ps1" }
+[xml]$project = Get-Content -LiteralPath "$root/launcher/DiRT3VR.vbproj" -Raw
+$version = [string]$project.Project.PropertyGroup.Version
+$output = Join-Path "$root/artifacts/packages" ($version + '-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+if (Test-Path -LiteralPath $output) { throw 'Package directory already exists.' }
+$stage = Join-Path $output 'DiRT3VR'
+New-Item -ItemType Directory -Path "$stage/payload", "$stage/licenses/OpenXR" -Force | Out-Null
+& dotnet publish "$root/launcher/DiRT3VR.vbproj" -c Release -o "$output/publish" --nologo
+if ($LASTEXITCODE) { throw 'Launcher publish failed.' }
+Copy-Item -LiteralPath "$output/publish/DiRT3VR.exe" -Destination $stage
+Copy-Item -LiteralPath "$root/build/native/bin/d3d11.dll", "$root/build/native/bin/DiRT3VR.RuntimeProbe.exe" -Destination "$stage/payload"
+Copy-Item -LiteralPath "$root/README.md" -Destination $stage
+Copy-Item -LiteralPath "$root/.deps/minhook/LICENSE.txt" -Destination "$stage/licenses/MinHook.txt"
+Copy-Item -LiteralPath "$root/.deps/OpenXR-SDK/LICENSE" -Destination "$stage/licenses/OpenXR/LICENSE.txt"
+Get-ChildItem -LiteralPath "$root/.deps/OpenXR-SDK/LICENSES" -File | Copy-Item -Destination "$stage/licenses/OpenXR"
+$capabilities = @{
+    schema = 1
+    supportedExeSha256 = 'c502b495bb34a097440756769c80dcb36a79b618943f739e20d591d54171ff98'
+    stereoVerified = $false
+    experimentalInteractive = $true
+    runtimes = @('vdxr')
+    milestone = 'Experimental VDXR stereo for all rendered 3D cameras; interactive acceptance pending'
+}
+$jsonEncoding = New-Object System.Text.UTF8Encoding($false)
+[IO.File]::WriteAllText("$stage/runtime-capabilities.json", ($capabilities | ConvertTo-Json -Depth 3), $jsonEncoding)
+$files = @{}
+Get-ChildItem -LiteralPath $stage -Recurse -File | ForEach-Object {
+    # Files came directly from this staging directory. Substring also works in
+    # Windows PowerShell 5.1, whose .NET Framework lacks GetRelativePath.
+    $relative = $_.FullName.Substring($stage.Length + 1).Replace('\','/')
+    $files[$relative] = (Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant()
+}
+$inventory = @{ schema=1; version=$version; builtUtc=[DateTime]::UtcNow.ToString('o'); stereoVerified=$false; files=$files }
+[IO.File]::WriteAllText("$stage/package.json", ($inventory | ConvertTo-Json -Depth 4), $jsonEncoding)
+Compress-Archive -LiteralPath $stage -DestinationPath "$output/DiRT3VR-$version.zip"
+Write-Output "Portable package: $stage"
+Write-Output "Archive: $output/DiRT3VR-$version.zip"

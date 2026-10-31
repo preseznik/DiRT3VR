@@ -1,0 +1,35 @@
+
+C:\Program Files (x86)\Steam\steamapps\common\DiRT 3 Complete Edition\dirt3_game.exe:     file format pei-i386
+
+
+Disassembly of section .text:
+
+008e2a50 <.text+0x4e1a50>:
+  8e2a50:	55                   	push   ebp
+  8e2a51:	8b ec                	mov    ebp,esp
+  8e2a53:	b8 01 00 00 00       	mov    eax,0x1
+  8e2a58:	01 05 68 41 0b 01    	add    DWORD PTR ds:0x10b4168,eax
+  8e2a5e:	01 05 b8 4a 0b 01    	add    DWORD PTR ds:0x10b4ab8,eax
+  8e2a64:	01 05 90 4b 0b 01    	add    DWORD PTR ds:0x10b4b90,eax
+  8e2a6a:	68 d0 01 00 00       	push   0x1d0
+  8e2a6f:	c7 05 6c 41 0b 01 d0 	mov    DWORD PTR ds:0x10b416c,0x1d0
+  8e2a76:	01 00 00 
+  8e2a79:	c7 05 bc 4a 0b 01 e0 	mov    DWORD PTR ds:0x10b4abc,0xe0
+  8e2a80:	00 00 00 
+  8e2a83:	c7 05 94 4b 0b 01 28 	mov    DWORD PTR ds:0x10b4b94,0x28
+  8e2a8a:	00 00 00 
+  8e2a8d:	e8 1e 19 c9 ff       	call   0x5743b0
+  8e2a92:	83 c4 04             	add    esp,0x4
+  8e2a95:	85 c0                	test   eax,eax
+  8e2a97:	74 11                	je     0x8e2aaa
+  8e2a99:	8b 4d 0c             	mov    ecx,DWORD PTR [ebp+0xc]
+  8e2a9c:	8b 55 08             	mov    edx,DWORD PTR [ebp+0x8]
+  8e2a9f:	51                   	push   ecx
+  8e2aa0:	52                   	push   edx
+  8e2aa1:	8b c8                	mov    ecx,eax
+  8e2aa3:	e8 a8 ea ff ff       	call   0x8e1550
+  8e2aa8:	5d                   	pop    ebp
+  8e2aa9:	c3                   	ret
+  8e2aaa:	33 c0                	xor    eax,eax
+  8e2aac:	5d                   	pop    ebp
+  8e2aad:	c3                   	ret

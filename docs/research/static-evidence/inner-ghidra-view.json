@@ -1,0 +1,525 @@
+{
+  "evidence_id": "ev_60bde0ba3bf2b2e5103ee4d866b30e36d16803e5794184c74b9c311f2d85ab52",
+  "subject": {
+    "name": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\DiRT 3 Complete Edition\\dirt3_game.exe",
+    "digest": {
+      "sha256": "c502b495bb34a097440756769c80dcb36a79b618943f739e20d591d54171ff98"
+    },
+    "format": "pe",
+    "architecture": "x86",
+    "local_path": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\DiRT 3 Complete Edition\\dirt3_game.exe"
+  },
+  "provider": {
+    "id": "ghidra",
+    "name": "Ghidra",
+    "version": "12.1.4"
+  },
+  "analysis_profile": {
+    "provider": {
+      "id": "ghidra",
+      "name": "Ghidra",
+      "version": "12.1.4"
+    },
+    "parameters": {
+      "target_kind": "executable",
+      "target_format": "pe",
+      "executable_role": "application",
+      "managed": false,
+      "native_aot_metadata": {
+        "contract_revision": "rtr-9.1-x64-pe-read-only-v3",
+        "source_bytes": 134217728,
+        "work_units": 67108864,
+        "working_memory_bytes": 67108864,
+        "report_bytes": 4194304
+      },
+      "architecture": "x86",
+      "available_architectures": [
+        "x86"
+      ],
+      "import_mode": "ephemeral-source-immutable",
+      "annotation_policy": "atomic-function-entry-metadata-v1",
+      "load_image_observations": "source-mappings-entry-context-v2",
+      "function_body_evidence": "complete-inclusive-ranges-v1",
+      "function_references": "complete-body-and-entry-reference-manager-v2",
+      "string_inventory_evidence": "defined-data-coverage-v1",
+      "location_resolution": "explicit-address-exact-entry-symbol-first-v3",
+      "instruction_flow_evidence": "decoded-return-pcode-v1",
+      "function_boundary_observations": "ghidra-terminal-call-limitations-v1",
+      "no_return_repair": "disabled-windows-p0",
+      "process_launch": "official-headless-script-v1",
+      "jump_table_evidence": "typed-case-default-blocks-v1",
+      "decompiler_jump_loads": true,
+      "loader": "auto-from-header",
+      "language_id": "auto-from-header",
+      "compiler_spec_id": "auto-default",
+      "analyzer_preset": "ghidra-default"
+    },
+    "digest": "b9d116ea480a02cc8773b19372074a3caf77785cbc080b1ac7133b5110e40b17"
+  },
+  "predicate_type": "rea.analysis",
+  "operation": "analyze_function",
+  "parameters": {
+    "procedure": "0x984a50"
+  },
+  "confidence": "observed",
+  "authority": "shipped-artifact",
+  "limitations": [
+    "The session serves operations only after Ghidra reports default auto-analysis complete; incomplete analysis does not expose partial results.",
+    "The imported Program and temporary project are ephemeral and deleted on close. Annotation operations edit session database metadata; original executable bytes are never written.",
+    "Cancelling an active Ghidra request terminates its ephemeral database and discards session annotations. The selected target remains open; the next provider query imports the original artifact again.",
+    "Default-space addresses use lowercase 0x-prefixed hexadecimal; other address spaces use <percent-encoded-space>:0x<hex>.",
+    "References cover the complete Ghidra function-body AddressSet and exact entry. Dossier incoming edges omit sources owned by that function; procedure_references also retains those internal edges.",
+    "The dossier combines Ghidra FunctionManager, Listing, ReferenceManager, BasicBlockModel, and decompiler observations; provider-specific pseudocode and assembly are not cross-provider text invariants.",
+    "Resolved reference metadata identifies computed, indirect, external, call, jump, and data edges; unresolved targetless flows remain unknown, and function classifications distinguish thunks and externals.",
+    "Synthetic Ghidra entry-point references without actionable memory sources are omitted.",
+    "The Java bridge serializes one function request per Program and lets each decompilation run until it completes or the caller cancels.",
+    "Windows Ghidra P0 accepts approved native x86 and x86-64 PE applications and DLLs; managed, hostile, sensitive, and mutable-path targets are unsupported.",
+    "The Windows bridge uses authenticated IPv4 loopback because Node path-based IPC does not expose Java AF_UNIX sockets; the endpoint file contains no bearer token.",
+    "Windows sessions require the matching packaged Windows x64 native addon, local NTFS targets and runtimes, and Windows 10 or later. Native handles enforce path admission, private DACLs, and Job Object ownership automatically."
+  ],
+  "locations": [],
+  "evidence_links": [],
+  "selected_view": {
+    "procedure": {
+      "address": "0x984a50",
+      "name": "FUN_00984a50",
+      "classification": {
+        "external": false,
+        "thunk": false,
+        "thunk_target": null,
+        "provenance": "ghidra-function-manager"
+      },
+      "body": {
+        "available": true,
+        "provenance": "ghidra-function-body-address-set",
+        "ranges": [
+          {
+            "start": "0x984a50",
+            "end": "0x984b3d"
+          }
+        ],
+        "total_bytes": 238,
+        "span_bytes": 238,
+        "non_contiguous": false,
+        "contains_entry": true
+      },
+      "signature": "undefined FUN_00984a50()",
+      "locals": [
+        {
+          "description": "undefined4 local_14 @ Stack[-0x14]:4",
+          "provenance": "ghidra-function-database"
+        },
+        {
+          "description": "undefined4 local_18 @ Stack[-0x18]:4",
+          "provenance": "ghidra-function-database"
+        }
+      ]
+    },
+    "pseudocode": "\nvoid FUN_00984a50(int param_1,undefined4 param_2,undefined4 param_3,undefined4 param_4,\n                 undefined4 param_5,char param_6)\n\n{\n  int *in_ECX;\n  \n  if ((*(char *)((int)in_ECX + 0x55) != '\\0') && (in_ECX[0xe] != 0)) {\n    FUN_00b70120(*(undefined4 *)(param_1 + 0xfc));\n  }\n  FUN_0097a9b0(param_4,param_3,in_ECX[0x11],3);\n  FUN_0096e410(param_4,param_3,param_1);\n  if (((char)in_ECX[0x15] != '\\0') && (in_ECX[0xd] != 0)) {\n    FUN_00b4bc20(param_4,in_ECX[0x29],in_ECX[0x2a]);\n  }\n  FUN_0097a9b0(param_4,param_3,in_ECX[0x11],3);\n  if (*(char *)((int)in_ECX + 0xa1) == '\\0') {\n    if (param_6 != '\\0') {\n      FUN_0096e510(param_4,param_5,param_2,*(undefined4 *)(param_1 + 0xf4));\n    }\n  }\n  else {\n    FUN_0097b650(param_4,param_1);\n  }\n  (**(code **)(*in_ECX + 0x14))(param_4,param_3,param_1);\n  if (*(char *)((int)in_ECX + 0x52) != '\\0') {\n    FUN_0097b7e0();\n  }\n  return;\n}\n\n",
+    "callers": [
+      {
+        "address": "0x98a270",
+        "name": "FUN_0098a270",
+        "classification": {
+          "external": false,
+          "thunk": false,
+          "thunk_target": null,
+          "provenance": "ghidra-function-manager"
+        },
+        "body": {
+          "available": true,
+          "provenance": "ghidra-function-body-address-set",
+          "ranges": [
+            {
+              "start": "0x98a270",
+              "end": "0x98a446"
+            }
+          ],
+          "total_bytes": 471,
+          "span_bytes": 471,
+          "non_contiguous": false,
+          "contains_entry": true
+        }
+      }
+    ],
+    "callees": [
+      {
+        "address": "0x96e410",
+        "name": "FUN_0096e410",
+        "classification": {
+          "external": false,
+          "thunk": false,
+          "thunk_target": null,
+          "provenance": "ghidra-function-manager"
+        },
+        "body": {
+          "available": true,
+          "provenance": "ghidra-function-body-address-set",
+          "ranges": [
+            {
+              "start": "0x96e410",
+              "end": "0x96e48c"
+            }
+          ],
+          "total_bytes": 125,
+          "span_bytes": 125,
+          "non_contiguous": false,
+          "contains_entry": true
+        }
+      },
+      {
+        "address": "0x96e510",
+        "name": "FUN_0096e510",
+        "classification": {
+          "external": false,
+          "thunk": false,
+          "thunk_target": null,
+          "provenance": "ghidra-function-manager"
+        },
+        "body": {
+          "available": true,
+          "provenance": "ghidra-function-body-address-set",
+          "ranges": [
+            {
+              "start": "0x96e510",
+              "end": "0x96e5a5"
+            }
+          ],
+          "total_bytes": 150,
+          "span_bytes": 150,
+          "non_contiguous": false,
+          "contains_entry": true
+        }
+      },
+      {
+        "address": "0x97a9b0",
+        "name": "FUN_0097a9b0",
+        "classification": {
+          "external": false,
+          "thunk": false,
+          "thunk_target": null,
+          "provenance": "ghidra-function-manager"
+        },
+        "body": {
+          "available": true,
+          "provenance": "ghidra-function-body-address-set",
+          "ranges": [
+            {
+              "start": "0x97a9b0",
+              "end": "0x97b649"
+            }
+          ],
+          "total_bytes": 3226,
+          "span_bytes": 3226,
+          "non_contiguous": false,
+          "contains_entry": true
+        }
+      },
+      {
+        "address": "0x97b650",
+        "name": "FUN_0097b650",
+        "classification": {
+          "external": false,
+          "thunk": false,
+          "thunk_target": null,
+          "provenance": "ghidra-function-manager"
+        },
+        "body": {
+          "available": true,
+          "provenance": "ghidra-function-body-address-set",
+          "ranges": [
+            {
+              "start": "0x97b650",
+              "end": "0x97b7d9"
+            }
+          ],
+          "total_bytes": 394,
+          "span_bytes": 394,
+          "non_contiguous": false,
+          "contains_entry": true
+        }
+      },
+      {
+        "address": "0x97b7e0",
+        "name": "FUN_0097b7e0",
+        "classification": {
+          "external": false,
+          "thunk": false,
+          "thunk_target": null,
+          "provenance": "ghidra-function-manager"
+        },
+        "body": {
+          "available": true,
+          "provenance": "ghidra-function-body-address-set",
+          "ranges": [
+            {
+              "start": "0x97b7e0",
+              "end": "0x97b86a"
+            }
+          ],
+          "total_bytes": 139,
+          "span_bytes": 139,
+          "non_contiguous": false,
+          "contains_entry": true
+        }
+      },
+      {
+        "address": "0xb4bc20",
+        "name": "FUN_00b4bc20",
+        "classification": {
+          "external": false,
+          "thunk": false,
+          "thunk_target": null,
+          "provenance": "ghidra-function-manager"
+        },
+        "body": {
+          "available": true,
+          "provenance": "ghidra-function-body-address-set",
+          "ranges": [
+            {
+              "start": "0xb4bc20",
+              "end": "0xb4c2d5"
+            }
+          ],
+          "total_bytes": 1718,
+          "span_bytes": 1718,
+          "non_contiguous": false,
+          "contains_entry": true
+        }
+      },
+      {
+        "address": "0xb70120",
+        "name": "FUN_00b70120",
+        "classification": {
+          "external": false,
+          "thunk": false,
+          "thunk_target": null,
+          "provenance": "ghidra-function-manager"
+        },
+        "body": {
+          "available": true,
+          "provenance": "ghidra-function-body-address-set",
+          "ranges": [
+            {
+              "start": "0xb70120",
+              "end": "0xb705d0"
+            }
+          ],
+          "total_bytes": 1201,
+          "span_bytes": 1201,
+          "non_contiguous": false,
+          "contains_entry": true
+        }
+      }
+    ],
+    "unresolved_calls": null,
+    "native_api": {
+      "available": true,
+      "provenance": "ghidra-high-function",
+      "signature_source": "default",
+      "calling_convention": "__stdcall",
+      "return_type": {
+        "ordinal": null,
+        "name": null,
+        "data_type": "void",
+        "size_bytes": 0,
+        "storage": "<VOID>",
+        "confidence": "low",
+        "evidence": [
+          {
+            "kind": "signature-source",
+            "source": "ghidra-function-manager",
+            "detail": "Function signature source is default."
+          },
+          {
+            "kind": "decompiler-type",
+            "source": "ghidra-high-function",
+            "detail": "HighFunction recovered data type void."
+          }
+        ],
+        "decompiler_artifacts": [
+          "recovered-signature",
+          "register-or-stack-storage"
+        ],
+        "role": "return"
+      },
+      "parameters": [
+        {
+          "ordinal": 0,
+          "name": "param_1",
+          "data_type": "int",
+          "size_bytes": 4,
+          "storage": "Stack[0x4]:4",
+          "confidence": "low",
+          "evidence": [
+            {
+              "kind": "signature-source",
+              "source": "ghidra-function-manager",
+              "detail": "Function signature source is default."
+            },
+            {
+              "kind": "decompiler-type",
+              "source": "ghidra-high-function",
+              "detail": "HighFunction recovered data type int."
+            }
+          ],
+          "decompiler_artifacts": [
+            "recovered-signature",
+            "register-or-stack-storage",
+            "compiler-generated-variable"
+          ],
+          "role": "parameter"
+        },
+        {
+          "ordinal": 1,
+          "name": "param_2",
+          "data_type": "undefined4",
+          "size_bytes": 4,
+          "storage": "Stack[0x8]:4",
+          "confidence": "low",
+          "evidence": [
+            {
+              "kind": "signature-source",
+              "source": "ghidra-function-manager",
+              "detail": "Function signature source is default."
+            },
+            {
+              "kind": "decompiler-type",
+              "source": "ghidra-high-function",
+              "detail": "HighFunction recovered data type undefined4."
+            }
+          ],
+          "decompiler_artifacts": [
+            "recovered-signature",
+            "register-or-stack-storage",
+            "compiler-generated-variable"
+          ],
+          "role": "parameter"
+        },
+        {
+          "ordinal": 2,
+          "name": "param_3",
+          "data_type": "undefined4",
+          "size_bytes": 4,
+          "storage": "Stack[0xc]:4",
+          "confidence": "low",
+          "evidence": [
+            {
+              "kind": "signature-source",
+              "source": "ghidra-function-manager",
+              "detail": "Function signature source is default."
+            },
+            {
+              "kind": "decompiler-type",
+              "source": "ghidra-high-function",
+              "detail": "HighFunction recovered data type undefined4."
+            }
+          ],
+          "decompiler_artifacts": [
+            "recovered-signature",
+            "register-or-stack-storage",
+            "compiler-generated-variable"
+          ],
+          "role": "parameter"
+        },
+        {
+          "ordinal": 3,
+          "name": "param_4",
+          "data_type": "undefined4",
+          "size_bytes": 4,
+          "storage": "Stack[0x10]:4",
+          "confidence": "low",
+          "evidence": [
+            {
+              "kind": "signature-source",
+              "source": "ghidra-function-manager",
+              "detail": "Function signature source is default."
+            },
+            {
+              "kind": "decompiler-type",
+              "source": "ghidra-high-function",
+              "detail": "HighFunction recovered data type undefined4."
+            }
+          ],
+          "decompiler_artifacts": [
+            "recovered-signature",
+            "register-or-stack-storage",
+            "compiler-generated-variable"
+          ],
+          "role": "parameter"
+        },
+        {
+          "ordinal": 4,
+          "name": "param_5",
+          "data_type": "undefined4",
+          "size_bytes": 4,
+          "storage": "Stack[0x14]:4",
+          "confidence": "low",
+          "evidence": [
+            {
+              "kind": "signature-source",
+              "source": "ghidra-function-manager",
+              "detail": "Function signature source is default."
+            },
+            {
+              "kind": "decompiler-type",
+              "source": "ghidra-high-function",
+              "detail": "HighFunction recovered data type undefined4."
+            }
+          ],
+          "decompiler_artifacts": [
+            "recovered-signature",
+            "register-or-stack-storage",
+            "compiler-generated-variable"
+          ],
+          "role": "parameter"
+        },
+        {
+          "ordinal": 5,
+          "name": "param_6",
+          "data_type": "char",
+          "size_bytes": 1,
+          "storage": "Stack[0x18]:1",
+          "confidence": "low",
+          "evidence": [
+            {
+              "kind": "signature-source",
+              "source": "ghidra-function-manager",
+              "detail": "Function signature source is default."
+            },
+            {
+              "kind": "decompiler-type",
+              "source": "ghidra-high-function",
+              "detail": "HighFunction recovered data type char."
+            }
+          ],
+          "decompiler_artifacts": [
+            "recovered-signature",
+            "register-or-stack-storage",
+            "compiler-generated-variable"
+          ],
+          "role": "parameter"
+        }
+      ],
+      "jump_tables": [],
+      "pseudocode": {
+        "classification": "decompiler-generated-non-source",
+        "compilable": false
+      },
+      "decompiler_artifacts": [
+        "recovered-signature",
+        "register-and-stack-variables",
+        "compiler-generated-control-flow",
+        "pointer-arithmetic",
+        "pseudocode"
+      ],
+      "limitations": [
+        "Types and calling conventions are Ghidra decompiler observations, not source declarations.",
+        "Register variables, compiler-generated blocks, and pointer arithmetic remain decompiler artifacts.",
+        "Pseudocode is neither original source nor guaranteed to compile."
+      ]
+    }
+  },
+  "source_envelope": "build/research/dirt3-inner-rea.json",
+  "note": "Selected fields from the full REA evidence envelope; not a canonical portable bundle."
+}
