@@ -11,6 +11,7 @@
 #include "hud_hooks.h"
 #include "intro_state.h"
 #include "frontend_shadow_state.h"
+#include "recenter_shortcut.h"
 #include <windows.h>
 #include <MinHook.h>
 #include <array>
@@ -52,7 +53,8 @@ struct PrototypeState {
     std::array<unsigned,6> pendingHistory{}; // before, first, second, advance, uploads L/R
     CameraKind previousCamera=CameraKind::Unknown;
     uintptr_t previousCameraOwner{};
-    bool previousStereoEligible{}, cameraReported{}, recenterHeld{};
+    bool previousStereoEligible{}, cameraReported{};
+    RecenterPoll recenter;
     bool basisPending=true;
     unsigned basisSamples{};
     bool rendering{}, windowReported{};
@@ -304,12 +306,26 @@ bool Prepare(PrototypeState& state,ID3D11Texture2D* back) {
         state.resolution.width,state.resolution.height,state.resolution.scale,state.resolution.sceneWidth,state.resolution.sceneHeight);
     return true;
 }
+RecenterShortcut ConfiguredRecenter() {
+    char text[32]{};
+    const DWORD length=GetEnvironmentVariableA("DIRT3VR_RECENTER_KEY",text,sizeof(text));
+    RecenterShortcut value;
+    if(length>0 && (length>=sizeof(text) || !RecenterShortcut::Parse(std::string_view(text,length),value))) {
+        RuntimeLog("XR recenter key setting rejected; using F10");
+        return RecenterShortcut{};
+    }
+    RuntimeLog(("XR recenter key="+value.Describe()).c_str());
+    return value;
+}
 void RecenterKey(PrototypeState& state) {
+    static const RecenterShortcut binding=ConfiguredRecenter();
     DWORD process{};
     GetWindowThreadProcessId(GetForegroundWindow(),&process);
-    const bool pressed=process==GetCurrentProcessId() && (GetAsyncKeyState(VK_F10)&0x8000);
-    if(pressed && !state.recenterHeld) { state.xr.RequestRecenter(); RuntimeLog("XR recenter requested key=F10"); }
-    state.recenterHeld=pressed;
+    const unsigned modifiers=(GetAsyncKeyState(VK_CONTROL)<0?1u:0u)|(GetAsyncKeyState(VK_MENU)<0?2u:0u)|(GetAsyncKeyState(VK_SHIFT)<0?4u:0u);
+    const bool keyDown=GetAsyncKeyState(static_cast<int>(binding.key))<0;
+    if(state.recenter.Update(binding,keyDown,modifiers,process==GetCurrentProcessId())) {
+        state.xr.RequestRecenter(); RuntimeLog(("XR recenter requested key="+binding.Describe()).c_str());
+    }
 }
 }
 

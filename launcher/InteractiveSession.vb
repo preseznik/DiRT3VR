@@ -33,6 +33,7 @@ Public Class InteractiveSession
         start.Environment("DIRT3VR_XR_PROTOTYPE") = "1"
         start.Environment("DIRT3VR_XR_INTERACTIVE") = "1"
         start.Environment("DIRT3VR_VR_RENDER_SCALE") = settings.VrRenderScale.ToString(Globalization.CultureInfo.InvariantCulture)
+        start.Environment("DIRT3VR_RECENTER_KEY") = String.Format(Globalization.CultureInfo.InvariantCulture, "{0} {1}", settings.RecenterKey, settings.RecenterModifiers)
         start.Environment("DIRT3VR_HEADSET_WIDTH") = headset.Width.ToString(Globalization.CultureInfo.InvariantCulture)
         start.Environment("DIRT3VR_HEADSET_HEIGHT") = headset.Height.ToString(Globalization.CultureInfo.InvariantCulture)
         start.Environment("DIRT3VR_LOG_DIR") = directory

@@ -16,6 +16,10 @@ Public Class MainForm
     Private interactive As InteractiveSession
     Private desktopStartup As DesktopStartupSession
     Private ReadOnly skipStartupMovies As New CheckBox With {.Name = "SkipStartupMovies", .Text = "Skip startup logo movies (experimental)", .AutoSize = True}
+    Private ReadOnly recenterButton As New Button With {.Name = "RecenterKey", .AutoSize = True, .AccessibleName = "Recenter key"}
+    Private ReadOnly recenterHint As New Label With {.Name = "RecenterHint", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12)}
+    Private recenterKey As Integer = RecenterShortcut.DefaultKey, recenterModifiers As Integer
+    Private capturingRecenter As Boolean
     Private ReadOnly experimental As New CheckBox With {.Name = "ExperimentalVR", .Text = "Enable experimental VR (VDXR)", .AutoSize = True}
     Private ReadOnly tabs As New ModernTabs With {.Name = "LauncherTabs", .Dock = DockStyle.Fill}
     Private ReadOnly state As New Label With {.Name = "SessionStatus", .AutoSize = True}
@@ -326,8 +330,52 @@ Public Class MainForm
         Dim general = Section(content, "General")
         general.Controls.Add(Info("Use your existing keyboard, controller or wheel bindings in DiRT 3. During experimental VR, closing this launcher minimizes it until the game exits and original files are restored."))
         Dim vrControls = Section(content, "VR and seat controls")
-        vrControls.Controls.Add(Info("Press F10 to recenter while DiRT 3 is the foreground application. Head tracking applies to every rendered 3D camera view, including replay. Per-car seat adjustment is not available yet."))
+        Field(vrControls, "Recenter key", recenterButton)
+        vrControls.Controls.Add(recenterHint)
+        vrControls.Controls.Add(Info("Head tracking applies to every rendered 3D camera view, including replay. Per-car seat adjustment is not available yet."))
+        AddHandler recenterButton.Click, Sub()
+                                             capturingRecenter = True
+                                             UpdateRecenterLabel()
+                                             notice.Text = "Press the new recenter key, with Ctrl, Alt or Shift if you like. Esc cancels."
+                                         End Sub
+        AddHandler recenterButton.LostFocus, Sub()
+                                                 If Not capturingRecenter Then Return
+                                                 capturingRecenter = False : UpdateRecenterLabel()
+                                             End Sub
+        tips.SetToolTip(recenterButton, "Click, then press the key or key combination that recenters the headset view while DiRT 3 is in front.")
+        UpdateRecenterLabel()
     End Sub
+
+    Private Sub UpdateRecenterLabel()
+        Dim keyText = RecenterShortcut.Describe(recenterKey, recenterModifiers)
+        recenterButton.Text = If(capturingRecenter, "Press a key…", keyText)
+        recenterHint.Text = "Press " & keyText & " while DiRT 3 is the foreground application to recenter the view. DiRT 3 also receives the key, so pick one the game doesn't use."
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If CaptureRecenterKey(keyData) Then Return True
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    ' Handles one key press while the recenter button waits for a key (public for the launcher tests).
+    Public Function CaptureRecenterKey(keyData As Keys) As Boolean
+        If Not capturingRecenter Then Return False
+        If RecenterShortcut.IsModifierOnly(keyData) Then Return True
+        If keyData = Keys.Escape Then
+            capturingRecenter = False : UpdateRecenterLabel()
+            notice.Text = "Recenter key unchanged."
+            Return True
+        End If
+        Dim key = CInt(keyData And Keys.KeyCode), modifiers = RecenterShortcut.Modifiers(keyData)
+        If Not RecenterShortcut.Valid(key, modifiers) Then
+            notice.Text = RecenterShortcut.Describe(key, modifiers) & " can't be used. Choose another key; Windows shortcuts such as Alt+Tab are reserved. Esc cancels."
+            Return True
+        End If
+        recenterKey = key : recenterModifiers = modifiers : capturingRecenter = False
+        UpdateRecenterLabel()
+        notice.Text = "Recenter key set to " & RecenterShortcut.Describe(key, modifiers) & ". Save settings or Launch to keep it."
+        Return True
+    End Function
 
     Private Sub BuildSettings()
         Dim content = Page("Settings")
@@ -400,6 +448,7 @@ Public Class MainForm
         logging.Checked = settings.DiagnosticLogging
         experimental.Checked = settings.ExperimentalVrEnabled
         skipStartupMovies.Checked = settings.SkipStartupMovies
+        recenterKey = settings.RecenterKey : recenterModifiers = settings.RecenterModifiers : capturingRecenter = False : UpdateRecenterLabel()
         renderScale.Value = settings.VrRenderScale
         desktopMode.SelectedIndex = Array.IndexOf({"game", "windowed", "fullscreen", "borderless"}, settings.DesktopDisplayMode)
         desktopVSync.SelectedIndex = Array.IndexOf({"game", "off", "on"}, settings.DesktopVSync)
@@ -418,7 +467,8 @@ Public Class MainForm
         Dim resolution = TryCast(desktopResolution.SelectedItem, DesktopResolutionChoice)
         Return New LauncherSettings With {.ModernInterface = modern.Checked, .RuntimeMode = If(runtime.SelectedIndex = 1, "steamvr", "vdxr"), .SteamRuntimeManifest = manifest.Text, .VdxrRuntimeManifest = vdxrManifest.Text, .DiagnosticLogging = logging.Checked, .ExperimentalVrEnabled = experimental.Checked, .VrRenderScale = renderScale.Value,
             .DesktopWidth = If(resolution Is Nothing, 0, resolution.Size.Width), .DesktopHeight = If(resolution Is Nothing, 0, resolution.Size.Height),
-            .DesktopDisplayMode = {"game", "windowed", "fullscreen", "borderless"}(Math.Max(0, desktopMode.SelectedIndex)), .DesktopVSync = {"game", "off", "on"}(Math.Max(0, desktopVSync.SelectedIndex)), .SkipStartupMovies = skipStartupMovies.Checked}
+            .DesktopDisplayMode = {"game", "windowed", "fullscreen", "borderless"}(Math.Max(0, desktopMode.SelectedIndex)), .DesktopVSync = {"game", "off", "on"}(Math.Max(0, desktopVSync.SelectedIndex)), .SkipStartupMovies = skipStartupMovies.Checked,
+            .RecenterKey = recenterKey, .RecenterModifiers = recenterModifiers}
     End Function
 
     Private Sub RememberSavedSettings()
@@ -565,7 +615,7 @@ Public Class MainForm
             Dim text As New TextBox With {.ReadOnly = True, .Multiline = True, .ScrollBars = ScrollBars.Vertical, .Dock = DockStyle.Fill, .BorderStyle = BorderStyle.None}
             text.Text = "DiRT3VR " & BuildVersion & " — Research build" & vbCrLf & vbCrLf &
                 "Launch starts DiRT 3 Complete Edition with the desktop choices under Graphics. Use game setting preserves each existing option. Desktop changes remain in the game graphics file; exact backups are kept in desktop-backups under the preferences folder below. Save settings only saves launcher preferences. Steam must be running with access to the game. Driving controls and saves remain managed by DiRT 3." & vbCrLf & vbCrLf &
-                "Advanced → Enable experimental VR enables the VDXR session when supported by this package. All rendered 3D camera views use stereo and tracking. Loading screens and movies use a virtual screen. Camera transitions remain experimental. F10 recenters while the game is foreground." & vbCrLf & vbCrLf &
+                "Advanced → Enable experimental VR enables the VDXR session when supported by this package. All rendered 3D camera views use stereo and tracking. Loading screens and movies use a virtual screen. Camera transitions remain experimental. " & RecenterShortcut.Describe(recenterKey, recenterModifiers) & " recenters while the game is foreground; change the key under Controls." & vbCrLf & vbCrLf &
                 "Settings → Check runtime and headset runs an x86 OpenXR probe without starting the game. Choose VDXR or SteamVR explicitly; the selected runtime is used for that process only, independently of the system OpenXR default. VDXR and SteamVR require separate checks. Browse to the selected runtime file if it is installed elsewhere." & vbCrLf & vbCrLf &
                 "Settings → Settings profiles keeps named presets of desktop, VR, startup, appearance and logging choices. Save as new profile and Overwrite profile store the current controls in a profile without saving the launcher's settings. Save settings (or Launch) keeps the current controls as the launcher's settings and never changes a profile. Load copies a profile into the controls and asks before replacing unsaved edits. Import adds a profile without loading it, and Export writes the selected saved profile. Game saves and local paths are excluded." & vbCrLf & vbCrLf &
                 "Launcher → Skip startup logo movies temporarily replaces the two startup movie states for desktop or VR. Copyright and Press Start remain. Keep the launcher open until game exit for restoration; closing it during the session minimizes it. Leave skipping off for multiplayer until checked. Background play is not implemented for DiRT 3." & vbCrLf & vbCrLf &
