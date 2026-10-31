@@ -245,7 +245,7 @@ Public NotInheritable Class RecenterDeviceForm
         If input Is Nothing Then Return
         For Each device In input.Devices
             Dim sample = input.Read(device)
-            Dim before As DrivingInput.Sample
+            Dim before As DrivingInput.Sample = Nothing
             If previous.TryGetValue(device.Id, before) Then
                 Dim found = RecenterDeviceBinding.Detect(device, before, sample)
                 If found IsNot Nothing Then

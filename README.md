@@ -3,8 +3,7 @@
 DiRT3VR is a local development build for **Steam DiRT 3 Complete Edition**.
 Version 0.1.19 adds an opt-in **Skip startup logo movies** control on Launcher.
 It replaces only the AMD and DiRT 3 logo states; copyright and Press Start remain.
-The original startup file is backed up and restored after desktop or VR exit.
-Keep the launcher open for recovery. Startup skipping passed attended desktop
+The original startup file is backed up and restored after desktop or VR exit. Startup skipping passed attended desktop
 and VDXR checks. VR cleanup required review of the game's known graphics XML
 rewrite; all originals were restored. Leave the experimental option off for
 multiplayer until compatibility is checked.
@@ -37,9 +36,10 @@ report is investigated.
 2. Open DiRT3VR and select your DiRT 3 Complete Edition folder if needed.
 3. Use **Launch** for ordinary desktop play through the game's own menus.
    **Startup → Skip startup logo movies** is off by default. When enabled, it
-   applies to desktop and VR launches. Closing the launcher during a session
-   with temporary startup changes minimizes it until the game exits and the
-   original file is restored. After an interrupted session, use this version's
+   applies to desktop and VR launches. Closing the launcher window during a
+   session with temporary startup changes keeps DiRT3VR in the notification
+   area until the game exits and the original file is restored; it then quits
+   by itself. After an interrupted session, use this version's
    **Restore original files** before launching again. Other movies remain.
    Progress stays open through the loading splash until the actual game window
    appears. If it is behind another application, use **Show game** in the same
@@ -113,6 +113,13 @@ Windows' 'prefer system32 images' rule applied, or Windows used its own copy
 (install the Visual C++ 2015-2022 Redistributable, x86). It refuses to start VR
 when that rule would apply anyway.
 Use **Launch VR** and select any camera through DiRT 3's native controls.
+**Stop VR** turns the headset off and keeps DiRT 3 running on the monitor; it
+keeps the temporary VR graphics settings until it closes. **End session**
+closes DiRT 3. Either way the original files are restored once DiRT 3 closes.
+You can close the launcher window during a session: DiRT3VR stays in the
+notification area (right-click its icon for Open, Stop VR and End session) and
+quits after restoring the files, or shows its window again if recovery needs
+you. Starting DiRT3VR again opens the running window.
 Rendered 3D scenes use stereo and headset tracking; loading screens, movies and
 frames without a valid 3D scene use a virtual screen. Press
 **F10** with the game focused to recenter; choose another key, optionally with
@@ -165,8 +172,10 @@ ordinary rendering performs no readback.
 The launcher temporarily installs its proxy and patches the graphics and CPU
 restriction files for DX11, native stereo off and serial rendering. It journals
 the original bytes and restores owned files after the session. Externally edited
-files are preserved and reported as a recovery conflict. Keep the launcher
-running until the session ends. UAC may be needed to write the Steam folder.
+files are preserved and reported as a recovery conflict. DiRT3VR keeps running,
+in the notification area if its window is closed, until the session ends. If
+Windows shuts down first, use **Restore original files** on the next start.
+UAC may be needed to write the Steam folder.
 Read-only game files are supported: the launcher changes them, they stay
 read-only during play, and restoration puts back the original read-only flag.
 

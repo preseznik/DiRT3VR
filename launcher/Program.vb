@@ -50,19 +50,15 @@ Public Module Program
             Application.SetHighDpiMode(HighDpiMode.PerMonitorV2)
             Application.SetColorMode(SystemColorMode.System)
             Application.EnableVisualStyles()
-            ' Setup and uninstall detect a running launcher through this name.
-            Dim running As System.Threading.Mutex = Nothing
-            Try
-                running = New System.Threading.Mutex(False, "Global\DiRT3VR.Session")
-            Catch ex As Exception When TypeOf ex Is UnauthorizedAccessException OrElse TypeOf ex Is System.Threading.WaitHandleCannotBeOpenedException
-                ' Installer detection is optional; the launcher does not depend on it.
-            End Try
-            Try
-                Application.Run(New MainForm(context))
-            Finally
-                running?.Dispose()
-            End Try
-            Return 0
+            ' One launcher per Windows sign-in: starting it again shows the running window, also
+            ' while it waits in the notification area for DiRT 3 to close.
+            Using instance As New SingleInstance("DiRT3VR")
+                If Not instance.Primary Then
+                    instance.SignalPrimary()
+                    Return 0
+                End If
+                Return RunLauncher(context, instance)
+            End Using
         Catch ex As Exception
             Dim errorLog = Array.IndexOf(arguments, "--error-log")
             If errorLog >= 0 AndAlso errorLog + 1 < arguments.Length Then
@@ -87,6 +83,31 @@ Public Module Program
             End If
             Return 1
         End Try
+    End Function
+
+    Private Function RunLauncher(context As InstallContext, instance As SingleInstance) As Integer
+        ' Setup and uninstall detect a running launcher through this name.
+        Dim running As System.Threading.Mutex = Nothing
+        Try
+            running = New System.Threading.Mutex(False, "Global\DiRT3VR.Session")
+        Catch ex As Exception When TypeOf ex Is UnauthorizedAccessException OrElse TypeOf ex Is System.Threading.WaitHandleCannotBeOpenedException
+            ' Installer detection is optional; the launcher does not depend on it.
+        End Try
+        Try
+            Using mainWindow As New MainForm(context)
+                instance.Listen(Sub()
+                                    Try
+                                        If mainWindow.IsHandleCreated AndAlso Not mainWindow.IsDisposed Then mainWindow.BeginInvoke(New Action(AddressOf mainWindow.ShowFromBackground))
+                                    Catch ex As Exception When TypeOf ex Is InvalidOperationException OrElse TypeOf ex Is ObjectDisposedException
+                                        ' The launcher is closing.
+                                    End Try
+                                End Sub)
+                Application.Run(mainWindow)
+            End Using
+        Finally
+            running?.Dispose()
+        End Try
+        Return 0
     End Function
 
     Public Function Argument(args As String(), key As String, fallback As String) As String
