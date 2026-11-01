@@ -45,6 +45,8 @@ Public Class MainForm
     Private headsetResolution As HeadsetResolution
     Private ReadOnly resolutionSummary As New Label With {.Name = "VrResolutionSummary", .AutoSize = True}
     Private ReadOnly refreshHeadset As New Button With {.Name = "RefreshHeadset", .Text = "Refresh headset resolution", .AutoSize = True}
+    Private ReadOnly graphicsDefaultsButton As New Button With {.Name = "GraphicsDefaults", .Text = "Restore graphics defaults…", .AutoSize = True}
+    Private ReadOnly launcherDefaultsButton As New Button With {.Name = "LauncherDefaults", .Text = "Restore launcher defaults…", .AutoSize = True}
     Private ReadOnly probe As New Button With {.Name = "CheckRuntime", .Text = "Check runtime and headset", .AutoSize = True}
     Private ReadOnly probeStatus As New Label With {.Name = "ProbeStatus", .Text = "No runtime check has been performed in this session.", .AutoSize = True}
     Private ReadOnly diagnostics As New TextBox With {.Name = "Diagnostics", .ReadOnly = True, .Multiline = True, .ScrollBars = ScrollBars.Vertical, .Height = 230}
@@ -226,6 +228,8 @@ Public Class MainForm
         AddHandler Shown, Sub() FitInitialWindow()
         AddHandler Shown, Async Sub() Await StartupUpdateCheckAsync()
         tips.SetToolTip(desktop, "Start the game with your desktop graphics choices and saved driving controls. No headset is required.")
+        tips.SetToolTip(graphicsDefaultsButton, "Set desktop display mode, resolution and VSync to Use game setting and VR render scale to 100%. Nothing is saved until Save settings or Launch.")
+        tips.SetToolTip(launcherDefaultsButton, "Reset every launcher choice except VR runtime locations and the experimental VR opt-in. Nothing is saved until Save settings or Launch.")
         tips.SetToolTip(stopVrButton, "Turn VR off and keep playing DiRT 3 on the monitor. Original files are restored when DiRT 3 closes.")
         tips.SetToolTip(save, "Keep the current controls as the launcher's settings for next time, as Launch does. Settings profiles are not changed.")
         tips.SetToolTip(probe, "Check OpenXR and headset access without starting DiRT 3. This does not validate stereoscopic game rendering.")
@@ -325,6 +329,8 @@ Public Class MainForm
         vrSettings.Controls.Add(refreshHeadset)
         vrSettings.Controls.Add(Info("Changing game graphics during VR can leave a recovery conflict; the launcher preserves your changes and the original backup."))
         Field(content, "Game graphics file", graphicsPath)
+        content.Controls.Add(graphicsDefaultsButton)
+        AddHandler graphicsDefaultsButton.Click, Sub() RestoreDefaults(graphicsOnly:=True)
     End Sub
 
     Private Sub InvalidateHeadset()
@@ -459,6 +465,10 @@ Public Class MainForm
         Dim content = Page("Settings")
         Dim appearance = Section(content, "Appearance")
         Field(appearance, "Modern interface", modern)
+        Dim defaultsSection = Section(content, "Defaults")
+        defaultsSection.Controls.Add(Info("Resets every launcher choice on all tabs: appearance, VR runtime, logging, startup, graphics, recenter key and controller button. VR runtime locations and the experimental VR opt-in are kept. Game files, settings profiles and saves are not changed, and nothing is saved until Save settings or Launch."))
+        defaultsSection.Controls.Add(launcherDefaultsButton)
+        AddHandler launcherDefaultsButton.Click, Sub() RestoreDefaults(graphicsOnly:=False)
         Dim profiles = Section(content, "Settings profiles")
         profilePanel = New SettingsProfilePanel(context, AddressOf CurrentSettings,
             Function(profile) LoadSettingsProfile(profile, AddressOf ConfirmReplaceSettings))
@@ -570,6 +580,33 @@ Public Class MainForm
     Private Function ConfirmReplaceSettings() As Boolean
         Return MessageBox.Show(Me, "Replace the unsaved changes in the launcher controls? Choose Cancel to keep them; you can save them as a profile first.",
             "Unsaved launcher settings", MessageBoxButtons.OKCancel, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) = DialogResult.OK
+    End Function
+
+    ' Asks before restoring defaults (public so the launcher tests can answer it).
+    <System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)>
+    Public Property ConfirmPrompt As Func(Of String, String, Boolean) = Function(caption, body) MessageBox.Show(Me, body, caption, MessageBoxButtons.OKCancel, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) = DialogResult.OK
+
+    ' Restore graphics defaults / Restore launcher defaults: like loading a profile, this changes the
+    ' controls only; Save settings or Launch keeps the result.
+    Public Function RestoreDefaults(graphicsOnly As Boolean) As Boolean
+        Dim current = CurrentSettings()
+        Dim replacement = If(graphicsOnly, LauncherDefaults.Graphics(current), LauncherDefaults.All(current))
+        Dim what = If(graphicsOnly, "graphics", "launcher")
+        If System.Text.Json.JsonSerializer.Serialize(replacement) = System.Text.Json.JsonSerializer.Serialize(current) Then
+            notice.Text = "The " & what & " choices already use their defaults."
+            Return False
+        End If
+        Dim question = If(graphicsOnly,
+                      "Set desktop display mode, resolution and VSync to Use game setting and VR render scale to 100%?",
+                      "Reset every launcher choice to its default: appearance, VR runtime, logging, startup, graphics, recenter key and controller button? VR runtime locations and the experimental VR opt-in are kept.") &
+                   If(HasUnsavedSettings(), " Your unsaved changes in the launcher controls are replaced.", "") &
+                   " Nothing is saved until you choose Save settings or Launch; game files and settings profiles are not changed."
+        If Not ConfirmPrompt("Restore " & what & " defaults", question) Then Return False
+        settings = replacement : ApplySettings()
+        If Not graphicsOnly Then InvalidateHeadset()
+        RefreshState()
+        notice.Text = If(graphicsOnly, "Graphics", "Launcher") & " defaults restored. Use Save settings or Launch to keep them."
+        Return True
     End Function
 
     Public Function LoadSettingsProfile(profile As SettingsProfile, confirmReplace As Func(Of Boolean)) As Boolean
@@ -821,6 +858,7 @@ Public Class MainForm
             "Launch starts DiRT 3 Complete Edition with the desktop choices under Graphics. Use game setting preserves each existing option. Desktop changes remain in the game graphics file; exact backups are kept in desktop-backups under the preferences folder below. Save settings only saves launcher preferences. Steam must be running with access to the game. Driving controls and saves remain managed by DiRT 3." & vbCrLf & vbCrLf &
             "Advanced → Enable experimental VR enables the VDXR session when supported by this package. All rendered 3D camera views use stereo and tracking. Loading screens and movies use a virtual screen. Camera transitions remain experimental. " & RecenterShortcut.Describe(recenterKey, recenterModifiers) & " recenters while the game is foreground; change the key under Controls." & vbCrLf & vbCrLf &
             "Settings → Check runtime and headset runs an x86 OpenXR probe without starting the game. Choose VDXR or SteamVR explicitly; the selected runtime is used for that process only, independently of the system OpenXR default. VDXR and SteamVR require separate checks. Browse to the selected runtime file if it is installed elsewhere." & vbCrLf & vbCrLf &
+            "Graphics → Restore graphics defaults sets the desktop display choices to Use game setting and VR render scale to 100%. Settings → Restore launcher defaults resets every launcher choice except VR runtime locations and the experimental VR opt-in. Both ask first and, like loading a profile, change only the controls until Save settings or Launch." & vbCrLf & vbCrLf &
             "Settings → Settings profiles keeps named presets of desktop, VR, startup, appearance and logging choices. Save as new profile and Overwrite profile store the current controls in a profile without saving the launcher's settings. Save settings (or Launch) keeps the current controls as the launcher's settings and never changes a profile. Load copies a profile into the controls and asks before replacing unsaved edits. Import adds a profile without loading it, and Export writes the selected saved profile. Game saves and local paths are excluded." & vbCrLf & vbCrLf &
             "Launcher → Skip startup logo movies temporarily replaces the two startup movie states for desktop or VR. Copyright and Press Start remain. The original startup file is restored when the game exits. Leave skipping off for multiplayer until checked." & vbCrLf & vbCrLf &
             "During a session, Stop VR turns the headset off and keeps DiRT 3 running on the monitor; End session closes DiRT 3. Closing this window keeps DiRT3VR in the notification area (next to the clock) until DiRT 3 closes and the original files are restored; it then quits by itself. Right-click its icon to open the window, stop VR or end the session. Starting DiRT3VR again opens the running window." & vbCrLf & vbCrLf &
