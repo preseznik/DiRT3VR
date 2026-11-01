@@ -1,0 +1,1402 @@
+{
+  "schema": 1,
+  "game": "DiRT 3 Complete Edition (Steam)",
+  "sourceDatabaseSha256": "e65d588dad9676228e311daab1e9d5a926722e06e421a7b7ce07ee5c308ae5fa",
+  "sourceLanguageSha256": "4d710a9fa54230693072ab08522a5382eb022272d0ef90cf3a3a6b8dfb1bdc4f",
+  "note": "Disciplines the game marks valid_for_benchmark; routes and cars whose folders are installed. Read-only extract; regenerate with tools/event-catalog.",
+  "disciplines": [
+    {
+      "id": "rally",
+      "name": "RALLY",
+      "trackType": "point_to_point",
+      "staggeredStart": true,
+      "laps": [
+        1
+      ]
+    },
+    {
+      "id": "rallycross",
+      "name": "RALLYCROSS",
+      "trackType": "circuit",
+      "staggeredStart": false,
+      "laps": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "id": "trailblazer",
+      "name": "TRAILBLAZER",
+      "trackType": "point_to_point",
+      "staggeredStart": true,
+      "laps": [
+        1
+      ]
+    },
+    {
+      "id": "landrush",
+      "name": "LANDRUSH",
+      "trackType": "circuit",
+      "staggeredStart": false,
+      "laps": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "id": 248,
+      "discipline": "rallycross",
+      "country": "usa",
+      "track": "aspen",
+      "route": "route_0",
+      "name": "LAKESIDE",
+      "trackName": "ASPEN RALLYX",
+      "locationName": "ASPEN",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 249,
+      "discipline": "rallycross",
+      "country": "usa",
+      "track": "aspen",
+      "route": "route_1",
+      "name": "LAKE VIEW",
+      "trackName": "ASPEN RALLYX",
+      "locationName": "ASPEN",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 250,
+      "discipline": "rallycross",
+      "country": "usa",
+      "track": "aspen",
+      "route": "route_2",
+      "name": "SNOWMASS SPRINT",
+      "trackName": "ASPEN RALLYX",
+      "locationName": "ASPEN",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 251,
+      "discipline": "rallycross",
+      "country": "usa",
+      "track": "aspen",
+      "route": "route_3",
+      "name": "SNOWMASS LOOP",
+      "trackName": "ASPEN RALLYX",
+      "locationName": "ASPEN",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 252,
+      "discipline": "rallycross",
+      "country": "usa",
+      "track": "la_coliseum",
+      "route": "route_0",
+      "name": "EXPOSITION DRIVE",
+      "trackName": "LA COLISEUM RALLYX",
+      "locationName": "L.A. COLISEUM",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 253,
+      "discipline": "rallycross",
+      "country": "usa",
+      "track": "la_coliseum",
+      "route": "route_1",
+      "name": "FIGUEROA LOOP",
+      "trackName": "LA COLISEUM RALLYX",
+      "locationName": "L.A. COLISEUM",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 254,
+      "discipline": "rallycross",
+      "country": "usa",
+      "track": "la_coliseum",
+      "route": "route_2",
+      "name": "VERMONT AVENUE",
+      "trackName": "LA COLISEUM RALLYX",
+      "locationName": "L.A. COLISEUM",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 255,
+      "discipline": "rallycross",
+      "country": "usa",
+      "track": "la_coliseum",
+      "route": "route_3",
+      "name": "ARENA SPRINT",
+      "trackName": "LA COLISEUM RALLYX",
+      "locationName": "L.A. COLISEUM",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 257,
+      "discipline": "rallycross",
+      "country": "monaco",
+      "track": "monaco",
+      "route": "route_0",
+      "name": "CASINO SQUARE",
+      "trackName": "MONACO RALLYX",
+      "locationName": "MONACO",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 258,
+      "discipline": "rallycross",
+      "country": "monaco",
+      "track": "monaco",
+      "route": "route_1",
+      "name": "PORT NEUVE",
+      "trackName": "MONACO RALLYX",
+      "locationName": "MONACO",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 259,
+      "discipline": "rallycross",
+      "country": "monaco",
+      "track": "monaco",
+      "route": "route_2",
+      "name": "SAINTE-DÉVOTE",
+      "trackName": "MONACO RALLYX",
+      "locationName": "MONACO",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 260,
+      "discipline": "rallycross",
+      "country": "monaco",
+      "track": "monaco",
+      "route": "route_3",
+      "name": "QUAI ANTOINE",
+      "trackName": "MONACO RALLYX",
+      "locationName": "MONACO",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 303,
+      "discipline": "rallycross",
+      "country": "japan",
+      "track": "shibuya",
+      "route": "route_0",
+      "name": "SAKURAGAOKACHO",
+      "trackName": "SHIBUYA RALLYX",
+      "locationName": "SHIBUYA",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 304,
+      "discipline": "rallycross",
+      "country": "japan",
+      "track": "shibuya",
+      "route": "route_1",
+      "name": "UDAGAWACHO",
+      "trackName": "SHIBUYA RALLYX",
+      "locationName": "SHIBUYA",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 305,
+      "discipline": "rallycross",
+      "country": "japan",
+      "track": "shibuya",
+      "route": "route_6",
+      "name": "YAMANOTE LINE",
+      "trackName": "SHIBUYA RALLYX",
+      "locationName": "SHIBUYA",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 306,
+      "discipline": "rallycross",
+      "country": "japan",
+      "track": "shibuya",
+      "route": "route_7",
+      "name": "HACHIKO SQUARE",
+      "trackName": "SHIBUYA RALLYX",
+      "locationName": "SHIBUYA",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 261,
+      "discipline": "rallycross",
+      "country": "usa",
+      "track": "smelter",
+      "route": "route_0",
+      "name": "COUNTY LOOP",
+      "trackName": "SMELTER RALLYX",
+      "locationName": "SMELTER",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 262,
+      "discipline": "rallycross",
+      "country": "usa",
+      "track": "smelter",
+      "route": "route_1",
+      "name": "PORTAGE CANAL",
+      "trackName": "SMELTER RALLYX",
+      "locationName": "SMELTER",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 263,
+      "discipline": "rallycross",
+      "country": "usa",
+      "track": "smelter",
+      "route": "route_2",
+      "name": "HOUGHTON SPRINT",
+      "trackName": "SMELTER RALLYX",
+      "locationName": "SMELTER",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 264,
+      "discipline": "rallycross",
+      "country": "usa",
+      "track": "smelter",
+      "route": "route_3",
+      "name": "WATERFRONT PARK",
+      "trackName": "SMELTER RALLYX",
+      "locationName": "SMELTER",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 232,
+      "discipline": "trailblazer",
+      "country": "finland",
+      "track": "finland_trail",
+      "route": "route_0",
+      "name": "PAIJANNE APPROACH",
+      "trackName": "FINLAND TRAIL",
+      "locationName": "FINLAND",
+      "trackType": "point_to_point",
+      "lengthMetres": 6986
+    },
+    {
+      "id": 233,
+      "discipline": "trailblazer",
+      "country": "finland",
+      "track": "finland_trail",
+      "route": "route_1",
+      "name": "VAAKSY RUN",
+      "trackName": "FINLAND TRAIL",
+      "locationName": "FINLAND",
+      "trackType": "point_to_point",
+      "lengthMetres": 3441
+    },
+    {
+      "id": 234,
+      "discipline": "trailblazer",
+      "country": "finland",
+      "track": "finland_trail",
+      "route": "route_2",
+      "name": "EVIJARVIE",
+      "trackName": "FINLAND TRAIL",
+      "locationName": "FINLAND",
+      "trackType": "point_to_point",
+      "lengthMetres": 3929
+    },
+    {
+      "id": 236,
+      "discipline": "trailblazer",
+      "country": "kenya",
+      "track": "kenya_trail",
+      "route": "route_0",
+      "name": "LEOPARD ROCK",
+      "trackName": "KENYA TRAIL",
+      "locationName": "KENYA",
+      "trackType": "point_to_point",
+      "lengthMetres": 8565
+    },
+    {
+      "id": 237,
+      "discipline": "trailblazer",
+      "country": "kenya",
+      "track": "kenya_trail",
+      "route": "route_1",
+      "name": "YATTA RIDGE",
+      "trackName": "KENYA TRAIL",
+      "locationName": "KENYA",
+      "trackType": "point_to_point",
+      "lengthMetres": 8556
+    },
+    {
+      "id": 238,
+      "discipline": "trailblazer",
+      "country": "kenya",
+      "track": "kenya_trail",
+      "route": "route_2",
+      "name": "GARBA TULA",
+      "trackName": "KENYA TRAIL",
+      "locationName": "KENYA",
+      "trackType": "point_to_point",
+      "lengthMetres": 4234
+    },
+    {
+      "id": 240,
+      "discipline": "trailblazer",
+      "country": "usa",
+      "track": "michigan_trail",
+      "route": "route_0",
+      "name": "LAKE GRATIOT",
+      "trackName": "MICHIGAN TRAIL",
+      "locationName": "MICHIGAN",
+      "trackType": "point_to_point",
+      "lengthMetres": 7231
+    },
+    {
+      "id": 242,
+      "discipline": "trailblazer",
+      "country": "usa",
+      "track": "michigan_trail",
+      "route": "route_1",
+      "name": "LAKE SUPERIOR",
+      "trackName": "MICHIGAN TRAIL",
+      "locationName": "MICHIGAN",
+      "trackType": "point_to_point",
+      "lengthMetres": 3520
+    },
+    {
+      "id": 243,
+      "discipline": "trailblazer",
+      "country": "usa",
+      "track": "michigan_trail",
+      "route": "route_2",
+      "name": "EAGLE RIVER",
+      "trackName": "MICHIGAN TRAIL",
+      "locationName": "MICHIGAN",
+      "trackType": "point_to_point",
+      "lengthMetres": 3483
+    },
+    {
+      "id": 244,
+      "discipline": "trailblazer",
+      "country": "norway",
+      "track": "norway_trail",
+      "route": "route_0",
+      "name": "VAALER CLIMB",
+      "trackName": "NORWAY TRAIL",
+      "locationName": "NORWAY",
+      "trackType": "point_to_point",
+      "lengthMetres": 8454
+    },
+    {
+      "id": 245,
+      "discipline": "trailblazer",
+      "country": "norway",
+      "track": "norway_trail",
+      "route": "route_1",
+      "name": "HAFJELL DESCENT",
+      "trackName": "NORWAY TRAIL",
+      "locationName": "NORWAY",
+      "trackType": "point_to_point",
+      "lengthMetres": 4237
+    },
+    {
+      "id": 246,
+      "discipline": "trailblazer",
+      "country": "norway",
+      "track": "norway_trail",
+      "route": "route_2",
+      "name": "NORDSETERVEGEN",
+      "trackName": "NORWAY TRAIL",
+      "locationName": "NORWAY",
+      "trackType": "point_to_point",
+      "lengthMetres": 4091
+    },
+    {
+      "id": 269,
+      "discipline": "landrush",
+      "country": "usa",
+      "track": "aspen",
+      "route": "route_6",
+      "name": "EAGLE HILL RISE",
+      "trackName": "ASPEN LANDRUSH",
+      "locationName": "ASPEN",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 270,
+      "discipline": "landrush",
+      "country": "usa",
+      "track": "aspen",
+      "route": "route_7",
+      "name": "EAGLE HILL LOOP",
+      "trackName": "ASPEN LANDRUSH",
+      "locationName": "ASPEN",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 271,
+      "discipline": "landrush",
+      "country": "usa",
+      "track": "aspen",
+      "route": "route_8",
+      "name": "BRUSH CREEK SPRINT",
+      "trackName": "ASPEN LANDRUSH",
+      "locationName": "ASPEN",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 272,
+      "discipline": "landrush",
+      "country": "usa",
+      "track": "aspen",
+      "route": "route_9",
+      "name": "BRUSH CREEK DASH",
+      "trackName": "ASPEN LANDRUSH",
+      "locationName": "ASPEN",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 273,
+      "discipline": "landrush",
+      "country": "usa",
+      "track": "smelter",
+      "route": "route_6",
+      "name": "COPPER RUN",
+      "trackName": "SMELTER LANDRUSH",
+      "locationName": "SMELTER",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 274,
+      "discipline": "landrush",
+      "country": "usa",
+      "track": "smelter",
+      "route": "route_7",
+      "name": "MAPLE WOODS",
+      "trackName": "SMELTER LANDRUSH",
+      "locationName": "SMELTER",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 275,
+      "discipline": "landrush",
+      "country": "usa",
+      "track": "smelter",
+      "route": "route_8",
+      "name": "ATLANTIC MILL",
+      "trackName": "SMELTER LANDRUSH",
+      "locationName": "SMELTER",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 276,
+      "discipline": "landrush",
+      "country": "usa",
+      "track": "smelter",
+      "route": "route_9",
+      "name": "COLE'S CREEK",
+      "trackName": "SMELTER LANDRUSH",
+      "locationName": "SMELTER",
+      "trackType": "circuit",
+      "lengthMetres": 0
+    },
+    {
+      "id": 191,
+      "discipline": "rally",
+      "country": "finland",
+      "track": "finland_rally",
+      "route": "route_0",
+      "name": "TUPASENTIE",
+      "trackName": "FINLAND RALLY",
+      "locationName": "FINLAND",
+      "trackType": "point_to_point",
+      "lengthMetres": 5982
+    },
+    {
+      "id": 192,
+      "discipline": "rally",
+      "country": "finland",
+      "track": "finland_rally",
+      "route": "route_1",
+      "name": "HANISJARVENTIE",
+      "trackName": "FINLAND RALLY",
+      "locationName": "FINLAND",
+      "trackType": "point_to_point",
+      "lengthMetres": 6249
+    },
+    {
+      "id": 194,
+      "discipline": "rally",
+      "country": "finland",
+      "track": "finland_rally",
+      "route": "route_2",
+      "name": "LANKAMAA",
+      "trackName": "FINLAND RALLY",
+      "locationName": "FINLAND",
+      "trackType": "point_to_point",
+      "lengthMetres": 5604
+    },
+    {
+      "id": 195,
+      "discipline": "rally",
+      "country": "finland",
+      "track": "finland_rally",
+      "route": "route_3",
+      "name": "ISOJARVI",
+      "trackName": "FINLAND RALLY",
+      "locationName": "FINLAND",
+      "trackType": "point_to_point",
+      "lengthMetres": 2733
+    },
+    {
+      "id": 196,
+      "discipline": "rally",
+      "country": "finland",
+      "track": "finland_rally",
+      "route": "route_4",
+      "name": "ALHOJARVI",
+      "trackName": "FINLAND RALLY",
+      "locationName": "FINLAND",
+      "trackType": "point_to_point",
+      "lengthMetres": 2911
+    },
+    {
+      "id": 197,
+      "discipline": "rally",
+      "country": "finland",
+      "track": "finland_rally",
+      "route": "route_5",
+      "name": "KAATSELKÄ",
+      "trackName": "FINLAND RALLY",
+      "locationName": "FINLAND",
+      "trackType": "point_to_point",
+      "lengthMetres": 3193
+    },
+    {
+      "id": 198,
+      "discipline": "rally",
+      "country": "finland",
+      "track": "finland_rally",
+      "route": "route_6",
+      "name": "KAKARISTO",
+      "trackName": "FINLAND RALLY",
+      "locationName": "FINLAND",
+      "trackType": "point_to_point",
+      "lengthMetres": 2759
+    },
+    {
+      "id": 199,
+      "discipline": "rally",
+      "country": "finland",
+      "track": "finland_rally",
+      "route": "route_7",
+      "name": "MUTANEN",
+      "trackName": "FINLAND RALLY",
+      "locationName": "FINLAND",
+      "trackType": "point_to_point",
+      "lengthMetres": 3202
+    },
+    {
+      "id": 200,
+      "discipline": "rally",
+      "country": "kenya",
+      "track": "kenya_rally",
+      "route": "route_0",
+      "name": "MWATATE",
+      "trackName": "KENYA RALLY",
+      "locationName": "KENYA",
+      "trackType": "point_to_point",
+      "lengthMetres": 4719
+    },
+    {
+      "id": 201,
+      "discipline": "rally",
+      "country": "kenya",
+      "track": "kenya_rally",
+      "route": "route_1",
+      "name": "TAVETA DESCENT",
+      "trackName": "KENYA RALLY",
+      "locationName": "KENYA",
+      "trackType": "point_to_point",
+      "lengthMetres": 4167
+    },
+    {
+      "id": 202,
+      "discipline": "rally",
+      "country": "kenya",
+      "track": "kenya_rally",
+      "route": "route_2",
+      "name": "CROCODILE POINT",
+      "trackName": "KENYA RALLY",
+      "locationName": "KENYA",
+      "trackType": "point_to_point",
+      "lengthMetres": 2364
+    },
+    {
+      "id": 203,
+      "discipline": "rally",
+      "country": "kenya",
+      "track": "kenya_rally",
+      "route": "route_3",
+      "name": "WUNDANYI CLIMB",
+      "trackName": "KENYA RALLY",
+      "locationName": "KENYA",
+      "trackType": "point_to_point",
+      "lengthMetres": 3239
+    },
+    {
+      "id": 204,
+      "discipline": "rally",
+      "country": "kenya",
+      "track": "kenya_rally",
+      "route": "route_4",
+      "name": "TSAVO",
+      "trackName": "KENYA RALLY",
+      "locationName": "KENYA",
+      "trackType": "point_to_point",
+      "lengthMetres": 2788
+    },
+    {
+      "id": 205,
+      "discipline": "rally",
+      "country": "kenya",
+      "track": "kenya_rally",
+      "route": "route_5",
+      "name": "CHUMVINI RISE",
+      "trackName": "KENYA RALLY",
+      "locationName": "KENYA",
+      "trackType": "point_to_point",
+      "lengthMetres": 2764
+    },
+    {
+      "id": 206,
+      "discipline": "rally",
+      "country": "kenya",
+      "track": "kenya_rally",
+      "route": "route_6",
+      "name": "MWANDA",
+      "trackName": "KENYA RALLY",
+      "locationName": "KENYA",
+      "trackType": "point_to_point",
+      "lengthMetres": 2913
+    },
+    {
+      "id": 207,
+      "discipline": "rally",
+      "country": "kenya",
+      "track": "kenya_rally",
+      "route": "route_7",
+      "name": "TAITA HILLS",
+      "trackName": "KENYA RALLY",
+      "locationName": "KENYA",
+      "trackType": "point_to_point",
+      "lengthMetres": 3246
+    },
+    {
+      "id": 216,
+      "discipline": "rally",
+      "country": "usa",
+      "track": "michigan_rally",
+      "route": "route_0",
+      "name": "MOUNTAIN DRIVE",
+      "trackName": "MICHIGAN RALLY",
+      "locationName": "MICHIGAN",
+      "trackType": "point_to_point",
+      "lengthMetres": 5356
+    },
+    {
+      "id": 217,
+      "discipline": "rally",
+      "country": "usa",
+      "track": "michigan_rally",
+      "route": "route_1",
+      "name": "PENINSULA RUN",
+      "trackName": "MICHIGAN RALLY",
+      "locationName": "MICHIGAN",
+      "trackType": "point_to_point",
+      "lengthMetres": 5214
+    },
+    {
+      "id": 218,
+      "discipline": "rally",
+      "country": "usa",
+      "track": "michigan_rally",
+      "route": "route_2",
+      "name": "QUINCY MINE",
+      "trackName": "MICHIGAN RALLY",
+      "locationName": "MICHIGAN",
+      "trackType": "point_to_point",
+      "lengthMetres": 4813
+    },
+    {
+      "id": 219,
+      "discipline": "rally",
+      "country": "usa",
+      "track": "michigan_rally",
+      "route": "route_3",
+      "name": "KENTON DESCENT",
+      "trackName": "MICHIGAN RALLY",
+      "locationName": "MICHIGAN",
+      "trackType": "point_to_point",
+      "lengthMetres": 2391
+    },
+    {
+      "id": 220,
+      "discipline": "rally",
+      "country": "usa",
+      "track": "michigan_rally",
+      "route": "route_4",
+      "name": "HORIZON DRIVE",
+      "trackName": "MICHIGAN RALLY",
+      "locationName": "MICHIGAN",
+      "trackType": "point_to_point",
+      "lengthMetres": 2660
+    },
+    {
+      "id": 221,
+      "discipline": "rally",
+      "country": "usa",
+      "track": "michigan_rally",
+      "route": "route_5",
+      "name": "CALUMET PASS",
+      "trackName": "MICHIGAN RALLY",
+      "locationName": "MICHIGAN",
+      "trackType": "point_to_point",
+      "lengthMetres": 2738
+    },
+    {
+      "id": 222,
+      "discipline": "rally",
+      "country": "usa",
+      "track": "michigan_rally",
+      "route": "route_6",
+      "name": "LIGHTHOUSE VIEW",
+      "trackName": "MICHIGAN RALLY",
+      "locationName": "MICHIGAN",
+      "trackType": "point_to_point",
+      "lengthMetres": 2423
+    },
+    {
+      "id": 223,
+      "discipline": "rally",
+      "country": "usa",
+      "track": "michigan_rally",
+      "route": "route_7",
+      "name": "PINE RIDGE",
+      "trackName": "MICHIGAN RALLY",
+      "locationName": "MICHIGAN",
+      "trackType": "point_to_point",
+      "lengthMetres": 2803
+    },
+    {
+      "id": 224,
+      "discipline": "rally",
+      "country": "france",
+      "track": "monte_carlo_rally",
+      "route": "route_0",
+      "name": "COL ST ROCH",
+      "trackName": "MONTE CARLO RALLY",
+      "locationName": "MONTE CARLO",
+      "trackType": "point_to_point",
+      "lengthMetres": 5659
+    },
+    {
+      "id": 225,
+      "discipline": "rally",
+      "country": "france",
+      "track": "monte_carlo_rally",
+      "route": "route_1",
+      "name": "BAROQUE",
+      "trackName": "MONTE CARLO RALLY",
+      "locationName": "MONTE CARLO",
+      "trackType": "point_to_point",
+      "lengthMetres": 6237
+    },
+    {
+      "id": 226,
+      "discipline": "rally",
+      "country": "france",
+      "track": "monte_carlo_rally",
+      "route": "route_2",
+      "name": "GORGES DE PIAON",
+      "trackName": "MONTE CARLO RALLY",
+      "locationName": "MONTE CARLO",
+      "trackType": "point_to_point",
+      "lengthMetres": 6329
+    },
+    {
+      "id": 227,
+      "discipline": "rally",
+      "country": "france",
+      "track": "monte_carlo_rally",
+      "route": "route_3",
+      "name": "LACET DE BLANC",
+      "trackName": "MONTE CARLO RALLY",
+      "locationName": "MONTE CARLO",
+      "trackType": "point_to_point",
+      "lengthMetres": 5254
+    },
+    {
+      "id": 228,
+      "discipline": "rally",
+      "country": "france",
+      "track": "monte_carlo_rally",
+      "route": "route_4",
+      "name": "SOSPEL",
+      "trackName": "MONTE CARLO RALLY",
+      "locationName": "MONTE CARLO",
+      "trackType": "point_to_point",
+      "lengthMetres": 3038
+    },
+    {
+      "id": 229,
+      "discipline": "rally",
+      "country": "france",
+      "track": "monte_carlo_rally",
+      "route": "route_5",
+      "name": "COL DE TURINI",
+      "trackName": "MONTE CARLO RALLY",
+      "locationName": "MONTE CARLO",
+      "trackType": "point_to_point",
+      "lengthMetres": 3433
+    },
+    {
+      "id": 230,
+      "discipline": "rally",
+      "country": "france",
+      "track": "monte_carlo_rally",
+      "route": "route_6",
+      "name": "BOIS NOIR",
+      "trackName": "MONTE CARLO RALLY",
+      "locationName": "MONTE CARLO",
+      "trackType": "point_to_point",
+      "lengthMetres": 2599
+    },
+    {
+      "id": 231,
+      "discipline": "rally",
+      "country": "france",
+      "track": "monte_carlo_rally",
+      "route": "route_7",
+      "name": "ROUTE DES ANGES",
+      "trackName": "MONTE CARLO RALLY",
+      "locationName": "MONTE CARLO",
+      "trackType": "point_to_point",
+      "lengthMetres": 2563
+    },
+    {
+      "id": 208,
+      "discipline": "rally",
+      "country": "norway",
+      "track": "norway_rally",
+      "route": "route_0",
+      "name": "KANTVEGEN",
+      "trackName": "NORWAY RALLY",
+      "locationName": "NORWAY",
+      "trackType": "point_to_point",
+      "lengthMetres": 5210
+    },
+    {
+      "id": 209,
+      "discipline": "rally",
+      "country": "norway",
+      "track": "norway_rally",
+      "route": "route_1",
+      "name": "LITLIKAUPANGER",
+      "trackName": "NORWAY RALLY",
+      "locationName": "NORWAY",
+      "trackType": "point_to_point",
+      "lengthMetres": 4828
+    },
+    {
+      "id": 210,
+      "discipline": "rally",
+      "country": "norway",
+      "track": "norway_rally",
+      "route": "route_2",
+      "name": "PAALSRUDVEGEN",
+      "trackName": "NORWAY RALLY",
+      "locationName": "NORWAY",
+      "trackType": "point_to_point",
+      "lengthMetres": 5284
+    },
+    {
+      "id": 211,
+      "discipline": "rally",
+      "country": "norway",
+      "track": "norway_rally",
+      "route": "route_3",
+      "name": "AASSTUEVEGEN",
+      "trackName": "NORWAY RALLY",
+      "locationName": "NORWAY",
+      "trackType": "point_to_point",
+      "lengthMetres": 2851
+    },
+    {
+      "id": 212,
+      "discipline": "rally",
+      "country": "norway",
+      "track": "norway_rally",
+      "route": "route_4",
+      "name": "HAMAR DESCENT ",
+      "trackName": "NORWAY RALLY",
+      "locationName": "NORWAY",
+      "trackType": "point_to_point",
+      "lengthMetres": 2862
+    },
+    {
+      "id": 213,
+      "discipline": "rally",
+      "country": "norway",
+      "track": "norway_rally",
+      "route": "route_5",
+      "name": "BIRKEBEINERVEGEN",
+      "trackName": "NORWAY RALLY",
+      "locationName": "NORWAY",
+      "trackType": "point_to_point",
+      "lengthMetres": 3447
+    },
+    {
+      "id": 214,
+      "discipline": "rally",
+      "country": "norway",
+      "track": "norway_rally",
+      "route": "route_6",
+      "name": "SKAARSETSAGA",
+      "trackName": "NORWAY RALLY",
+      "locationName": "NORWAY",
+      "trackType": "point_to_point",
+      "lengthMetres": 3601
+    },
+    {
+      "id": 215,
+      "discipline": "rally",
+      "country": "norway",
+      "track": "norway_rally",
+      "route": "route_7",
+      "name": "RUSTADVEGEN",
+      "trackName": "NORWAY RALLY",
+      "locationName": "NORWAY",
+      "trackType": "point_to_point",
+      "lengthMetres": 3700
+    }
+  ],
+  "cars": [
+    {
+      "code": "stx",
+      "name": "SUBARU IMPREZA WRX STI GR RALLYCROSS",
+      "discipline": "rallycross",
+      "vehicleClass": "rally_cross",
+      "vehicleClassName": "RALLYCROSS"
+    },
+    {
+      "code": "mex",
+      "name": "MITSUBISHI LANCER EVOLUTION X",
+      "discipline": "rallycross",
+      "vehicleClass": "rally_cross",
+      "vehicleClassName": "RALLYCROSS"
+    },
+    {
+      "code": "20x",
+      "name": "PEUGEOT 207 T16 4X4",
+      "discipline": "rallycross",
+      "vehicleClass": "rally_cross",
+      "vehicleClassName": "RALLYCROSS"
+    },
+    {
+      "code": "6r4",
+      "name": "MG METRO 6R4 RALLYX",
+      "discipline": "rallycross",
+      "vehicleClass": "rally_cross",
+      "vehicleClassName": "RALLYCROSS"
+    },
+    {
+      "code": "rs2",
+      "name": "FORD RS200 RALLYX",
+      "discipline": "rallycross",
+      "vehicleClass": "rally_cross",
+      "vehicleClassName": "RALLYCROSS"
+    },
+    {
+      "code": "fox",
+      "name": "FORD FOCUS ST RALLYCROSS",
+      "discipline": "rallycross",
+      "vehicleClass": "rally_cross",
+      "vehicleClassName": "RALLYCROSS"
+    },
+    {
+      "code": "frx",
+      "name": "FORD FIESTA RALLYCROSS",
+      "discipline": "rallycross",
+      "vehicleClass": "rally_cross",
+      "vehicleClassName": "RALLYCROSS"
+    },
+    {
+      "code": "c4x",
+      "name": "CITROËN C4 RALLYCROSS",
+      "discipline": "rallycross",
+      "vehicleClass": "rally_cross",
+      "vehicleClassName": "RALLYCROSS"
+    },
+    {
+      "code": "bmt",
+      "name": "BMW Z4 M COUPE MOTORSPORT",
+      "discipline": "trailblazer",
+      "vehicleClass": "trailblazer",
+      "vehicleClassName": "MODERN"
+    },
+    {
+      "code": "aqp",
+      "name": "AUDI QUATTRO S1 PIKES PEAK",
+      "discipline": "trailblazer",
+      "vehicleClass": "classic_trailbla",
+      "vehicleClassName": "CLASSIC"
+    },
+    {
+      "code": "sx4",
+      "name": "MONSTER SPORT SX4 HILLCLIMB SPECIAL",
+      "discipline": "trailblazer",
+      "vehicleClass": "trailblazer",
+      "vehicleClassName": "MODERN"
+    },
+    {
+      "code": "405",
+      "name": "PEUGEOT 405 T16 PIKES PEAK",
+      "discipline": "trailblazer",
+      "vehicleClass": "classic_trailbla",
+      "vehicleClassName": "CLASSIC"
+    },
+    {
+      "code": "tac",
+      "name": "TOYOTA TACOMA",
+      "discipline": "trailblazer",
+      "vehicleClass": "classic_trailbla",
+      "vehicleClassName": "CLASSIC"
+    },
+    {
+      "code": "rmt",
+      "name": "RHYS MILLEN RACING PM580",
+      "discipline": "trailblazer",
+      "vehicleClass": "trailblazer",
+      "vehicleClassName": "MODERN"
+    },
+    {
+      "code": "cam",
+      "name": "CHEVROLET CAMARO SSX CONCEPT",
+      "discipline": "trailblazer",
+      "vehicleClass": "trailblazer",
+      "vehicleClassName": "MODERN"
+    },
+    {
+      "code": "mus",
+      "name": "FORD MUSTANG GT",
+      "discipline": "trailblazer",
+      "vehicleClass": "trailblazer",
+      "vehicleClassName": "MODERN"
+    },
+    {
+      "code": "fpp",
+      "name": "FORD FIESTA OMSE HILLCLIMB SPECIAL",
+      "discipline": "trailblazer",
+      "vehicleClass": "trailblazer",
+      "vehicleClassName": "MODERN"
+    },
+    {
+      "code": "fst",
+      "name": "STADIUM TRUCK",
+      "discipline": "landrush",
+      "vehicleClass": "landrush_trucks",
+      "vehicleClassName": "LANDRUSH TRUCKS"
+    },
+    {
+      "code": "fsb",
+      "name": "STADIUM BUGGY",
+      "discipline": "landrush",
+      "vehicleClass": "landrush_buggies",
+      "vehicleClassName": "LANDRUSH BUGGIES"
+    },
+    {
+      "code": "lan",
+      "name": "MITSUBISHI RACING LANCER",
+      "discipline": "rally",
+      "vehicleClass": "raid_t1",
+      "vehicleClassName": "RAID"
+    },
+    {
+      "code": "vwt",
+      "name": "VW RACE TOUAREG 2",
+      "discipline": "rally",
+      "vehicleClass": "raid_t1",
+      "vehicleClassName": "RAID"
+    },
+    {
+      "code": "bow",
+      "name": "BOWLER NEMESIS",
+      "discipline": "rally",
+      "vehicleClass": "raid_t1",
+      "vehicleClassName": "RAID"
+    },
+    {
+      "code": "hh3",
+      "name": "HUMMER H3",
+      "discipline": "rally",
+      "vehicleClass": "raid_t1",
+      "vehicleClassName": "RAID"
+    },
+    {
+      "code": "for",
+      "name": "FORD FOCUS RS WRC",
+      "discipline": "rally",
+      "vehicleClass": "wrc_rally",
+      "vehicleClassName": "PRO"
+    },
+    {
+      "code": "c4r",
+      "name": "CITROËN C4 WRC",
+      "discipline": "rally",
+      "vehicleClass": "wrc_rally",
+      "vehicleClassName": "PRO"
+    },
+    {
+      "code": "mcr",
+      "name": "MINI COUNTRYMAN RALLY EDITION",
+      "discipline": "rally",
+      "vehicleClass": "wrc_rally",
+      "vehicleClassName": "PRO"
+    },
+    {
+      "code": "sti",
+      "name": "SUBARU IMPREZA WRX STI SRT USA",
+      "discipline": "rally",
+      "vehicleClass": "open_rally",
+      "vehicleClassName": "OPEN"
+    },
+    {
+      "code": "n12",
+      "name": "SUBARU IMPREZA WRX STI N12",
+      "discipline": "rally",
+      "vehicleClass": "open_rally",
+      "vehicleClassName": "OPEN"
+    },
+    {
+      "code": "mer",
+      "name": "MITSUBISHI LANCER EVOLUTION X",
+      "discipline": "rally",
+      "vehicleClass": "open_rally",
+      "vehicleClassName": "OPEN"
+    },
+    {
+      "code": "cr4",
+      "name": "COLIN MCRAE R4",
+      "discipline": "rally",
+      "vehicleClass": "open_rally",
+      "vehicleClassName": "OPEN"
+    },
+    {
+      "code": "fra",
+      "name": "FORD FIESTA OPEN CLASS",
+      "discipline": "rally",
+      "vehicleClass": "open_rally",
+      "vehicleClassName": "OPEN"
+    },
+    {
+      "code": "207",
+      "name": "PEUGEOT 207 S2000",
+      "discipline": "rally",
+      "vehicleClass": "s2000_rally",
+      "vehicleClassName": "S2000"
+    },
+    {
+      "code": "pun",
+      "name": "ABARTH GRANDE PUNTO S2000",
+      "discipline": "rally",
+      "vehicleClass": "s2000_rally",
+      "vehicleClassName": "S2000"
+    },
+    {
+      "code": "ffr",
+      "name": "FORD FIESTA RS RALLY CAR",
+      "discipline": "rally",
+      "vehicleClass": "wrc_rally",
+      "vehicleClassName": "PRO"
+    },
+    {
+      "code": "555",
+      "name": "1995 SUBARU IMPREZA WRX STI",
+      "discipline": "rally",
+      "vehicleClass": "90s_rally",
+      "vehicleClassName": "90s"
+    },
+    {
+      "code": "ldi",
+      "name": "LANCIA DELTA HF INTEGRALE",
+      "discipline": "rally",
+      "vehicleClass": "90s_rally",
+      "vehicleClassName": "90s"
+    },
+    {
+      "code": "ers",
+      "name": "FORD ESCORT RS COSWORTH",
+      "discipline": "rally",
+      "vehicleClass": "90s_rally",
+      "vehicleClassName": "90s"
+    },
+    {
+      "code": "gt4",
+      "name": "TOYOTA CELICA GT-FOUR",
+      "discipline": "rally",
+      "vehicleClass": "90s_rally",
+      "vehicleClassName": "90s"
+    },
+    {
+      "code": "aqb",
+      "name": "AUDI SPORT QUATTRO RALLYE",
+      "discipline": "rally",
+      "vehicleClass": "groupb_rally",
+      "vehicleClassName": "GROUP B"
+    },
+    {
+      "code": "6rb",
+      "name": "MG METRO 6R4",
+      "discipline": "rally",
+      "vehicleClass": "groupb_rally",
+      "vehicleClassName": "GROUP B"
+    },
+    {
+      "code": "lds",
+      "name": "LANCIA DELTA S4",
+      "discipline": "rally",
+      "vehicleClass": "groupb_rally",
+      "vehicleClassName": "GROUP B"
+    },
+    {
+      "code": "20b",
+      "name": "PEUGEOT 205 T16 EVO 2",
+      "discipline": "rally",
+      "vehicleClass": "groupb_rally",
+      "vehicleClassName": "GROUP B"
+    },
+    {
+      "code": "rsb",
+      "name": "FORD RS200",
+      "discipline": "rally",
+      "vehicleClass": "groupb_rally",
+      "vehicleClassName": "GROUP B"
+    },
+    {
+      "code": "mta",
+      "name": "OPEL MANTA 400",
+      "discipline": "rally",
+      "vehicleClass": "80s_rally",
+      "vehicleClassName": "80s"
+    },
+    {
+      "code": "srs",
+      "name": "FORD SIERRA COSWORTH RS500",
+      "discipline": "rally",
+      "vehicleClass": "80s_rally",
+      "vehicleClassName": "80s"
+    },
+    {
+      "code": "m3r",
+      "name": "BMW M3 RALLY",
+      "discipline": "rally",
+      "vehicleClass": "80s_rally",
+      "vehicleClassName": "80s"
+    },
+    {
+      "code": "r5t",
+      "name": "RENAULT 5 TURBO",
+      "discipline": "rally",
+      "vehicleClass": "80s_rally",
+      "vehicleClassName": "80s"
+    },
+    {
+      "code": "cme",
+      "name": "FORD ESCORT MK II",
+      "discipline": "rally",
+      "vehicleClass": "70s_rally",
+      "vehicleClassName": "70s"
+    },
+    {
+      "code": "131",
+      "name": "FIAT 131 ABARTH",
+      "discipline": "rally",
+      "vehicleClass": "70s_rally",
+      "vehicleClassName": "70s"
+    },
+    {
+      "code": "str",
+      "name": "LANCIA STRATOS",
+      "discipline": "rally",
+      "vehicleClass": "70s_rally",
+      "vehicleClassName": "70s"
+    },
+    {
+      "code": "mcs",
+      "name": "MINI COOPER S",
+      "discipline": "rally",
+      "vehicleClass": "60s_rally",
+      "vehicleClassName": "60s"
+    },
+    {
+      "code": "ful",
+      "name": "LANCIA FULVIA HF",
+      "discipline": "rally",
+      "vehicleClass": "60s_rally",
+      "vehicleClassName": "60s"
+    },
+    {
+      "code": "alp",
+      "name": "RENAULT ALPINE A110 1600 S",
+      "discipline": "rally",
+      "vehicleClass": "60s_rally",
+      "vehicleClassName": "60s"
+    },
+    {
+      "code": "kad",
+      "name": "OPEL KADETT GT/E 16V",
+      "discipline": "rally",
+      "vehicleClass": "70s_rally",
+      "vehicleClassName": "70s"
+    },
+    {
+      "code": "kbe",
+      "name": "FORD ESCORT MK II",
+      "discipline": "rally",
+      "vehicleClass": "open_rally",
+      "vehicleClassName": "OPEN"
+    }
+  ]
+}
