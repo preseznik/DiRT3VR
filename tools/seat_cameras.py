@@ -85,8 +85,8 @@ def _chunk(data: bytes, cursor: int, signature: bytes) -> tuple[bytes, int]:
     return data[cursor + 8:end], end
 
 
-def decode(data: bytes) -> BinXml:
-    if not 24 <= len(data) <= MAX_BYTES or data[:4] != MAGIC or struct.unpack_from("<I", data, 4)[0] != len(data) - 8:
+def decode(data: bytes, max_bytes: int = MAX_BYTES) -> BinXml:
+    if not 24 <= len(data) <= max_bytes or data[:4] != MAGIC or struct.unpack_from("<I", data, 4)[0] != len(data) - 8:
         raise ValueError("Not a supported BinXml file")
     if data[8:12] != STRINGS_CONTAINER:
         raise ValueError("Missing BinXml string container")

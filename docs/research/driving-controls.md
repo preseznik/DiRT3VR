@@ -75,6 +75,21 @@ PC reported in a direct session (level 0, runs 36–37) was most likely that def
 iztok's setting. DiRT2VR had the same gap and redirected its direct-start
 flow through the profile-loading states (`docs/driving-controls.md` there).
 
+### Redirect test (in progress)
+
+`run_benchmark.py --load-profile` applies a journaled `flow.bin` change that sends a
+skipfe start through the normal profile load: node `32e` (`profile_reset_p2`) links
+`next` to `C` (`create_protected_data_context`) instead of `10`. It is one attribute
+(`tools/diagnostic_files.profile_load_redirect`; the string `C` already exists, so the
+file keeps its size and every element). Run 44 (direct practice, difficulty hook at 5):
+no prompt blocked the start, the race began normally, and the Steam Cloud saves were
+unchanged. Whether the profile actually loaded is still open: the difficulty lookup
+still answered 0 (which may be iztok's real setting), and Steam Cloud reads don't show
+up in the in-process file trace (runs 45/46 opened the same 1263 files with and without
+the change). Next: iztok's real difficulty level, or a research hook on
+`StateBeginLoad` (factory `0x523f60`, vtable `0xe9cb28`; overridden slots 1, 2, 3, 6, 7
+against the base vtable `0xe90028`) to log that the load runs.
+
 ## Recommendation
 
 1. **Load the profile in direct launch** (so the game's own controls menu works for
