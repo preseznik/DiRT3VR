@@ -87,6 +87,13 @@ bool Install(void (*log)(const char*,...)) {
         installed.store(true,std::memory_order_release);
         log("Direct practice: benchmark start keeps the player's car under player control (base=0x%x)",static_cast<unsigned>(base));
         if(const auto laps=RequestedLaps()) log("Direct practice laps: %u requested",laps);
+        // The pause menu is separate: if only its site differs, the player still drives.
+        if(!PauseSiteMatches(image,base)) log("Direct practice pause refused: pause check instructions differ; Esc stays without a menu");
+        else {
+            const uint8_t pauseOriginal=0x74,pauseJump=0xeb;
+            if(WriteCode(image+pauseBranchRva,&pauseJump,&pauseOriginal,1,"Direct practice pause",log))
+                log("Direct practice pause: Esc opens DiRT 3's pause menu");
+        }
     });
     return installed.load(std::memory_order_acquire);
 }

@@ -148,7 +148,20 @@ renderer, AI driving) went from the finish camera to DiRT 3's main menu and stay
 That the menus then behave normally (starting another event, Exit) still needs real input.
 
 Pause is blocked deliberately: the race's next-state check (`0x51f3f0`) returns "pause"
-when a pause is requested, except while the benchmark flag is set (`0x51f456`).
+when a pause is requested, except while the benchmark flag is set (`0x51f456`). Direct
+practice now makes that `je` unconditional too (byte-checked with the relocated flag
+address). A direct session then has DiRT 3's full Single Race pause menu: CONTINUE /
+RESTART / RESTART VIA SERVICE AREA / RESET VEHICLE / REPLAY / OPTIONS / RETIRE (run 22,
+iztok pressing Esc; run 23 with the real renderer). Retire asks "RETIRE FROM EVENT?" and,
+confirmed, closes the game cleanly without a result (run 23). In run 22 a pause choice
+led through the Aspen event intro to the Single Race pre-race screen (RACE / ENTRANTS /
+DIFFICULTY AND ASSISTS / VEHICLE SETUP); RACE started a new race with the player in
+control.
+
+Checks that need keyboard input use `run_benchmark.py --focus-keys`, only with the
+user's permission: it brings DiRT 3 to the front and presses real keys, refusing to send
+anything unless the game is the foreground window. Keys sent in the first ~40 s skip the
+pre-race camera instead.
 
 Run 19 posted Esc to the game window at 40 s: no pause menu appeared and the timer kept
 running. That doesn't settle whether the benchmark can pause: DiRT 3 reads the keyboard
@@ -157,9 +170,8 @@ with real input.
 
 ## Still open
 
-- Verify with real input that the menus work after a return, and allow the pause menu
-  (`0x51f456`) and check what its entries do in a benchmark start. A Restart at the finish
-  would need more (DiRT2VR patched `flow.bin`/`states.bin` for a finish menu).
+- Confirm what the pause menu's Restart does, and that the main menu works after a
+  return (starting another event, Exit).
 - Opponents (more `<car>` entries, as DiRT2VR's race grid), and which disciplines and
   routes start correctly. The event catalog is #5b02d01b.
 - Not yet tried in VR.
