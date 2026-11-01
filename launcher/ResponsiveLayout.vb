@@ -64,7 +64,7 @@ End Module
 ' after it in its stack; rows are never removed, recreated or reordered.
 Public Class SectionHeader
     Inherits Button
-    Private collapsedValue As Boolean, hot As Boolean
+    Private collapsedValue As Boolean, hot As Boolean, isNewValue As Boolean
     Public ReadOnly Property Title As String
     Public Event CollapsedChanged As EventHandler
     Public Sub New(title As String)
@@ -82,6 +82,7 @@ Public Class SectionHeader
         End Using
         TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, If(Enabled, ForeColor, SystemColors.GrayText),
                               TextFormatFlags.Left Or TextFormatFlags.VerticalCenter Or TextFormatFlags.SingleLine Or TextFormatFlags.NoPrefix)
+        If isNewValue Then NewFeatures.Draw(e.Graphics, Font, TextRenderer.MeasureText(Text, Font, Size.Empty, TextFormatFlags.SingleLine Or TextFormatFlags.NoPrefix).Width + NewFeatures.Gap(Me), 0, Height)
         If Focused AndAlso ShowFocusCues Then ControlPaint.DrawFocusRectangle(e.Graphics, ClientRectangle, ForeColor, back)
     End Sub
     Protected Overrides Sub OnMouseEnter(e As EventArgs)
@@ -103,6 +104,21 @@ Public Class SectionHeader
             RaiseEvent CollapsedChanged(Me, EventArgs.Empty)
         End Set
     End Property
+    ' Added since the last release: "*new*" follows the title (NewFeatures).
+    <System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)>
+    Public Property IsNew As Boolean
+        Get
+            Return isNewValue
+        End Get
+        Set(value As Boolean)
+            isNewValue = value : Invalidate() : Parent?.PerformLayout()
+        End Set
+    End Property
+    Public Overrides Function GetPreferredSize(proposedSize As Size) As Size
+        Dim preferred = MyBase.GetPreferredSize(proposedSize)
+        If isNewValue Then preferred.Width += NewFeatures.Gap(Me) + NewFeatures.Width(Font)
+        Return preferred
+    End Function
     Protected Overrides Sub OnClick(e As EventArgs)
         Collapsed = Not Collapsed
         MyBase.OnClick(e)
@@ -149,7 +165,8 @@ Public Class VerticalStack
                 End If
                 If collapsedHidden.Remove(child) Then child.Visible = True
                 Dim width = Math.Max(1, ClientSize.Width - Padding.Horizontal - child.Margin.Horizontal)
-                Dim fixedWidth = TypeOf child Is Button OrElse TypeOf child Is LinkLabel
+                ' A control marked new keeps its own width, so its "*new*" fits beside it (OnPaint).
+                Dim fixedWidth = TypeOf child Is Button OrElse TypeOf child Is LinkLabel OrElse NewFeatures.IsMarked(child)
                 child.SetBounds(Padding.Left + child.Margin.Left, y + child.Margin.Top, If(fixedWidth, Math.Min(width, child.PreferredSize.Width), width), child.Height)
                 If (TypeOf child Is Label AndAlso child.AutoSize) OrElse TypeOf child Is Button OrElse TypeOf child Is FlowLayoutPanel Then
                     child.Height = child.GetPreferredSize(New Size(width, 0)).Height
@@ -160,6 +177,13 @@ Public Class VerticalStack
         Finally
             arranging = False
         End Try
+        Invalidate()
+    End Sub
+    Protected Overrides Sub OnPaint(e As PaintEventArgs)
+        MyBase.OnPaint(e)
+        For Each child As Control In Controls
+            If child.Visible AndAlso NewFeatures.IsMarked(child) Then NewFeatures.Draw(e.Graphics, child.Font, child.Right + NewFeatures.Gap(Me), child.Top, child.Height)
+        Next
     End Sub
     Public Overrides Function GetPreferredSize(proposedSize As Size) As Size
         ' Scroll layout probes with unconstrained widths (65535). Do not turn that
@@ -173,13 +197,29 @@ Public Class SettingRow
     Inherits Panel
     Private ReadOnly caption As Label
     Private ReadOnly editor As Control
-    Private arranging As Boolean
+    Private arranging As Boolean, isNewValue As Boolean
     Public Sub New(title As String, value As Control)
         Dock = DockStyle.Top : Margin = New Padding(0) : TabStop = False : AutoSize = True : AutoSizeMode = AutoSizeMode.GrowAndShrink
         caption = New Label With {.Text = title, .AutoSize = False, .TextAlign = ContentAlignment.MiddleLeft, .Name = value.Name & "Label"}
         editor = value : editor.Dock = DockStyle.None : editor.Margin = New Padding(0)
         If editor.AccessibleName Is Nothing Then editor.AccessibleName = title
         Controls.Add(caption) : Controls.Add(editor)
+        AddHandler caption.Paint, AddressOf PaintNewMark
+    End Sub
+    ' Added since the last release: "*new*" follows the label, in room the label keeps free (NewFeatures).
+    <System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)>
+    Public Property IsNew As Boolean
+        Get
+            Return isNewValue
+        End Get
+        Set(value As Boolean)
+            isNewValue = value : PerformLayout() : caption.Invalidate()
+        End Set
+    End Property
+    Private Sub PaintNewMark(sender As Object, e As PaintEventArgs)
+        If Not isNewValue Then Return
+        Dim textWidth = Math.Min(TextRenderer.MeasureText(caption.Text, caption.Font, Size.Empty, TextFormatFlags.SingleLine Or TextFormatFlags.NoPrefix).Width, caption.Width - caption.Padding.Horizontal)
+        NewFeatures.Draw(e.Graphics, caption.Font, textWidth + NewFeatures.Gap(Me), 0, caption.Height)
     End Sub
     ' The row's label; Simple view renames a few rows while it borrows them.
     <System.ComponentModel.Browsable(False), System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)>
@@ -203,7 +243,8 @@ Public Class SettingRow
             Dim editorWidth = If(stacked, width, width - labelWidth - gap)
             Dim editorHeight = If(TypeOf editor Is ValueSlider, Px(Me, DirectCast(editor, ValueSlider).LogicalHeight), editor.GetPreferredSize(New Size(editorWidth, 0)).Height)
             editorHeight = Math.Max(Px(Me, 28), editorHeight)
-            Dim labelHeight = TextRenderer.MeasureText(caption.Text, Font, New Size(If(stacked, width, labelWidth), 0), TextFormatFlags.WordBreak Or TextFormatFlags.NoPrefix).Height
+            caption.Padding = If(isNewValue, New System.Windows.Forms.Padding(0, 0, NewFeatures.Gap(Me) + NewFeatures.Width(Font), 0), System.Windows.Forms.Padding.Empty)
+            Dim labelHeight = TextRenderer.MeasureText(caption.Text, Font, New Size(Math.Max(1, If(stacked, width, labelWidth) - caption.Padding.Horizontal), 0), TextFormatFlags.WordBreak Or TextFormatFlags.NoPrefix).Height
             Dim rowHeight = If(stacked, labelHeight + editorHeight + gap, Math.Max(labelHeight, editorHeight))
             caption.SetBounds(0, padding, If(stacked, width, labelWidth), If(stacked, labelHeight, rowHeight))
             editor.SetBounds(If(stacked, 0, labelWidth + gap), padding + If(stacked, labelHeight + gap, (rowHeight - editorHeight) \ 2), editorWidth, editorHeight)

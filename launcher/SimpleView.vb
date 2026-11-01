@@ -191,6 +191,7 @@ End Class
 Public NotInheritable Class LauncherViewPicker
     Inherits FlowLayoutPanel
     Private ReadOnly simpleChoice As New RadioButton With {.Name = "SimpleView", .Text = "Simple", .Appearance = Appearance.Button, .AutoSize = True, .Margin = New Padding(0), .TextAlign = ContentAlignment.MiddleCenter, .FlatStyle = FlatStyle.Flat}
+    Private isNewValue As Boolean
     Private ReadOnly advancedChoice As New RadioButton With {.Name = "AdvancedView", .Text = "Advanced", .Appearance = Appearance.Button, .AutoSize = True, .Margin = New Padding(0), .TextAlign = ContentAlignment.MiddleCenter, .FlatStyle = FlatStyle.Flat, .Checked = True}
     Public Event ViewChanged As EventHandler
 
@@ -212,6 +213,32 @@ Public NotInheritable Class LauncherViewPicker
             If value Then advancedChoice.Checked = True Else simpleChoice.Checked = True
         End Set
     End Property
+
+    ' Added since the last release: "*new*" follows the switch (NewFeatures).
+    <System.ComponentModel.Browsable(False), System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)>
+    Public Property IsNew As Boolean
+        Get
+            Return isNewValue
+        End Get
+        Set(value As Boolean)
+            isNewValue = value : FitNewMark()
+        End Set
+    End Property
+
+    Private Sub FitNewMark()
+        Padding = If(isNewValue, New Padding(0, 0, NewFeatures.Gap(Me) + NewFeatures.Width(Font), 0), Padding.Empty)
+        Invalidate()
+    End Sub
+
+    Protected Overrides Sub OnFontChanged(e As EventArgs)
+        MyBase.OnFontChanged(e)
+        If isNewValue Then FitNewMark()
+    End Sub
+
+    Protected Overrides Sub OnPaint(e As PaintEventArgs)
+        MyBase.OnPaint(e)
+        If isNewValue Then NewFeatures.Draw(e.Graphics, Font, advancedChoice.Right + NewFeatures.Gap(Me), 0, Height)
+    End Sub
 
     ' The chosen view reads as pressed in both themes.
     Private Sub UpdateColors()

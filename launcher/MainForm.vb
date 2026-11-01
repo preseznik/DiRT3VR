@@ -123,6 +123,7 @@ Public Class MainForm
         layout.Controls.Add(tabs, 0, 2)
         BuildLauncher() : BuildGraphics() : BuildControls() : BuildSettings() : BuildAdvanced()
         headers.AddRange(FindHeaders(tabs))
+        NewFeatures.Apply(layout)
         InitializeViews()
         For Each heading In headers
             AddHandler heading.CollapsedChanged, Sub() collapsedSectionTitles = WindowPreferences.JoinSections(headers.Where(Function(h) h.Collapsed).Select(Function(h) h.Title))
@@ -1002,7 +1003,8 @@ Public Class MainForm
                 "Launch starts DiRT 3 Complete Edition on your monitor with the desktop choices under Graphics. Choose your career, event, car and track in the game's own menus. Steam must be running with access to the game. Driving controls and saves stay managed by DiRT 3." & vbCrLf & vbCrLf &
                 "Launch VR starts an experimental VR session (see " & HelpVr & "). While DiRT 3 runs, Launch becomes Show game, which brings the game window to the front." & vbCrLf & vbCrLf &
                 "Save settings keeps the current controls as the launcher's settings for next time, as Launch does. It never changes the game or a settings profile." & vbCrLf & vbCrLf &
-                "The ? button opens this window: updates at the top, these topics below. The Instructions link on each tab opens that tab's topic. The Simple | Advanced switch beside it shows the essentials on one page or every option (see " & HelpViews & ")."),
+                "The ? button opens this window: updates at the top, these topics below. The Instructions link on each tab opens that tab's topic. The Simple | Advanced switch beside it shows the essentials on one page or every option (see " & HelpViews & ")." & vbCrLf & vbCrLf &
+                "Features added since the last release carry a yellow " & NewFeatures.Mark & " mark in development and experimental builds; stable releases don't show it, and the next version drops it."),
             ViewsTopic(),
             New HelpTopic(HelpDirect,
                 "Launcher → Launch mode → Direct practice starts DiRT 3 straight on a route with your car, without its menus, through the game's own benchmark start; DiRT3VR's renderer keeps the car under your control." & vbCrLf & vbCrLf &
