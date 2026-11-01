@@ -81,6 +81,10 @@ report is investigated.
    height per eye. Output stays at that recommendation while the slider changes
    scene detail. The launcher rechecks the headset before every VR launch.
    Unsupported sizes are refused; the displayed maximum depends on the headset.
+   **Quality (desktop and VR)** offers DiRT 3's own presets (Ultra Low to Ultra)
+   and each quality option. Everything starts on **Use game setting**; chosen
+   options are written into the game's graphics file (backed up first) at every
+   launch, desktop and VR, replacing changes made in the game's own menu.
    Changes apply on the next VR launch. Below it, **Last VR session** shows the
    headset refresh rate (when the runtime reports it) and whether DiRT 3
    rendered the requested scene size.
@@ -113,9 +117,10 @@ are not reinterpreted as scene scale. Other preferences are preserved.
 Closing the launcher remembers its window size and maximized state separately;
 it does not save unsaved game settings. The title shows the build version.
 
-Named settings profiles now export schema 3, including the startup choice and
-the recenter key. Schema-1 and schema-2 profiles remain readable, with startup
-skipping off and F10 for recentering where they lack those choices.
+Named settings profiles now export schema 4, including the startup choice, the
+recenter key and the graphics quality choices. Schema-1 to schema-3 profiles
+remain readable, with startup skipping off, F10 for recentering and every
+quality option on Use game setting where they lack those choices.
 
 For experimental VR, connect the headset through Virtual Desktop, choose VDXR,
 and enable the experimental VR option in Advanced. Close other VR games first.

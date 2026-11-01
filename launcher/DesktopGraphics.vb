@@ -6,7 +6,21 @@ Imports System.Xml.Linq
 ' Persistent desktop preferences; VR continues to use ExperimentalFiles and its own recovery transaction.
 Public Module DesktopGraphics
     Public Function HasOverrides(settings As LauncherSettings) As Boolean
+        Return HasDisplayOverrides(settings) OrElse HasQuality(settings)
+    End Function
+
+    Public Function HasDisplayOverrides(settings As LauncherSettings) As Boolean
         Return settings.DesktopWidth <> 0 OrElse settings.DesktopDisplayMode <> "game" OrElse settings.DesktopVSync <> "game"
+    End Function
+
+    Public Function HasQuality(settings As LauncherSettings) As Boolean
+        Return settings.GraphicsQuality IsNot Nothing AndAlso settings.GraphicsQuality.Values.Any(Function(value) value <> "game")
+    End Function
+
+    ' The same settings with only the quality choices: a VR launch applies quality to the game file
+    ' (shared by desktop and VR) but uses its own display settings.
+    Public Function QualityOnly(settings As LauncherSettings) As LauncherSettings
+        Return New LauncherSettings With {.GraphicsQuality = New Dictionary(Of String, String)(If(settings.GraphicsQuality, New Dictionary(Of String, String)))}
     End Function
 
     Public Sub Validate(settings As LauncherSettings)
@@ -22,6 +36,7 @@ Public Module DesktopGraphics
 
     Public Function Transform(data As Byte(), settings As LauncherSettings, monitor As Size) As Byte()
         Validate(settings)
+        Dim quality = GraphicsCatalog.Current.Normalize(settings.GraphicsQuality)
         If Not HasOverrides(settings) Then Return data ' Exact default preservation, including a first launch without graphics XML.
         If data.Length > 1024 * 1024 Then Throw New IOException("The game graphics file is too large; it was preserved.")
         Dim document As XDocument
@@ -33,6 +48,9 @@ Public Module DesktopGraphics
             Throw New IOException("The game graphics file is invalid; it was preserved.", ex)
         End Try
         If document.Root?.Name <> "hardware_settings_config" Then Throw New IOException("Unexpected game graphics file; it was preserved.")
+        ' Quality options: exactly the attributes DiRT 3's own options write.
+        GraphicsCatalog.Current.Apply(document.Root, quality)
+        If Not HasDisplayOverrides(settings) Then Return Serialized(data, document)
         Dim resolutions = document.Root.Elements("graphics_card").Elements("resolution").ToArray()
         If resolutions.Length <> 1 Then Throw New IOException("Expected one game resolution entry; the file was preserved.")
         Dim resolution = resolutions(0)
@@ -51,9 +69,13 @@ Public Module DesktopGraphics
             If resolution.Attribute(change.Key) Is Nothing Then Throw New IOException("Missing game graphics setting: " & change.Key & ". The file was preserved.")
             resolution.SetAttributeValue(change.Key, change.Value)
         Next
-        ' Avoid reformatting and making backups when every requested value already matches.
-        If ExperimentalFiles.SameXml(data, Encoding.UTF8.GetBytes(document.ToString(SaveOptions.DisableFormatting))) Then Return data
-        Return Encoding.UTF8.GetBytes(document.ToString(SaveOptions.DisableFormatting))
+        Return Serialized(data, document)
+    End Function
+
+    ' Avoid reformatting and making backups when every requested value already matches.
+    Private Function Serialized(data As Byte(), document As XDocument) As Byte()
+        Dim written = Encoding.UTF8.GetBytes(document.ToString(SaveOptions.DisableFormatting))
+        Return If(ExperimentalFiles.SameXml(data, written), data, written)
     End Function
 
     Public Sub Apply(context As InstallContext, settings As LauncherSettings, monitor As Size)

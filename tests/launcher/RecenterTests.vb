@@ -43,12 +43,12 @@ Module RecenterTests
         Dim store As New SettingsProfileStore(ctx)
         Dim saved = store.Create("Wheel", ProfileValues.Capture(New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = "", .RecenterKey = 36, .RecenterModifiers = 4}))
         Dim reread = store.Read(saved.Id).Profile
-        check(reread.Schema = 3 AndAlso reread.Settings.RecenterKey = 36 AndAlso reread.Settings.RecenterModifiers = 4, "settings profiles keep the recenter key as schema 3")
+        check(reread.Schema = 4 AndAlso reread.Settings.RecenterKey = 36 AndAlso reread.Settings.RecenterModifiers = 4, "settings profiles keep the recenter key (schema 4)")
         check(reread.Settings.ApplyTo(New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = ""}).RecenterKey = 36, "loading a profile applies its recenter key")
         Dim importPath = Path.Combine(root, "recenter-profile.json")
         File.WriteAllText(importPath, "{""Kind"":""DiRT3VR.SettingsProfile"",""Schema"":2,""Name"":""Before recenter"",""Settings"":{""VrRenderScale"":125}}")
         Dim migrated = store.Import(importPath).Profile
-        check(migrated.Schema = 3 AndAlso migrated.Settings.RecenterKey = 121 AndAlso migrated.Settings.RecenterModifiers = 0, "schema 2 profiles import with F10")
+        check(migrated.Schema = 4 AndAlso migrated.Settings.RecenterKey = 121 AndAlso migrated.Settings.RecenterModifiers = 0, "schema 2 profiles import with F10")
         File.WriteAllText(importPath, "{""Kind"":""DiRT3VR.SettingsProfile"",""Schema"":2,""Name"":""Too new"",""Settings"":{""RecenterKey"":82}}")
         check(Refused(Sub() store.Import(importPath)), "a schema 2 profile cannot carry a recenter key")
         File.WriteAllText(importPath, "{""Kind"":""DiRT3VR.SettingsProfile"",""Schema"":3,""Name"":""Reserved"",""Settings"":{""RecenterKey"":115,""RecenterModifiers"":2}}")

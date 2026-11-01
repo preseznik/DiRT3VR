@@ -163,6 +163,8 @@ Public Class LauncherSettings
     ' True: recentering turns to face forward and keeps the horizon level (default, as in GRID2VR).
     ' False: a manual recenter also resets pitch and roll.
     Public Property RecenterKeepLevel As Boolean = True
+    ' Graphics quality per catalog field (GraphicsCatalog), applied at every launch; absent = Use game setting.
+    Public Property GraphicsQuality As New Dictionary(Of String, String)
     ' Optional controller/wheel button; machine-specific, so never part of settings profiles.
     Public Property RecenterDevice As RecenterDeviceBinding
 
@@ -176,6 +178,7 @@ Public Class LauncherSettings
         If Not RecenterShortcut.Valid(RecenterKey, RecenterModifiers) Then Throw New IOException("Choose another recenter key. Windows shortcuts such as Alt+Tab are reserved.")
         RecenterDevice?.Validate()
         DesktopGraphics.Validate(Me)
+        GraphicsQuality = GraphicsCatalog.Current.Normalize(GraphicsQuality)
     End Sub
 
     Public Shared Function Load(context As InstallContext) As LauncherSettings

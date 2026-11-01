@@ -15,6 +15,8 @@ Public Class ProfileValues
     Public Property SkipStartupMovies As Boolean
     Public Property RecenterKey As Integer = RecenterShortcut.DefaultKey
     Public Property RecenterModifiers As Integer
+    ' Schema 4: graphics quality choices (catalog field → choice); empty = Use game setting.
+    Public Property GraphicsQuality As New Dictionary(Of String, String)
 
     Public Shared Function Capture(value As LauncherSettings) As ProfileValues
         value.Validate()
@@ -23,7 +25,8 @@ Public Class ProfileValues
             .DiagnosticLogging = value.DiagnosticLogging, .ExperimentalVrEnabled = value.ExperimentalVrEnabled,
             .VrRenderScale = value.VrRenderScale, .DesktopWidth = value.DesktopWidth, .DesktopHeight = value.DesktopHeight,
             .DesktopDisplayMode = value.DesktopDisplayMode, .DesktopVSync = value.DesktopVSync, .SkipStartupMovies = value.SkipStartupMovies,
-            .RecenterKey = value.RecenterKey, .RecenterModifiers = value.RecenterModifiers}
+            .RecenterKey = value.RecenterKey, .RecenterModifiers = value.RecenterModifiers,
+            .GraphicsQuality = New Dictionary(Of String, String)(value.GraphicsQuality)}
     End Function
 
     Public Function ApplyTo(local As LauncherSettings) As LauncherSettings
@@ -34,24 +37,28 @@ Public Class ProfileValues
             .DiagnosticLogging = DiagnosticLogging, .ExperimentalVrEnabled = ExperimentalVrEnabled,
             .VrRenderScale = VrRenderScale, .DesktopWidth = DesktopWidth, .DesktopHeight = DesktopHeight,
             .DesktopDisplayMode = DesktopDisplayMode, .DesktopVSync = DesktopVSync, .SkipStartupMovies = SkipStartupMovies,
-            .RecenterKey = RecenterKey, .RecenterModifiers = RecenterModifiers}
+            .RecenterKey = RecenterKey, .RecenterModifiers = RecenterModifiers,
+            .GraphicsQuality = New Dictionary(Of String, String)(If(GraphicsQuality, New Dictionary(Of String, String)))}
         result.Validate()
         Return result
     End Function
 End Class
 
 Public Class SettingsProfile
+    ' 2 added startup logo skipping, 3 the recenter key, 4 graphics quality.
+    Public Const CurrentSchema As Integer = 4
     Public Property Kind As String
     Public Property Schema As Integer
     Public Property Name As String
     Public Property Settings As ProfileValues
 
     Public Sub Validate()
-        If Kind <> "DiRT3VR.SettingsProfile" OrElse (Schema < 1 OrElse Schema > 3) Then Throw New IOException("This is not a supported DiRT3VR settings profile.")
+        If Kind <> "DiRT3VR.SettingsProfile" OrElse (Schema < 1 OrElse Schema > CurrentSchema) Then Throw New IOException("This is not a supported DiRT3VR settings profile.")
         Name = SettingsProfileStore.ValidateName(Name)
         If Settings Is Nothing Then Throw New IOException("The profile has no settings.")
         If Schema = 1 AndAlso Settings.SkipStartupMovies Then Throw New IOException("Startup choices require settings profile schema 2.")
         If Schema < 3 AndAlso (Settings.RecenterKey <> RecenterShortcut.DefaultKey OrElse Settings.RecenterModifiers <> 0) Then Throw New IOException("Recenter keys require settings profile schema 3.")
+        If Schema < 4 AndAlso Settings.GraphicsQuality IsNot Nothing AndAlso Settings.GraphicsQuality.Count > 0 Then Throw New IOException("Graphics quality choices require settings profile schema 4.")
         Settings.ApplyTo(New LauncherSettings())
     End Sub
 End Class
@@ -148,7 +155,7 @@ Public Class SettingsProfileStore
     End Function
 
     Private Function MakeProfile(name As String, values As ProfileValues, Optional exceptId As String = Nothing) As SettingsProfile
-        Dim profile As New SettingsProfile With {.Kind = "DiRT3VR.SettingsProfile", .Schema = 3, .Name = name, .Settings = values}
+        Dim profile As New SettingsProfile With {.Kind = "DiRT3VR.SettingsProfile", .Schema = SettingsProfile.CurrentSchema, .Name = name, .Settings = values}
         profile.Validate()
         Dim entries = List()
         If exceptId Is Nothing AndAlso entries.Count >= MaximumProfiles Then Throw New IOException("Keep at most 128 settings profiles per installation.")

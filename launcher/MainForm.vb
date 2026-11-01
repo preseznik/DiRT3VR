@@ -48,6 +48,9 @@ Public Class MainForm
     Private ReadOnly resolutionSummary As New Label With {.Name = "VrResolutionSummary", .AutoSize = True}
     Private ReadOnly lastSessionSummary As New Label With {.Name = "LastVrSession", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12)}
     Private ReadOnly refreshHeadset As New Button With {.Name = "RefreshHeadset", .Text = "Refresh headset resolution", .AutoSize = True}
+    Private ReadOnly qualityPreset As New ComboBox With {.Name = "QualityPreset", .DropDownStyle = ComboBoxStyle.DropDownList}
+    Private ReadOnly qualityBoxes As New Dictionary(Of String, ComboBox)
+    Private updatingQuality As Boolean
     Private ReadOnly graphicsDefaultsButton As New Button With {.Name = "GraphicsDefaults", .Text = "Restore graphics defaults…", .AutoSize = True}
     Private ReadOnly launcherDefaultsButton As New Button With {.Name = "LauncherDefaults", .Text = "Restore launcher defaults…", .AutoSize = True}
     Private ReadOnly probe As New Button With {.Name = "CheckRuntime", .Text = "Check runtime and headset", .AutoSize = True}
@@ -234,7 +237,7 @@ Public Class MainForm
         AddHandler Shown, Async Sub() Await StartupUpdateCheckAsync()
         ' Old session logs, F8 captures and finished recovery records go after 30 days (newest 10 kept).
         AddHandler Shown, Async Sub() Await LogCleanup.RunAsync(context)
-        tips.SetToolTip(graphicsDefaultsButton, "Set desktop display mode, resolution and VSync to Use game setting and VR render scale to 100%. Nothing is saved until Save settings or Launch.")
+        tips.SetToolTip(graphicsDefaultsButton, "Set desktop display, VSync and quality options to Use game setting and VR render scale to 100%. Nothing is saved until Save settings or Launch.")
         tips.SetToolTip(launcherDefaultsButton, "Reset every launcher choice except VR runtime locations and the experimental VR opt-in. Nothing is saved until Save settings or Launch.")
         tips.SetToolTip(probe, "Check OpenXR and headset access without starting DiRT 3. This does not validate stereoscopic game rendering.")
         tips.SetToolTip(skipStartupMovies, "Skips the AMD and DiRT 3 logo movies in desktop and VR launches. Copyright and Press Start remain. The original startup file is restored when the game exits; closing this window keeps DiRT3VR running in the notification area until then.")
@@ -341,10 +344,88 @@ Public Class MainForm
         vrSettings.Controls.Add(lastSessionSummary)
         UpdateLastSession()
         vrSettings.Controls.Add(Info("Changing game graphics during VR can leave a recovery conflict; the launcher preserves your changes and the original backup."))
+        BuildQuality(content)
         Field(content, "Game graphics file", graphicsPath)
         content.Controls.Add(graphicsDefaultsButton)
         content.Controls.Add(TopicLink(HelpGraphics))
         AddHandler graphicsDefaultsButton.Click, Sub() RestoreDefaults(graphicsOnly:=True)
+    End Sub
+
+    ' Quality (desktop and VR): DiRT 3's own presets and options from the embedded catalog.
+    Private Sub BuildQuality(content As Control)
+        Dim catalog = GraphicsCatalog.Current
+        Dim quality = Section(content, "Quality (desktop and VR)")
+        qualityPreset.Items.Add("Use game settings")
+        For Each preset In catalog.Presets
+            qualityPreset.Items.Add(If(preset.Id = "medium", preset.Label & " (game default)", preset.Label))
+        Next
+        qualityPreset.Items.Add("Custom")
+        StyleChoice(qualityPreset, quality)
+        Field(quality, "Preset", qualityPreset)
+        quality.Controls.Add(Info("DiRT3VR writes these choices into DiRT 3's graphics file at every launch, desktop and VR. Options set to Use game setting stay as DiRT 3 has them; the others replace changes made in the game's own options menu on the next launch. These are DiRT 3's own presets and options (DirectX 11 values). A backup of the graphics file is kept before it is changed."))
+        Dim columns As New ResponsiveColumns() : quality.Controls.Add(columns)
+        Dim index = 0
+        For Each category In catalog.Categories
+            Dim box As New ComboBox With {.Name = "Quality" & category.Field, .DropDownStyle = ComboBoxStyle.DropDownList, .AccessibleName = category.Label}
+            box.Items.Add("Use game setting")
+            For Each choice In category.Choices
+                box.Items.Add(If(choice.Id = category.Default, choice.Label & " (game default)", choice.Label))
+            Next
+            Dim column = If(index < (catalog.Categories.Count + 1) \ 2, columns.First, columns.Second)
+            StyleChoice(box, column)
+            Field(column, category.Label, box)
+            qualityBoxes.Add(category.Field, box)
+            AddHandler box.SelectedIndexChanged, Sub() If Not updatingQuality Then UpdateQualityPreset()
+            index += 1
+        Next
+        AddHandler qualityPreset.SelectedIndexChanged, Sub() QualityPresetChosen()
+    End Sub
+
+    Private Sub QualityPresetChosen()
+        If updatingQuality Then Return
+        Dim catalog = GraphicsCatalog.Current
+        Dim index = qualityPreset.SelectedIndex
+        If index = 0 Then
+            SetQualityBoxes(New Dictionary(Of String, String))
+        ElseIf index >= 1 AndAlso index <= catalog.Presets.Count Then
+            SetQualityBoxes(catalog.Presets(index - 1).Values)
+        End If ' Custom keeps the individual choices.
+        UpdateQualityPreset()
+    End Sub
+
+    Private Sub SetQualityBoxes(values As IDictionary(Of String, String))
+        updatingQuality = True
+        Try
+            For Each category In GraphicsCatalog.Current.Categories
+                Dim value As String = Nothing
+                Dim choice = If(values IsNot Nothing AndAlso values.TryGetValue(category.Field, value), category.Choices.FindIndex(Function(item) item.Id = value), -1)
+                qualityBoxes(category.Field).SelectedIndex = choice + 1
+            Next
+        Finally
+            updatingQuality = False
+        End Try
+    End Sub
+
+    Private Function CurrentQuality() As Dictionary(Of String, String)
+        Dim result As New Dictionary(Of String, String)
+        For Each category In GraphicsCatalog.Current.Categories
+            Dim index = qualityBoxes(category.Field).SelectedIndex
+            If index > 0 Then result.Add(category.Field, category.Choices(index - 1).Id)
+        Next
+        Return result
+    End Function
+
+    ' The preset dropdown names the preset the individual choices match, or Custom.
+    Private Sub UpdateQualityPreset()
+        Dim catalog = GraphicsCatalog.Current
+        Dim current = CurrentQuality()
+        Dim match = catalog.MatchingPreset(current)
+        updatingQuality = True
+        Try
+            qualityPreset.SelectedIndex = If(current.Count = 0, 0, If(match Is Nothing, catalog.Presets.Count + 1, catalog.Presets.IndexOf(match) + 1))
+        Finally
+            updatingQuality = False
+        End Try
     End Sub
 
     Private Sub InvalidateHeadset()
@@ -579,6 +660,7 @@ Public Class MainForm
         recenterDevice = settings.RecenterDevice : UpdateRecenterDeviceLabel()
         recenterKeepLevel.Checked = settings.RecenterKeepLevel
         renderScale.Value = settings.VrRenderScale
+        SetQualityBoxes(settings.GraphicsQuality) : UpdateQualityPreset()
         desktopMode.SelectedIndex = Array.IndexOf({"game", "windowed", "fullscreen", "borderless"}, settings.DesktopDisplayMode)
         desktopVSync.SelectedIndex = Array.IndexOf({"game", "off", "on"}, settings.DesktopVSync)
         desktopResolution.Items.Clear()
@@ -597,7 +679,8 @@ Public Class MainForm
         Return New LauncherSettings With {.ModernInterface = modern.Checked, .RuntimeMode = If(runtime.SelectedIndex = 1, "steamvr", "vdxr"), .SteamRuntimeManifest = manifest.Text, .VdxrRuntimeManifest = vdxrManifest.Text, .DiagnosticLogging = logging.Checked, .ExperimentalVrEnabled = experimental.Checked, .VrRenderScale = renderScale.Value,
             .DesktopWidth = If(resolution Is Nothing, 0, resolution.Size.Width), .DesktopHeight = If(resolution Is Nothing, 0, resolution.Size.Height),
             .DesktopDisplayMode = {"game", "windowed", "fullscreen", "borderless"}(Math.Max(0, desktopMode.SelectedIndex)), .DesktopVSync = {"game", "off", "on"}(Math.Max(0, desktopVSync.SelectedIndex)), .SkipStartupMovies = skipStartupMovies.Checked,
-            .RecenterKey = recenterKey, .RecenterModifiers = recenterModifiers, .RecenterDevice = recenterDevice, .RecenterKeepLevel = recenterKeepLevel.Checked}
+            .RecenterKey = recenterKey, .RecenterModifiers = recenterModifiers, .RecenterDevice = recenterDevice, .RecenterKeepLevel = recenterKeepLevel.Checked,
+            .GraphicsQuality = CurrentQuality()}
     End Function
 
     Private Sub RememberSavedSettings()
@@ -628,7 +711,7 @@ Public Class MainForm
             Return False
         End If
         Dim question = If(graphicsOnly,
-                      "Set desktop display mode, resolution and VSync to Use game setting and VR render scale to 100%?",
+                      "Set desktop display mode, resolution, VSync and every quality option to Use game setting, and VR render scale to 100%?",
                       "Reset every launcher choice to its default: appearance, VR runtime, logging, startup, graphics, recenter key and controller button? VR runtime locations and the experimental VR opt-in are kept.") &
                    If(HasUnsavedSettings(), " Your unsaved changes in the launcher controls are replaced.", "") &
                    " Nothing is saved until you choose Save settings or Launch; game files and settings profiles are not changed."
@@ -924,7 +1007,8 @@ Public Class MainForm
                 "Desktop: display mode, resolution and VSync for Launch. Use game setting leaves that option unchanged. Borderless fills the main display at its current resolution. Desktop choices stay in the game's graphics file; an exact backup is saved under desktop-backups in the preferences folder before each change." & vbCrLf & vbCrLf &
                 "VR rendering: one VR render scale from 50% to 300%. At 100% the scene matches the connected headset's recommended resolution per eye; output stays at that recommendation while the slider changes scene detail. Refresh headset resolution shows the detected sizes. The launcher checks the headset again before every VR launch and refuses unsupported sizes." & vbCrLf & vbCrLf &
                 "Below it, Last VR session shows the headset refresh rate (when the runtime reports it) and whether DiRT 3 rendered the scene size DiRT3VR asked for, read from that session's log." & vbCrLf & vbCrLf &
-                "Restore graphics defaults sets the desktop choices to Use game setting and the render scale to 100%. It asks first and changes only the controls until Save settings or Launch."),
+                "Quality (desktop and VR): choose one of DiRT 3's presets or set each option. The preset shows Custom when the options match none of them. DiRT3VR writes these into DiRT 3's graphics file at every launch, desktop and VR, so options not set to Use game setting replace changes made in the game's own menu. Use game setting leaves an option as DiRT 3 has it. The values are DiRT 3's DirectX 11 options; Medium is the game's default." & vbCrLf & vbCrLf &
+                "Restore graphics defaults sets the desktop and quality choices to Use game setting and the render scale to 100%. It asks first and changes only the controls until Save settings or Launch."),
             New HelpTopic(HelpControls,
                 "Use your existing keyboard, controller or wheel bindings in DiRT 3." & vbCrLf & vbCrLf &
                 "Live input and force feedback shows your wheel, pedals, shifter and controllers as Windows reports them and tests rumble or force feedback on each one. It reads devices without taking them over and changes no game or Windows setting. Close DiRT 3 before testing force feedback." & vbCrLf & vbCrLf &
@@ -937,7 +1021,7 @@ Public Class MainForm
                 "OpenXR add-ons… lists the add-ons turned off for DiRT 3 and turns them back on."),
             New HelpTopic(HelpSettings,
                 "Modern / Classic follows Windows light, dark and high-contrast preferences." & vbCrLf & vbCrLf &
-                "Settings profiles keep named copies of the desktop, VR, startup, appearance, logging and recenter-key choices for this installation. Save as new profile and Overwrite profile store the current controls in a profile without saving the launcher's settings. Load copies a profile into the controls and asks before replacing unsaved edits; nothing is saved until Save settings or Launch. Rename uses the Name field, Delete removes the selected profile, Import adds a JSON profile without loading it, and Export writes the selected saved profile. Game saves, local paths and controller buttons are not included." & vbCrLf & vbCrLf &
+                "Settings profiles keep named copies of the desktop, graphics quality, VR, startup, appearance, logging and recenter-key choices for this installation. Save as new profile and Overwrite profile store the current controls in a profile without saving the launcher's settings. Load copies a profile into the controls and asks before replacing unsaved edits; nothing is saved until Save settings or Launch. Rename uses the Name field, Delete removes the selected profile, Import adds a JSON profile without loading it, and Export writes the selected saved profile. Game saves, local paths and controller buttons are not included." & vbCrLf & vbCrLf &
                 "Restore launcher defaults resets every launcher choice except the VR runtime locations and the experimental VR opt-in. It asks first and changes only the controls until Save settings or Launch." & vbCrLf & vbCrLf &
                 "Choose game folder switches to another DiRT 3 Complete Edition installation. Close DiRT 3 first."),
             New HelpTopic(HelpRestore,
