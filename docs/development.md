@@ -63,6 +63,13 @@ For a release to be offered:
   release page), at most 512 MiB.
 - Setup runs with `/DIR=<game folder>` after the launcher has restored any
   pending game files; the launcher then closes so Setup's running check passes.
+- New features are marked **\*new\*** in development builds and in experimental
+  builds (prerelease versions) of the version listed in
+  `launcher/NewFeatures.vb`; stable releases never show the marks. If the
+  release gets another number than `NextVersion`, change it before building.
+  After the release, set `NextVersion` to the following version and remove the
+  released entries; `NewFeaturesTests` fails until this build is before
+  `NextVersion` again.
 
 ## Bounded desktop diagnostic
 
