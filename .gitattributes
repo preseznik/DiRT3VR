@@ -1,2 +1,4 @@
 # The 31 Oct 2026 graphics files from a real session (#13ad25e5), kept byte for byte.
 tests/launcher/fixtures/rewrite-2026-10-31/*.xml binary
+# Synthetic seat camera files (tests/launcher/fixtures/seat/make_seat_fixture.py), compared byte for byte.
+tests/launcher/fixtures/seat/*.bin binary

@@ -180,6 +180,11 @@ Public Class LauncherSettings
     Public Property DirectDifficulty As Integer = -1
     ' After the finish: "quit" (DiRT 3 closes, as its benchmark start does) or "menus" (DiRT 3's main menu).
     Public Property DirectAfterFinish As String = "quit"
+    ' VR seat positions per catalog car (SeatPositions), or one for every car; they belong to the
+    ' player's body and rig, so settings profiles and Restore launcher defaults keep them.
+    Public Property SeatOffsets As New Dictionary(Of String, SeatOffset)
+    Public Property SeatSameForAll As Boolean
+    Public Property SeatAllCars As New SeatOffset
     ' Optional controller/wheel button; machine-specific, so never part of settings profiles.
     Public Property RecenterDevice As RecenterDeviceBinding
 
@@ -204,6 +209,15 @@ Public Class LauncherSettings
         If Not DirectPractice.OpponentCarChoices.Contains(DirectOpponentCars) Then Throw New IOException("Choose which cars the opponents drive.")
         If DirectDifficulty < -1 OrElse DirectDifficulty > DirectPractice.MaxDifficulty Then Throw New IOException("Choose the AI difficulty for direct practice.")
         If Not DirectPractice.AfterFinishChoices.Contains(DirectAfterFinish) Then Throw New IOException("Choose what happens after the finish.")
+        SeatAllCars = If(SeatAllCars, New SeatOffset) : SeatAllCars.Validate()
+        Dim seats As New Dictionary(Of String, SeatOffset)(StringComparer.Ordinal)
+        For Each pair In If(SeatOffsets, New Dictionary(Of String, SeatOffset)).OrderBy(Function(item) item.Key, StringComparer.Ordinal)
+            If EventCatalog.Current.FindCar(pair.Key) Is Nothing Then Throw New IOException("Seat positions name an unknown car.")
+            If pair.Value Is Nothing OrElse pair.Value.IsZero Then Continue For
+            pair.Value.Validate()
+            seats.Add(pair.Key, pair.Value)
+        Next
+        SeatOffsets = seats
     End Sub
 
     Public Shared Function Load(context As InstallContext) As LauncherSettings

@@ -47,6 +47,8 @@ Public Class ProfileValues
             .ModernInterface = ModernInterface, .RuntimeMode = RuntimeMode,
             .SteamRuntimeManifest = local.SteamRuntimeManifest, .VdxrRuntimeManifest = local.VdxrRuntimeManifest, .RecenterDevice = local.RecenterDevice,
             .RecenterKeepLevel = local.RecenterKeepLevel,
+            .SeatOffsets = If(local.SeatOffsets, New Dictionary(Of String, SeatOffset)).ToDictionary(Function(pair) pair.Key, Function(pair) pair.Value.Copy()),
+            .SeatSameForAll = local.SeatSameForAll, .SeatAllCars = If(local.SeatAllCars, New SeatOffset).Copy(),
             .DiagnosticLogging = DiagnosticLogging, .ExperimentalVrEnabled = ExperimentalVrEnabled,
             .VrRenderScale = VrRenderScale, .DesktopWidth = DesktopWidth, .DesktopHeight = DesktopHeight,
             .DesktopDisplayMode = DesktopDisplayMode, .DesktopVSync = DesktopVSync, .SkipStartupMovies = SkipStartupMovies,

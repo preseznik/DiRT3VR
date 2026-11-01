@@ -16,7 +16,7 @@ Public NotInheritable Class NewFeatures
     Private Shared ReadOnly Since As New Dictionary(Of String, String)(StringComparer.Ordinal) From {
         {"LauncherView", NextVersion}, {"SectionLaunchmode", NextVersion}, {"SectionQuality", NextVersion}, {"SectionDefaults", NextVersion},
         {"GraphicsDefaults", NextVersion}, {"LiveInput", NextVersion}, {"RecenterKey", NextVersion}, {"RecenterDevice", NextVersion},
-        {"RecenterKeepLevel", NextVersion}, {"VrCompatibility", NextVersion}}
+        {"RecenterKeepLevel", NextVersion}, {"VrCompatibility", NextVersion}, {"SectionSeatVR", NextVersion}}
     Private Shared ReadOnly marked As New ConditionalWeakTable(Of Control, Object)
 
     Private Sub New()

@@ -49,6 +49,7 @@ Public Class MainForm
     Private ReadOnly lastSessionSummary As New Label With {.Name = "LastVrSession", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12)}
     Private ReadOnly refreshHeadset As New Button With {.Name = "RefreshHeadset", .Text = "Refresh headset resolution", .AutoSize = True}
     Private directPicker As DirectPracticePicker
+    Private seatPicker As SeatPicker
     Private WithEvents desktopQuality As QualityChoices
     Private WithEvents vrQuality As QualityChoices
     Private ReadOnly potatoPreset As New Button With {.Name = "PotatoPreset", .Text = "Potato / Low-End", .AutoSize = True}
@@ -204,7 +205,8 @@ Public Class MainForm
                                                                                                         End If
                                                                                                         RefreshState()
                                                                                                     End Sub
-                                                              notice.Text = "Starting experimental VR. Original files are restored when DiRT 3 closes, even if you close this window."
+                                                              notice.Text = "Starting experimental VR. Original files are restored when DiRT 3 closes, even if you close this window." &
+                                                                  If(interactive.SeatsSkipped.Count > 0, " Seat position not applied for " & String.Join(", ", interactive.SeatsSkipped) & ": its camera file is missing or not in the expected format.", "")
                                                               launchProgress.Start()
                                                               ObserveInteractive()
                                                           End Function)
@@ -500,7 +502,7 @@ Public Class MainForm
                                                End Sub
         AddHandler clearRecenterDevice.Click, Sub() SetRecenterDevice(Nothing)
         UpdateRecenterDeviceLabel()
-        vrControls.Controls.Add(Info("Head tracking applies to every rendered 3D camera view, including replay. Per-car seat adjustment is not available yet."))
+        vrControls.Controls.Add(Info("Head tracking applies to every rendered 3D camera view, including replay."))
         AddHandler recenterButton.Click, Sub()
                                              capturingRecenter = True
                                              UpdateRecenterLabel()
@@ -512,6 +514,9 @@ Public Class MainForm
                                              End Sub
         tips.SetToolTip(recenterButton, "Click, then press the key or key combination that recenters the headset view while DiRT 3 is in front.")
         UpdateRecenterLabel()
+        Dim seat = Section(content, "Seat (VR)")
+        seat.Controls.Add(Info("Moves your eye point in the cockpit, per car, for example to match the headset to your seat and rig: sideways (+ left), height and forward. Launch VR applies it: DiRT3VR writes the car's camera file for the session and restores it after exit. Desktop play keeps DiRT 3's own seat."))
+        seatPicker = New SeatPicker(seat)
         content.Controls.Add(TopicLink(HelpControls))
     End Sub
 
@@ -576,7 +581,7 @@ Public Class MainForm
         Dim appearance = Section(content, "Appearance")
         Field(appearance, "Modern interface", modern)
         Dim defaultsSection = Section(content, "Defaults")
-        defaultsSection.Controls.Add(Info("Resets every launcher choice on all tabs: appearance, VR runtime, logging, startup, graphics, recenter key and controller button. VR runtime locations and the experimental VR opt-in are kept. Game files, settings profiles and saves are not changed, and nothing is saved until Save settings or Launch."))
+        defaultsSection.Controls.Add(Info("Resets every launcher choice on all tabs: appearance, VR runtime, logging, startup, graphics, recenter key and controller button. VR runtime locations, the experimental VR opt-in and seat positions are kept. Game files, settings profiles and saves are not changed, and nothing is saved until Save settings or Launch."))
         defaultsSection.Controls.Add(launcherDefaultsButton)
         AddHandler launcherDefaultsButton.Click, Sub() RestoreDefaults(graphicsOnly:=False)
         Dim profiles = Section(content, "Settings profiles")
@@ -668,6 +673,7 @@ Public Class MainForm
         renderScale.Value = settings.VrRenderScale
         applyingPreset = True
         desktopQuality.Values = settings.GraphicsQuality : vrQuality.Values = settings.VrGraphicsQuality
+        seatPicker.Apply(settings.SeatOffsets, settings.SeatSameForAll, settings.SeatAllCars, settings.DirectCar)
         directPicker.Apply(settings.LaunchMode, settings.DirectRoute, settings.DirectCar, settings.DirectLaps, settings.DirectOpponents, settings.DirectOpponentCars, settings.DirectDifficulty, settings.DirectAfterFinish)
         applyingPreset = False
         ClearPresetUndo()
@@ -692,7 +698,8 @@ Public Class MainForm
             .RecenterKey = recenterKey, .RecenterModifiers = recenterModifiers, .RecenterDevice = recenterDevice, .RecenterKeepLevel = recenterKeepLevel.Checked,
             .GraphicsQuality = desktopQuality.Values, .VrGraphicsQuality = vrQuality.Values,
             .LaunchMode = directPicker.Mode, .DirectRoute = directPicker.RouteId, .DirectCar = directPicker.CarCode, .DirectLaps = directPicker.LapCount,
-            .DirectOpponents = directPicker.OpponentCount, .DirectOpponentCars = directPicker.OpponentCars, .DirectDifficulty = directPicker.DifficultyLevel, .DirectAfterFinish = directPicker.AfterFinish}
+            .DirectOpponents = directPicker.OpponentCount, .DirectOpponentCars = directPicker.OpponentCars, .DirectDifficulty = directPicker.DifficultyLevel, .DirectAfterFinish = directPicker.AfterFinish,
+            .SeatOffsets = seatPicker.Offsets, .SeatSameForAll = seatPicker.SameForAll, .SeatAllCars = seatPicker.AllCars}
     End Function
 
     Private Sub RememberSavedSettings()
@@ -724,7 +731,7 @@ Public Class MainForm
         End If
         Dim question = If(graphicsOnly,
                       "Set desktop display mode, resolution, VSync and every desktop quality option to Use game setting, every VR quality option to Same as desktop, and VR render scale to 100%?",
-                      "Reset every launcher choice to its default: appearance, VR runtime, logging, startup, graphics, recenter key and controller button? VR runtime locations and the experimental VR opt-in are kept.") &
+                      "Reset every launcher choice to its default: appearance, VR runtime, logging, startup, graphics, recenter key and controller button? VR runtime locations, the experimental VR opt-in and seat positions are kept.") &
                    If(HasUnsavedSettings(), " Your unsaved changes in the launcher controls are replaced.", "") &
                    " Nothing is saved until you choose Save settings or Launch; game files and settings profiles are not changed."
         If Not ConfirmPrompt("Restore " & what & " defaults", question) Then Return False
@@ -1041,7 +1048,8 @@ Public Class MainForm
                 "Live input and force feedback shows your wheel, pedals, shifter and controllers as Windows reports them and tests rumble or force feedback on each one. It reads devices without taking them over and changes no game or Windows setting. Close DiRT 3 before testing force feedback." & vbCrLf & vbCrLf &
                 recenter & " recenters the headset view while DiRT 3 is in front. To change it, click the key under VR and seat controls and press another key, optionally with Ctrl, Alt or Shift; Esc cancels. DiRT 3 still receives the key, so pick one the game doesn't use. Alt+Tab, Alt+F4 and Ctrl+Alt+Delete are reserved." & vbCrLf & vbCrLf &
                 "Bind a button… adds a controller, wheel or button-box button, or a D-pad / hat direction, as another way to recenter. During VR the launcher watches it only while DiRT 3 is in front, without taking the device over. Clear removes it." & vbCrLf & vbCrLf &
-                "Keep the horizon level when recentering is on by default: recentering turns the view to face forward but leaves pitch and roll alone. Turn it off if your headset sits tilted; the key or button then also makes the way you hold your head level. The automatic centering at the start of VR always keeps the horizon level."),
+                "Keep the horizon level when recentering is on by default: recentering turns the view to face forward but leaves pitch and roll alone. Turn it off if your headset sits tilted; the key or button then also makes the way you hold your head level. The automatic centering at the start of VR always keeps the horizon level." & vbCrLf & vbCrLf &
+                "Seat (VR) moves your eye point in the cockpit, for each car, up to 50 cm in each direction: sideways (+ left), height and forward. Pick the car (cars with their own position say adjusted), move the sliders, and Reset this car to go back to DiRT 3's seat. Same position for all cars uses one position everywhere. Launch VR writes each adjusted car's camera file (cars\models\<car>\cameras.xml) for the session and restores it after exit, like DiRT3VR's other temporary changes; a car whose camera file isn't in the expected format keeps its own seat, and the launcher names it. Desktop play keeps DiRT 3's seat. Seat positions stay with this PC: settings profiles and Restore launcher defaults keep them."),
             New HelpTopic(HelpRuntime,
                 "Settings → Check runtime and headset runs a small 32-bit OpenXR check without starting the game. A successful check does not mean VR driving is ready." & vbCrLf & vbCrLf &
                 "Choose VDXR or SteamVR explicitly. The selected runtime is used only by DiRT3VR's own processes; your system OpenXR default stays unchanged. VDXR and SteamVR need separate checks. Browse to the selected runtime file if it is installed elsewhere." & vbCrLf & vbCrLf &
