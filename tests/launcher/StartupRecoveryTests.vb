@@ -88,7 +88,8 @@ Module StartupRecoveryTests
         Dim foreign = patched.Concat(New Byte() {0}).ToArray()
         File.WriteAllBytes(States(combinedCtx), foreign)
         Reject(Sub() combined.Recover(), check, "startup recovery refuses even a one-byte external edit")
-        check(combined.Pending AndAlso File.ReadAllBytes(States(combinedCtx)).SequenceEqual(foreign) AndAlso File.ReadAllBytes(combinedCtx.GraphicsPath).SequenceEqual(changes("graphics")) AndAlso File.Exists(Path.Combine(combinedCtx.GameRoot, "d3d11.dll")), "startup conflict preflights before restoring any other target")
+        check(combined.Pending AndAlso File.ReadAllBytes(States(combinedCtx)).SequenceEqual(foreign) AndAlso File.ReadAllBytes(combinedCtx.GraphicsPath).SequenceEqual(Graphics) AndAlso File.ReadAllBytes(restrictionsPath).SequenceEqual(restrictions) AndAlso Not File.Exists(Path.Combine(combinedCtx.GameRoot, "d3d11.dll")),
+              "a startup conflict leaves only the startup file and the journal; the other targets are restored")
         File.WriteAllBytes(States(combinedCtx), patched)
         check(combined.Recover(), "reviewed startup conflict can recover when approved bytes are restored")
 

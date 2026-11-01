@@ -72,15 +72,85 @@ Public Module ExperimentalFiles
         Throw New IOException("Unrecognized graphics XML node; preserve the current file.")
     End Function
 
+    Private Function CanonicalDocument(document As XDocument) As XDocument
+        Return New XDocument(document.Nodes().Select(AddressOf Canonical).Where(Function(value) value IsNot Nothing))
+    End Function
+
     Public Function SameXml(left As Byte(), right As Byte()) As Boolean
         Try
             Dim a = ReadXml(left), b = ReadXml(right)
-            Return a.Root IsNot Nothing AndAlso b.Root IsNot Nothing AndAlso XNode.DeepEquals(
-                New XDocument(a.Nodes().Select(AddressOf Canonical).Where(Function(value) value IsNot Nothing)),
-                New XDocument(b.Nodes().Select(AddressOf Canonical).Where(Function(value) value IsNot Nothing)))
+            Return a.Root IsNot Nothing AndAlso b.Root IsNot Nothing AndAlso XNode.DeepEquals(CanonicalDocument(a), CanonicalDocument(b))
         Catch ex As IOException
             Return False
         End Try
+    End Function
+
+    ' The values a VR session sets (see Graphics), plus the aspect and refresh rate that DiRT 3
+    ' rewrites together with the resolution when it starts.
+    Private ReadOnly SessionValues As New Dictionary(Of String, String()) From {
+        {"cpu/threadStrategy", New String() {"parallelUpdateRender"}},
+        {"graphics_card/directx", New String() {"forcedx9"}},
+        {"graphics_card/stereo", New String() {"enabled"}},
+        {"graphics_card/resolution", New String() {"width", "height", "fullscreen", "vsync", "multisampling", "aspect"}}}
+    Private Const RefreshRatePath As String = "graphics_card/resolution/refreshRate"
+
+    Private Function FindOne(root As XElement, path As String) As XElement
+        Dim elements As IEnumerable(Of XElement) = {root}
+        For Each name In path.Split("/"c)
+            elements = elements.Elements(name)
+        Next
+        Dim found = elements.Take(2).ToArray()
+        Return If(found.Length = 1, found(0), Nothing)
+    End Function
+
+    Private Function SettingsDocument(data As Byte()) As XDocument
+        Try
+            Dim document = ReadXml(data)
+            If document.Root Is Nothing OrElse document.Root.Name <> "hardware_settings_config" Then Return Nothing
+            Return If(SessionValues.Keys.All(Function(key) FindOne(document.Root, key) IsNot Nothing), document, Nothing)
+        Catch ex As IOException
+            Return Nothing
+        End Try
+    End Function
+
+    ' True when the current file differs from what the VR session wrote only in values the session
+    ' owns. DiRT 3 does this when it starts (for example 1280x720 at 100 Hz instead of the headset
+    ' size), so restoring the original settings loses nothing that was changed during the session.
+    Public Function OnlySessionValuesChanged(current As Byte(), applied As Byte()) As Boolean
+        Dim a = SettingsDocument(current), b = SettingsDocument(applied)
+        If a Is Nothing OrElse b Is Nothing Then Return False
+        For Each document In {a, b}
+            For Each pair In SessionValues
+                Dim element = FindOne(document.Root, pair.Key)
+                For Each name In pair.Value
+                    element.Attribute(name)?.Remove()
+                Next
+            Next
+            FindOne(document.Root, "graphics_card/resolution").Elements("refreshRate").Remove()
+        Next
+        Return XNode.DeepEquals(CanonicalDocument(a), CanonicalDocument(b))
+    End Function
+
+    ' Keeps what changed in DiRT 3 during the session but puts back the original's values for
+    ' everything the session owns. Nothing when the current file isn't DiRT 3's settings XML.
+    Public Function RestoreSessionValues(current As Byte(), original As Byte()) As Byte()
+        Dim target = SettingsDocument(current), source = SettingsDocument(original)
+        If target Is Nothing OrElse source Is Nothing Then Return Nothing
+        For Each pair In SessionValues
+            Dim originalElement = FindOne(source.Root, pair.Key), currentElement = FindOne(target.Root, pair.Key)
+            For Each name In pair.Value
+                Dim value = originalElement.Attribute(name)
+                If value IsNot Nothing Then currentElement.SetAttributeValue(name, value.Value) ' Absent in the original: keep DiRT 3's.
+            Next
+        Next
+        Dim rate = FindOne(source.Root, RefreshRatePath)
+        If rate IsNot Nothing Then
+            Dim resolution = FindOne(target.Root, "graphics_card/resolution")
+            resolution.Elements("refreshRate").Remove()
+            resolution.Add(New XElement(rate))
+        End If
+        Dim declaration = If(target.Declaration Is Nothing, "", target.Declaration.ToString())
+        Return Encoding.UTF8.GetBytes(declaration & target.ToString(SaveOptions.DisableFormatting))
     End Function
 
     Public Function AppliedGraphicsSize(data As Byte()) As Drawing.Size

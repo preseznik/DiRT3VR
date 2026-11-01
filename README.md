@@ -171,8 +171,16 @@ ordinary rendering performs no readback.
 
 The launcher temporarily installs its proxy and patches the graphics and CPU
 restriction files for DX11, native stereo off and serial rendering. It journals
-the original bytes and restores owned files after the session. Externally edited
-files are preserved and reported as a recovery conflict. DiRT3VR keeps running,
+the original bytes and restores owned files after the session. A file changed by
+something else (another mod, a game update or repair) is left as it is and
+reported, while the other files are still restored. When DiRT 3 rewrites its
+graphics settings during VR (it changes the resolution and refresh rate when it
+starts), the settings from before VR come back automatically and the game's
+version is kept in the recovery folder. If other graphics settings changed too,
+for example in the game's options menu, **Restore original files** asks whether
+to keep those changes (the display values from before VR come back) or to
+restore all settings from before the session. Every restore result is written
+to `logs\recovery.json`. DiRT3VR keeps running,
 in the notification area if its window is closed, until the session ends. If
 Windows shuts down first, use **Restore original files** on the next start.
 UAC may be needed to write the Steam folder.
@@ -201,8 +209,9 @@ restricted to VDXR.
   and driving passed the live check. Other scales and resets remain untested.
   If DiRT 3 ignores or changes the requested size, VR stops with a resolution
   mismatch in the logs; quit to restore the original graphics settings.
-- The game can rewrite resolution and refresh-rate XML during startup. If
-  recovery reports a conflict, keep its backups and use **Open logs** for review.
+- The game can rewrite resolution and refresh-rate XML during startup. Recovery
+  handles that rewrite; other conflicts keep their backups, are explained in the
+  launcher and in `logs\recovery.json`, and can be reviewed with **Open logs**.
 - Scene and output dimensions are limited to 4096 per dimension. XR output is
   limited to 512 MiB of color textures and four swapchain images per eye.
 - All 3D camera types use the same stereo path. Pause, replay and frontend

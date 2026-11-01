@@ -16,6 +16,29 @@ Public Class RecoveryJournal
     Public Property Entries As New List(Of RecoveryEntry)
 End Class
 
+' What to do with a graphics file that changed during the session beyond DiRT3VR's own values.
+Public Enum GraphicsRecoveryChoice
+    Ask = 0              ' Leave it as it is, keep the journal pending and report it.
+    KeepGameChanges = 1  ' Put back the session's values (resolution, VSync, MSAA, DirectX…), keep the rest.
+    RestoreOriginal = 2  ' Restore the file from before the session.
+End Enum
+
+Public Enum GraphicsConflictKind
+    None = 0
+    Mergeable = 1     ' Both choices are possible.
+    NotMergeable = 2  ' Not DiRT 3's settings XML any more: only the original can be restored.
+End Enum
+
+' Recovery restored every file it could; these targets changed outside DiRT3VR and were left as they are.
+Public Class RecoveryConflictException
+    Inherits IOException
+    Public ReadOnly Property Targets As IReadOnlyList(Of String)
+    Public Sub New(message As String, conflicts As IReadOnlyList(Of String))
+        MyBase.New(message)
+        Targets = conflicts
+    End Sub
+End Class
+
 ' Fixed target IDs only; no arbitrary destinations from a journal or elevated worker.
 Public Class OwnedFileTransaction
     Private ReadOnly context As InstallContext
@@ -163,7 +186,9 @@ Public Class OwnedFileTransaction
         context.RequireClosed() : context.ValidateGame()
         Dim journal = LoadJournal()
         If journal.Schema < 2 Then Throw New IOException("Only a prepared session may be deployed.")
-        Preflight(journal, False)
+        For Each pair In Inspect(journal, False)
+            If pair.Value.State = EntryState.Conflict Then Throw New IOException("Recovery conflict: " & TargetPath(pair.Key) & ". Its contents changed outside DiRT3VR. The current file and original backup were preserved.")
+        Next
         For Each entry In journal.Entries
             CheckedApplied(journal, entry, deployment:=True)
         Next
@@ -175,39 +200,117 @@ Public Class OwnedFileTransaction
         Next
     End Sub
 
-    Public Function Recover() As Boolean
+    Private Enum EntryState
+        Original   ' Already as before the session.
+        Applied    ' DiRT3VR's bytes, or the game's equivalent formatting of them: restore the backup.
+        Rewritten  ' Graphics: DiRT 3 changed only values the session owns: restore the backup.
+        Conflict   ' Changed outside DiRT3VR: left as it is unless the user decides (graphics only).
+    End Enum
+
+    ' Restores every target that still holds DiRT3VR's changes, also when another target changed
+    ' outside DiRT3VR: a game rewrite of the graphics file must not leave the proxy and patched game
+    ' files behind. A changed target is left as it is, the journal stays pending and
+    ' RecoveryConflictException names it, unless it is the graphics file and the user chose what to
+    ' keep. Damaged recovery evidence still stops everything before any file is touched.
+    Public Function Recover(Optional graphicsChoice As GraphicsRecoveryChoice = GraphicsRecoveryChoice.Ask) As Boolean
         context.RequireClosed()
         If Not Pending Then Return False
         Dim journal = LoadJournal()
-        Dim observed = Preflight(journal, True)
+        Dim states = Inspect(journal, True)
+        Dim conflicts As New List(Of String)
+        Dim mergeRefused = False
         For Each entry In journal.Entries
             Dim target = TargetPath(entry.Target)
             SafeFiles.NoLinks(target)
             Dim current = If(File.Exists(target), SafeFiles.Hash(target), "")
-            Dim original = If(entry.OriginalExists, entry.OriginalHash, "")
-            If current <> observed(entry.Target) Then Throw New IOException("Recovery conflict: the file changed during restoration. Backups were preserved.")
-            If current <> original Then
-                If entry.OriginalExists Then
-                    If current <> entry.AppliedHash Then SafeFiles.WriteAtomic(Path.Combine(Folder, "game-written-" & Guid.NewGuid().ToString("N") & ".xml"), File.ReadAllBytes(target))
-                    Dim originalBytes = File.ReadAllBytes(Path.Combine(Folder, entry.Backup))
-                    If SafeFiles.HashBytes(originalBytes) <> entry.OriginalHash Then Throw New IOException("Original backup changed before restoration.")
-                    If SafeFiles.Hash(target) <> current Then Throw New IOException("Graphics file changed before restoration; backups preserved.")
-                    SafeFiles.WriteAtomic(target, originalBytes)
-                Else
-                    SafeFiles.SetReadOnly(target, False)
-                    File.Delete(target)
-                End If
-            End If
-            If If(File.Exists(target), SafeFiles.Hash(target), "") <> original Then Throw New IOException("Restored file verification failed; recovery evidence retained.")
+            Dim expected = If(entry.OriginalExists, entry.OriginalHash, "")
+            Dim observed = states(entry.Target)
+            If current <> observed.Hash Then Throw New IOException("Recovery conflict: the file changed during restoration. Backups were preserved.")
+            Select Case observed.State
+                Case EntryState.Original
+                Case EntryState.Applied, EntryState.Rewritten
+                    If entry.OriginalExists Then
+                        If current <> entry.AppliedHash Then KeepGameCopy(target)
+                        ReplaceTarget(target, current, OriginalBytes(entry))
+                    Else
+                        SafeFiles.SetReadOnly(target, False)
+                        File.Delete(target)
+                    End If
+                Case EntryState.Conflict
+                    Dim replacement As Byte() = Nothing
+                    If entry.Target = "graphics" AndAlso entry.OriginalExists AndAlso File.Exists(target) Then
+                        If graphicsChoice = GraphicsRecoveryChoice.RestoreOriginal Then
+                            replacement = OriginalBytes(entry)
+                        ElseIf graphicsChoice = GraphicsRecoveryChoice.KeepGameChanges Then
+                            replacement = ExperimentalFiles.RestoreSessionValues(File.ReadAllBytes(target), OriginalBytes(entry))
+                            mergeRefused = replacement Is Nothing
+                        End If
+                    End If
+                    If replacement Is Nothing Then
+                        conflicts.Add(entry.Target)
+                        Continue For
+                    End If
+                    KeepGameCopy(target)
+                    ReplaceTarget(target, current, replacement)
+                    expected = SafeFiles.HashBytes(replacement)
+            End Select
+            If If(File.Exists(target), SafeFiles.Hash(target), "") <> expected Then Throw New IOException("Restored file verification failed; recovery evidence retained.")
             If entry.OriginalExists Then SafeFiles.SetReadOnly(target, entry.OriginalReadOnly)
         Next
+        If conflicts.Count > 0 Then Throw New RecoveryConflictException(ConflictMessage(conflicts, journal.Entries.Count > conflicts.Count, mergeRefused), conflicts)
         File.Move(JournalPath, Path.Combine(Folder, "restored-" & Guid.NewGuid().ToString("N") & ".json"))
         Return True
     End Function
 
-    Private Function Preflight(journal As RecoveryJournal, allowFormatting As Boolean) As Dictionary(Of String, String)
-        Dim observed As New Dictionary(Of String, String)
-        ' Preflight the complete journal before restoring any target.
+    ' Whether the graphics file is the only target left that changed outside DiRT3VR, so the user can
+    ' choose what to keep (read-only; nothing is changed).
+    Public Function GraphicsConflict() As GraphicsConflictKind
+        If Not Pending Then Return GraphicsConflictKind.None
+        Try
+            Dim journal = LoadJournal()
+            Dim conflicts = Inspect(journal, True).Where(Function(pair) pair.Value.State = EntryState.Conflict).Select(Function(pair) pair.Key).ToArray()
+            If Not conflicts.SequenceEqual({"graphics"}) OrElse Not File.Exists(context.GraphicsPath) Then Return GraphicsConflictKind.None
+            Dim entry = journal.Entries.Single(Function(item) item.Target = "graphics")
+            Return If(ExperimentalFiles.RestoreSessionValues(File.ReadAllBytes(context.GraphicsPath), OriginalBytes(entry)) Is Nothing, GraphicsConflictKind.NotMergeable, GraphicsConflictKind.Mergeable)
+        Catch ex As Exception When TypeOf ex Is IOException OrElse TypeOf ex Is UnauthorizedAccessException
+            Return GraphicsConflictKind.None
+        End Try
+    End Function
+
+    Private Function ConflictMessage(conflicts As IReadOnlyList(Of String), othersRestored As Boolean, mergeRefused As Boolean) As String
+        Dim parts As New List(Of String)
+        If othersRestored Then parts.Add("The other game files were restored.")
+        For Each target In conflicts
+            If target = "graphics" Then
+                parts.Add(If(mergeRefused,
+                    "DiRT 3's graphics settings file is no longer valid settings XML, so its changes can't be kept. Use Restore original files and choose to restore the settings from before the session.",
+                    "DiRT 3's graphics settings changed during the session beyond DiRT3VR's VR values. Use Restore original files to choose whether to keep those changes or restore the settings from before the session."))
+            Else
+                parts.Add("Recovery conflict: " & TargetPath(target) & ". Its contents changed outside DiRT3VR (for example a game update, a repair or another mod), so it was left as it is; the original backup was preserved.")
+            End If
+        Next
+        Return String.Join(" ", parts)
+    End Function
+
+    Private Function OriginalBytes(entry As RecoveryEntry) As Byte()
+        Dim bytes = File.ReadAllBytes(Path.Combine(Folder, entry.Backup))
+        If SafeFiles.HashBytes(bytes) <> entry.OriginalHash Then Throw New IOException("Original backup changed before restoration.")
+        Return bytes
+    End Function
+
+    ' The game's own version of a file DiRT3VR replaces stays in the recovery folder for inspection.
+    Private Sub KeepGameCopy(target As String)
+        SafeFiles.WriteAtomic(Path.Combine(Folder, "game-written-" & Guid.NewGuid().ToString("N") & ".xml"), File.ReadAllBytes(target))
+    End Sub
+
+    Private Shared Sub ReplaceTarget(target As String, observed As String, bytes As Byte())
+        If SafeFiles.Hash(target) <> observed Then Throw New IOException("Game file changed before restoration; backups preserved.")
+        SafeFiles.WriteAtomic(target, bytes)
+    End Sub
+
+    Private Function Inspect(journal As RecoveryJournal, allowGameRewrites As Boolean) As Dictionary(Of String, (Hash As String, State As EntryState))
+        Dim states As New Dictionary(Of String, (Hash As String, State As EntryState))
+        ' Check the evidence for the complete journal before restoring any target.
         For Each entry In journal.Entries
             If entry Is Nothing Then Throw New IOException("Invalid recovery entry.")
             Dim target = TargetPath(entry.Target)
@@ -224,11 +327,20 @@ Public Class OwnedFileTransaction
             Dim current = If(File.Exists(target), SafeFiles.Hash(target), "")
             Dim original = If(entry.OriginalExists, entry.OriginalHash, "")
             Dim applied = CheckedApplied(journal, entry)
-            Dim formattingOnly = allowFormatting AndAlso journal.Schema >= 2 AndAlso entry.Target = "graphics" AndAlso File.Exists(target) AndAlso ExperimentalFiles.SameXml(File.ReadAllBytes(target), applied)
-            If current <> original AndAlso current <> entry.AppliedHash AndAlso Not formattingOnly Then Throw New IOException("Recovery conflict: " & target & ". Its contents changed outside DiRT3VR. The current file and original backup were preserved.")
-            observed.Add(entry.Target, current)
+            Dim state As EntryState
+            If current = original Then
+                state = EntryState.Original
+            ElseIf current = entry.AppliedHash Then
+                state = EntryState.Applied
+            ElseIf allowGameRewrites AndAlso journal.Schema >= 2 AndAlso entry.Target = "graphics" AndAlso File.Exists(target) Then
+                Dim bytes = File.ReadAllBytes(target)
+                state = If(ExperimentalFiles.SameXml(bytes, applied), EntryState.Applied, If(ExperimentalFiles.OnlySessionValuesChanged(bytes, applied), EntryState.Rewritten, EntryState.Conflict))
+            Else
+                state = EntryState.Conflict
+            End If
+            states.Add(entry.Target, (current, state))
         Next
-        Return observed
+        Return states
     End Function
 End Class
 
@@ -239,14 +351,51 @@ Public Module RecoveryWorker
         SafeFiles.NoLinks(path)
     End Sub
 
-    Public Async Function RecoverAsync(context As InstallContext) As Task(Of Boolean)
+    ' Every outcome is also written to logs\recovery.json, so a refused restore is visible later.
+    Public Async Function RecoverAsync(context As InstallContext, Optional graphicsChoice As GraphicsRecoveryChoice = GraphicsRecoveryChoice.Ask) As Task(Of Boolean)
         Try
-            Return Await Task.Run(Function() New OwnedFileTransaction(context).Recover())
+            Dim restored = Await RecoverOnceAsync(context, graphicsChoice)
+            WriteLog(context, If(restored, "restored", "nothing-pending"), If(restored, "Original game files restored.", "No recovery was pending."), graphicsChoice)
+            Return restored
+        Catch ex As Exception
+            WriteLog(context, "pending", ex.Message, graphicsChoice)
+            Throw
+        End Try
+    End Function
+
+    Private Async Function RecoverOnceAsync(context As InstallContext, graphicsChoice As GraphicsRecoveryChoice) As Task(Of Boolean)
+        Try
+            Return Await Task.Run(Function() New OwnedFileTransaction(context).Recover(graphicsChoice))
         Catch ex As UnauthorizedAccessException
             ' Retry only the file operation under elevation; preferences stay with the owner.
         End Try
-        Await RunWorkerAsync(context, "--recover-worker")
+        Await RunWorkerAsync(context, "--recover-worker", "--graphics-choice", ChoiceArgument(graphicsChoice))
         Return True
+    End Function
+
+    Private Sub WriteLog(context As InstallContext, outcome As String, message As String, graphicsChoice As GraphicsRecoveryChoice)
+        Try
+            SafeFiles.SaveJson(Path.Combine(context.UserRoot, "logs", "recovery.json"), New With {.updatedUtc = DateTime.UtcNow, .outcome = outcome, .message = message, .graphicsChoice = ChoiceArgument(graphicsChoice)})
+        Catch ex As Exception When TypeOf ex Is IOException OrElse TypeOf ex Is UnauthorizedAccessException
+            ' The result is still reported to the caller.
+        End Try
+    End Sub
+
+    Public Function ChoiceArgument(choice As GraphicsRecoveryChoice) As String
+        Select Case choice
+            Case GraphicsRecoveryChoice.KeepGameChanges : Return "keep"
+            Case GraphicsRecoveryChoice.RestoreOriginal : Return "original"
+            Case Else : Return "ask"
+        End Select
+    End Function
+
+    Public Function ParseChoice(value As String) As GraphicsRecoveryChoice
+        Select Case value
+            Case "ask" : Return GraphicsRecoveryChoice.Ask
+            Case "keep" : Return GraphicsRecoveryChoice.KeepGameChanges
+            Case "original" : Return GraphicsRecoveryChoice.RestoreOriginal
+            Case Else : Throw New IOException("Unknown graphics recovery choice.")
+        End Select
     End Function
 
     Public Async Function ApplyAsync(context As InstallContext) As Task
@@ -262,20 +411,39 @@ Public Module RecoveryWorker
         Await RunWorkerAsync(context, "--apply-worker")
     End Function
 
-    Private Async Function RunWorkerAsync(context As InstallContext, mode As String) As Task
+    Private Async Function RunWorkerAsync(context As InstallContext, mode As String, ParamArray extra As String()) As Task
         ValidateGraphicsPath(context.GraphicsPath)
         Dim start As New ProcessStartInfo(Environment.ProcessPath) With {.UseShellExecute = True, .Verb = "runas", .WindowStyle = ProcessWindowStyle.Hidden}
-        For Each item As String In {mode, "--game", context.GameRoot, "--owner-base", Path.GetDirectoryName(context.UserRoot), "--graphics", context.GraphicsPath}
+        For Each item As String In {mode, "--game", context.GameRoot, "--owner-base", Path.GetDirectoryName(context.UserRoot), "--graphics", context.GraphicsPath}.Concat(extra)
             start.ArgumentList.Add(item)
         Next
+        Dim startedUtc = DateTime.UtcNow
         Try
             Using child = Process.Start(start)
                 If child Is Nothing Then Throw New IOException("The recovery worker could not start.")
                 Await child.WaitForExitAsync()
-                If child.ExitCode <> 0 Then Throw New IOException("The recovery worker did not finish. Original backups were preserved; see recovery-worker.json in the logs folder.")
+                If child.ExitCode <> 0 Then Throw New IOException(If(WorkerFailure(context, startedUtc), "The recovery worker did not finish. Original backups were preserved; see recovery-worker.json in the logs folder."))
             End Using
         Catch ex As ComponentModel.Win32Exception When ex.NativeErrorCode = 1223
             Throw New IOException("Administrator recovery was cancelled. Backups and pending recovery were preserved.", ex)
+        End Try
+    End Function
+
+    ' The elevated worker's own explanation (for example a recovery conflict), if it wrote one for this run.
+    Public Function WorkerFailure(context As InstallContext, startedUtc As DateTime) As String
+        Try
+            Dim path = IO.Path.Combine(context.UserRoot, "logs", "recovery-worker.json")
+            If Not File.Exists(path) Then Return Nothing
+            Using document = System.Text.Json.JsonDocument.Parse(File.ReadAllBytes(path))
+                Dim root = document.RootElement
+                Dim updated, message As System.Text.Json.JsonElement
+                If Not root.TryGetProperty("updatedUtc", updated) OrElse Not root.TryGetProperty("message", message) OrElse message.ValueKind <> System.Text.Json.JsonValueKind.String Then Return Nothing
+                Dim written As DateTime
+                If updated.ValueKind <> System.Text.Json.JsonValueKind.String OrElse Not updated.TryGetDateTime(written) OrElse written.ToUniversalTime() < startedUtc.AddSeconds(-2) Then Return Nothing
+                Return message.GetString()
+            End Using
+        Catch ex As Exception When TypeOf ex Is IOException OrElse TypeOf ex Is UnauthorizedAccessException OrElse TypeOf ex Is System.Text.Json.JsonException
+            Return Nothing
         End Try
     End Function
 End Module
