@@ -191,7 +191,7 @@ def diagnostic_environment(directory: Path, *, scene_observer: bool = False, rep
                            xr_runtime: Path | None = None, background_play: bool = False) -> dict:
     env = dict(os.environ, DIRT3VR_DIAGNOSTICS="1", DIRT3VR_LOG_DIR=str(directory), SteamAppId="321040")
     for flag in ("DIRT3VR_ENABLE_VR", "DIRT3VR_SCENE_DIAGNOSTICS", "DIRT3VR_REPLAY_DIAGNOSTICS",
-                 "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH", "DIRT3VR_RESEARCH_FILE_TRACE"):
+                 "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH", "DIRT3VR_RESEARCH_FILE_TRACE", "DIRT3VR_DIRECT_PRACTICE"):
         env.pop(flag, None)
     if background_play:
         env["DIRT3VR_BACKGROUND_PLAY"] = "1"
@@ -336,6 +336,8 @@ def main() -> int:
                         help="Opt into the headset prototype with an explicit x86 runtime manifest; requires --serial-render and --scene-observer; incompatible with --replay-pair")
     parser.add_argument("--background-play", action="store_true",
                         help="Keep the game running when it loses focus (suppresses its focus-loss pause in memory) and start its window without activating it")
+    parser.add_argument("--direct-practice", action="store_true",
+                        help="Keep the benchmark's car under player control (the renderer's direct-practice patch); no input is sent, so the car stays at the start and no result is written")
     parser.add_argument("--spectator-human-switch", action="store_true",
                         help="Research: temporarily add the normal race's 'Controller / Switch type=human' event to cutscene/spectator_startsequence.xml (journaled and restored)")
     parser.add_argument("--research-patch", metavar="RVA:ORIGINAL:REPLACEMENT",
@@ -384,7 +386,7 @@ def main() -> int:
                  "stereo": False, "sceneObserver": args.scene_observer,
                  "serialRender": args.serial_render, "replayPair": args.replay_pair,
                  "xrRuntime": xr_runtime, "backgroundPlay": args.background_play, "researchPatch": args.research_patch,
-                 "spectatorHumanSwitch": args.spectator_human_switch,
+                 "spectatorHumanSwitch": args.spectator_human_switch, "directPractice": args.direct_practice,
                  "durationSeconds": args.seconds}
     if restrictions:
         preflight["restrictionsOriginalSha256"] = hashlib.sha256(restrictions[0]).hexdigest()
@@ -434,6 +436,8 @@ def main() -> int:
             env["DIRT3VR_RESEARCH_PATCH"] = args.research_patch
         if args.file_trace:
             env["DIRT3VR_RESEARCH_FILE_TRACE"] = "1"
+        if args.direct_practice:
+            env["DIRT3VR_DIRECT_PRACTICE"] = "1"
         startup = None
         if args.background_play:
             # Ask Windows not to activate the game window; DiRT 3 may still bring itself forward.
@@ -474,6 +478,10 @@ def main() -> int:
         report["elapsedSeconds"] = round(time.monotonic() - started, 2)
         logs = native_logs(run)
         report["supportedProxyLoaded"] = "supported_host=1" in logs
+        if args.direct_practice:
+            report["directPracticeInstalled"] = "Direct practice: benchmark start keeps the player's car under player control" in logs
+            if not report["directPracticeInstalled"]:
+                report["errors"].append("Direct practice was requested but the proxy did not install it")
         if args.research_patch:
             report["researchPatchesApplied"] = len(re.findall(r"Research patch applied", logs))
             report["researchPatchRefused"] = "Research patch refused" in logs

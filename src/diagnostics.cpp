@@ -4,6 +4,7 @@
 #include "scene_resolution.h"
 #include "hud_hooks.h"
 #include "background_play.h"
+#include "direct_practice.h"
 #if defined(DIRT3VR_RESEARCH_PATCHES)
 #include "research_patch.h"
 #endif
@@ -282,6 +283,7 @@ void ObserveCreation(HRESULT result, ID3D11Device* device, IDXGISwapChain* chain
         Initialize();
         auto& state = GetState();
         if(state.supported && backgroundplay::Requested()) backgroundplay::Install(Log);
+        if(state.supported && directpractice::Requested()) directpractice::Install(Log);
 #if defined(DIRT3VR_RESEARCH_PATCHES)
         if(state.supported && state.enabled) research::Apply(Log);
 #endif
