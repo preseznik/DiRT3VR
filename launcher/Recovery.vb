@@ -18,6 +18,9 @@ Public Class RecoveryJournal
     ' written when set, so other journals stay readable by older launchers; those refuse one that has it.
     <System.Text.Json.Serialization.JsonIgnore(Condition:=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)>
     Public Property GraphicsQuality As Dictionary(Of String, String)
+    ' Schema 6: the seat offset each car's camera file was prepared with (approved transform).
+    <System.Text.Json.Serialization.JsonIgnore(Condition:=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)>
+    Public Property Seats As Dictionary(Of String, SeatOffset)
 End Class
 
 ' What to do with a graphics file that changed during the session beyond DiRT3VR's own values.
@@ -62,6 +65,7 @@ Public Class OwnedFileTransaction
     End Property
 
     Private Function TargetPath(target As String) As String
+        If SeatPositions.IsTarget(target) Then Return SeatPositions.CameraPath(context, SeatPositions.CodeOf(target))
         Select Case target
             Case "proxy" : Return Path.Combine(context.GameRoot, "d3d11.dll")
             Case "direct" : Return DirectPractice.ConfigPath(context)
@@ -72,7 +76,8 @@ Public Class OwnedFileTransaction
         End Select
     End Function
 
-    Public Sub Prepare(changes As IReadOnlyDictionary(Of String, Byte()), Optional experimental As Boolean = False, Optional apply As Boolean = True, Optional vrQuality As IDictionary(Of String, String) = Nothing)
+    Public Sub Prepare(changes As IReadOnlyDictionary(Of String, Byte()), Optional experimental As Boolean = False, Optional apply As Boolean = True, Optional vrQuality As IDictionary(Of String, String) = Nothing,
+                       Optional seats As IReadOnlyDictionary(Of String, SeatOffset) = Nothing)
         context.RequireClosed()
         If Pending Then Throw New IOException("File recovery is pending. Restore original files first.")
         If changes.Count = 0 Then Return
@@ -82,11 +87,20 @@ Public Class OwnedFileTransaction
         ' Schema 4: a VR session with a direct practice config (and optionally startup). Schema 5: a desktop
         ' direct practice session (config and renderer, optionally startup; no graphics or restrictions).
         Dim hasDirect = changes.ContainsKey("direct")
-        Dim journal As New RecoveryJournal With {.Schema = If(hasDirect, If(experimental, 4, 5), If(hasStartup, 3, If(experimental, 2, 1))), .InstallId = context.Id, .GraphicsPath = context.GraphicsPath, .GraphicsQuality = If(quality.Count > 0, quality, Nothing)}
+        ' Schema 6: a VR session that also moves seats (one camera file per car, with its offset recorded).
+        Dim seatCodes = changes.Keys.Where(AddressOf SeatPositions.IsTarget).Select(AddressOf SeatPositions.CodeOf).OrderBy(Function(code) code, StringComparer.Ordinal).ToArray()
+        Dim hasSeats = seatCodes.Length > 0
+        If hasSeats AndAlso Not experimental Then Throw New IOException("Seat positions belong to a VR session.")
+        If Not If(seats?.Keys.OrderBy(Function(code) code, StringComparer.Ordinal).SequenceEqual(seatCodes), Not hasSeats) OrElse (seats IsNot Nothing AndAlso seats.Values.Any(Function(offset) offset Is Nothing OrElse offset.IsZero)) Then Throw New IOException("Every seat change needs its own offset.")
+        For Each offset In If(seats?.Values, Array.Empty(Of SeatOffset)())
+            offset.Validate()
+        Next
+        Dim journal As New RecoveryJournal With {.Schema = If(hasSeats, 6, If(hasDirect, If(experimental, 4, 5), If(hasStartup, 3, If(experimental, 2, 1)))), .InstallId = context.Id, .GraphicsPath = context.GraphicsPath, .GraphicsQuality = If(quality.Count > 0, quality, Nothing),
+                                                 .Seats = If(hasSeats, seats.ToDictionary(Function(pair) pair.Key, Function(pair) pair.Value.Copy(), StringComparer.Ordinal), Nothing)}
         Dim prepared = journal.Schema >= 2
         If experimental Then
             Dim required = {"graphics", "proxy", "restrictions"}.Concat(If(hasStartup, {"startup"}, Array.Empty(Of String)())).Concat(If(hasDirect, {"direct"}, Array.Empty(Of String)())).Order().ToArray()
-            If Not changes.Keys.Order().SequenceEqual(required) Then Throw New IOException("The experimental session requires its complete set of fixed targets.")
+            If Not changes.Keys.Where(Function(key) Not SeatPositions.IsTarget(key)).Order().SequenceEqual(required) Then Throw New IOException("The experimental session requires its complete set of fixed targets.")
         ElseIf hasDirect Then
             Dim required = {"direct", "proxy"}.Concat(If(hasStartup, {"startup"}, Array.Empty(Of String)())).Order().ToArray()
             If Not changes.Keys.Order().SequenceEqual(required) Then Throw New IOException("A desktop direct practice session changes only its config, DiRT3VR's renderer and optionally the startup movie definitions.")
@@ -101,7 +115,7 @@ Public Class OwnedFileTransaction
             If pair.Key = "proxy" AndAlso File.Exists(target) Then Throw New IOException("An existing d3d11.dll was preserved. Another graphics mod must be removed using its own instructions.")
             If pair.Key = "direct" AndAlso File.Exists(target) Then Throw New IOException("A " & DirectPractice.FileName & " already exists in the game folder; it was preserved. Remove it if it isn't needed, then launch again.")
             If prepared AndAlso Not Created(pair.Key) AndAlso Not File.Exists(target) Then Throw New IOException("The original settings file is missing: " & target)
-            If prepared Then ValidateApplied(pair.Key, If(File.Exists(target), File.ReadAllBytes(target), Array.Empty(Of Byte)()), pair.Value, journal.GraphicsQuality)
+            If prepared Then ValidateApplied(pair.Key, If(File.Exists(target), File.ReadAllBytes(target), Array.Empty(Of Byte)()), pair.Value, journal)
         Next
         For Each pair In changes
             Dim target = TargetPath(pair.Key)
@@ -147,8 +161,16 @@ Public Class OwnedFileTransaction
         If SafeFiles.Hash(path) <> SafeFiles.HashBytes(bytes) Then Throw New IOException("Deployed file verification failed: " & path)
     End Sub
 
-    Private Sub ValidateApplied(target As String, original As Byte(), applied As Byte(), vrQuality As IDictionary(Of String, String))
+    Private Sub ValidateApplied(target As String, original As Byte(), applied As Byte(), journal As RecoveryJournal)
         Dim expected As Byte()
+        Dim vrQuality = journal.GraphicsQuality
+        If SeatPositions.IsTarget(target) Then
+            Dim offset As SeatOffset = Nothing
+            If journal.Seats Is Nothing OrElse Not journal.Seats.TryGetValue(SeatPositions.CodeOf(target), offset) OrElse offset Is Nothing Then Throw New IOException("Unknown prepared session target.")
+            expected = SeatPositions.Apply(original, offset)
+            If Not expected.SequenceEqual(applied) Then Throw New IOException("Prepared session data does not match its approved transformation: " & target)
+            Return
+        End If
         Select Case target
             Case "graphics"
                 Dim size = ExperimentalFiles.AppliedGraphicsSize(applied)
@@ -166,7 +188,7 @@ Public Class OwnedFileTransaction
 
     Private Function LoadJournal() As RecoveryJournal
         Dim journal = SafeFiles.ReadJson(Of RecoveryJournal)(JournalPath)
-        If Not {1, 2, 3, 4, 5}.Contains(journal.Schema) OrElse journal.InstallId <> context.Id OrElse journal.Entries Is Nothing OrElse journal.Entries.Count < 1 OrElse journal.Entries.Count > MaxEntries(journal.Schema) OrElse journal.Entries.Any(Function(entry) entry Is Nothing) OrElse journal.Entries.Select(Function(e) e.Target).Distinct().Count() <> journal.Entries.Count Then Throw New IOException("Invalid recovery journal. Backups were preserved.")
+        If Not {1, 2, 3, 4, 5, 6}.Contains(journal.Schema) OrElse journal.InstallId <> context.Id OrElse journal.Entries Is Nothing OrElse journal.Entries.Count < 1 OrElse journal.Entries.Count > MaxEntries(journal.Schema) OrElse journal.Entries.Any(Function(entry) entry Is Nothing) OrElse journal.Entries.Select(Function(e) e.Target).Distinct().Count() <> journal.Entries.Count Then Throw New IOException("Invalid recovery journal. Backups were preserved.")
         If Not String.Equals(journal.GraphicsPath, context.GraphicsPath, StringComparison.OrdinalIgnoreCase) Then Throw New IOException("Graphics recovery belongs to the Windows account that started this session. The original backup was preserved.")
         Dim targets = journal.Entries.Select(Function(entry) entry.Target).Order().ToArray()
         Select Case journal.Schema
@@ -180,7 +202,18 @@ Public Class OwnedFileTransaction
                 If Not targets.SequenceEqual({"direct", "graphics", "proxy", "restrictions"}) AndAlso Not targets.SequenceEqual({"direct", "graphics", "proxy", "restrictions", "startup"}) Then Throw New IOException("Incomplete direct practice recovery journal.")
             Case 5
                 If Not targets.SequenceEqual({"direct", "proxy"}) AndAlso Not targets.SequenceEqual({"direct", "proxy", "startup"}) Then Throw New IOException("Incomplete desktop direct practice recovery journal.")
+            Case 6
+                ' A VR session (with or without startup and direct practice) plus one camera file per seat offset.
+                Dim fixedTargets = targets.Where(Function(target) Not SeatPositions.IsTarget(target)).ToArray()
+                Dim seatCodes = targets.Where(AddressOf SeatPositions.IsTarget).Select(AddressOf SeatPositions.CodeOf).OrderBy(Function(code) code, StringComparer.Ordinal).ToArray()
+                Dim sessions = New String()() {New String() {"graphics", "proxy", "restrictions"}, New String() {"graphics", "proxy", "restrictions", "startup"}, New String() {"direct", "graphics", "proxy", "restrictions"}, New String() {"direct", "graphics", "proxy", "restrictions", "startup"}}
+                If Not sessions.Any(Function(session) fixedTargets.SequenceEqual(session)) OrElse seatCodes.Length = 0 OrElse journal.Seats Is Nothing OrElse
+                   Not journal.Seats.Keys.OrderBy(Function(code) code, StringComparer.Ordinal).SequenceEqual(seatCodes) OrElse journal.Seats.Values.Any(Function(offset) offset Is Nothing OrElse offset.IsZero) Then Throw New IOException("Incomplete seat recovery journal.")
+                For Each offset In journal.Seats.Values
+                    offset.Validate()
+                Next
         End Select
+        If journal.Schema <> 6 AndAlso journal.Seats IsNot Nothing Then Throw New IOException("Invalid recovery journal. Backups were preserved.")
         Return journal
     End Function
 
@@ -190,6 +223,7 @@ Public Class OwnedFileTransaction
             Case 2 : Return 3
             Case 3 : Return 4
             Case 4 : Return 5
+            Case 6 : Return 5 + EventCatalog.Current.Cars.Count
             Case Else : Return 3
         End Select
     End Function
@@ -213,7 +247,7 @@ Public Class OwnedFileTransaction
         Dim applied = File.ReadAllBytes(path)
         If SafeFiles.HashBytes(applied) <> entry.AppliedHash Then Throw New IOException("Applied backup changed during inspection.")
         ' Recovery remains possible after the package was moved or updated.
-        If deployment OrElse entry.Target <> "proxy" Then ValidateApplied(entry.Target, If(entry.OriginalExists, File.ReadAllBytes(IO.Path.Combine(Folder, entry.Backup)), Array.Empty(Of Byte)()), applied, journal.GraphicsQuality)
+        If deployment OrElse entry.Target <> "proxy" Then ValidateApplied(entry.Target, If(entry.OriginalExists, File.ReadAllBytes(IO.Path.Combine(Folder, entry.Backup)), Array.Empty(Of Byte)()), applied, journal)
         Return applied
     End Function
 

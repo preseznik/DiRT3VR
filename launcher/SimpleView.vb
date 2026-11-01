@@ -76,6 +76,9 @@ Partial Public Class MainForm
         Borrow(recenterButton.Parent, comfort)
         Borrow(recenterDeviceButton.Parent.Parent, comfort)
         Borrow(recenterKeepLevel, comfort)
+        Dim seats As New Button With {.Name = "SimpleSeats", .Text = "Seat positions…", .AutoSize = True}
+        comfort.Controls.Add(seats)
+        AddHandler seats.Click, Sub() ShowAdvancedTab("Controls")
         Dim profiles As New Button With {.Name = "SimpleProfiles", .Text = "Settings profiles…", .AutoSize = True}
         comfort.Controls.Add(profiles)
         AddHandler profiles.Click, Sub() ShowAdvancedTab("Settings")
@@ -182,7 +185,7 @@ Partial Public Class MainForm
     Private Shared Function ViewsTopic() As HelpTopic
         Return New HelpTopic(HelpViews,
             "The Simple | Advanced switch beside ? chooses how much of the launcher you see. Advanced, the default, shows every option on the Launcher, Graphics, Controls, Settings and Advanced tabs." & vbCrLf & vbCrLf &
-            "Simple shows one Quick start page with the essentials: Launch mode with direct practice, startup logo skipping, experimental VR and the VR runtime, the desktop and VR quality presets, VR render scale and the quick VR presets, and recentering. Settings profiles… opens them in Advanced." & vbCrLf & vbCrLf &
+            "Simple shows one Quick start page with the essentials: Launch mode with direct practice, startup logo skipping, experimental VR and the VR runtime, the desktop and VR quality presets, VR render scale and the quick VR presets, and recentering. Settings profiles… and Seat positions… open those in Advanced." & vbCrLf & vbCrLf &
             "Both views use the same controls, so a choice made in one shows in the other. Switching views never changes or saves settings; Save settings and Launch work as usual. Switching to Advanced asks first, and DiRT3VR remembers the view with the window size.")
     End Function
 End Class
