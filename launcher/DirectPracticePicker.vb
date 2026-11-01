@@ -30,7 +30,7 @@ Public NotInheritable Class DirectPracticePicker
             discipline.Items.Add(item)
         Next
         rivalCars.Items.AddRange({"Same class as my car", "Mixed: any car of this discipline", "My car's model"})
-        aiLevel.Items.AddRange({"My DiRT 3 setting", "Level 0 (easiest)", "Level 1", "Level 2", "Level 3", "Level 4", "Level 5 (hardest)"})
+        aiLevel.Items.AddRange({"DiRT 3's default", "Level 0 (easiest)", "Level 1", "Level 2", "Level 3", "Level 4", "Level 5 (hardest)"})
         finish.Items.AddRange({"Quit to desktop", "Return to DiRT 3's menus"})
         For Each box In {discipline, route, carClass, car, rivalCars, aiLevel, finish}
             StyleChoice(box, parent)
@@ -114,7 +114,7 @@ Public NotInheritable Class DirectPracticePicker
         End Get
     End Property
 
-    ' -1 = the player's own DiRT 3 setting, 0 to 5 = the AI level for this session.
+    ' -1 = DiRT 3's default level, 0 to 5 = the AI level for this session.
     Public ReadOnly Property DifficultyLevel As Integer
         Get
             Return Math.Max(0, aiLevel.SelectedIndex) - 1

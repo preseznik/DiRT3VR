@@ -176,7 +176,7 @@ Public Class LauncherSettings
     ' AI opponents on circuits (0 = practice alone) and their cars: "class", "mixed" or "same" (DirectPractice).
     Public Property DirectOpponents As Integer
     Public Property DirectOpponentCars As String = "class"
-    ' AI difficulty with opponents: -1 = the player's own DiRT 3 setting, 0 (easiest) to 5 (hardest).
+    ' AI difficulty with opponents: -1 = DiRT 3's default (a direct start doesn't load the player's profile), 0 (easiest) to 5 (hardest).
     Public Property DirectDifficulty As Integer = -1
     ' After the finish: "quit" (DiRT 3 closes, as its benchmark start does) or "menus" (DiRT 3's main menu).
     Public Property DirectAfterFinish As String = "quit"
