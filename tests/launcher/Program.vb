@@ -505,6 +505,7 @@ Module Program
         RecoveryConflictTests.RunUi(root, AddressOf Check)
         DefaultsTests.RunUi(root, AddressOf Check)
         HelpTests.RunUi(root, AddressOf Check)
+        StatusTextTests.RunUi(root, AddressOf Check)
         WheelGuardTests.Run(root, AddressOf Check)
         InstallerTests.RunUi(AddressOf Check)
         SectionCollapseTests.Run(root, AddressOf Check)
@@ -549,7 +550,7 @@ Module Program
             outputScale.Value = 150
             Check(summary.Text.Contains("Render: 3600 × 3900") AndAlso summary.Text.Contains("Output: 2400 × 2600"), "one slider updates scene dimensions without changing output")
             outputScale.Value = 75
-            Dim notice = DirectCast(form.Controls.Find("Notice", True).Single(), Label)
+            Dim notice = form.Controls.Find("Notice", True).Single()
             notice.Text = "DiRT 3 exited before its game window appeared (exit code 0xC0000005). Open logs for details."
             Check(choice.Items.Cast(Of String)().SequenceEqual({"VDXR", "SteamVR"}), "runtime choices are explicit")
             Check(tabs.TabPages.Cast(Of TabPage)().Select(Function(p) p.Text).SequenceEqual({"Launcher", "Graphics", "Controls", "Settings", "Advanced"}), "familiar tab order")
@@ -605,7 +606,7 @@ Module Program
             experimental.Checked = True
             Check(form.Controls.Find("LaunchVR", True).Single().Enabled, "explicit UI opt-in and VDXR package allow experimental button")
             choice.SelectedIndex = 1
-            Check(Not form.Controls.Find("LaunchVR", True).Single().Enabled AndAlso DirectCast(form.Controls.Find("SessionStatus", True).Single(), Label).Text.Contains("orientation"), "SteamVR selection disables interactive launch with a reason")
+            Check(Not form.Controls.Find("LaunchVR", True).Single().Enabled AndAlso form.Controls.Find("SessionStatus", True).Single().Text.Contains("orientation"), "SteamVR selection disables interactive launch with a reason")
             experimental.Checked = False
             form.Size = New Size(1000, 740)
             Dim closingSize = form.Size
