@@ -21,7 +21,8 @@ import uuid
 import xml.etree.ElementTree as ET
 import zlib
 
-from diagnostic_files import (DiagnosticFiles, RESTRICTIONS_NAME, SPECTATOR_NAME, preflight_replacement, no_links,
+import diagnostic_files
+from diagnostic_files import (DiagnosticFiles, RESTRICTIONS_NAME, SEAT_NAME, SPECTATOR_NAME, preflight_replacement, no_links,
                               preflight_serial_render, replace_verified, restore_xml_formatting, save_json, sha256)
 
 EXPECTED_EXE = "c502b495bb34a097440756769c80dcb36a79b618943f739e20d591d54171ff98"
@@ -416,6 +417,16 @@ def bmp_to_png(source: Path) -> Path:
 CATALOG = ROOT / "tools/data/event-catalog.json"
 
 
+def parse_seat_offset(text: str) -> tuple[float, float, float]:
+    try:
+        values = tuple(float(part) for part in text.split(","))
+    except ValueError:
+        raise argparse.ArgumentTypeError("use SIDE,UP,FORWARD in metres, e.g. 0,0.2,0") from None
+    if len(values) != 3 or any(abs(v) > 0.5 for v in values):
+        raise argparse.ArgumentTypeError("three offsets within ±0.5 m")
+    return values
+
+
 def choose_scene(route_text: str | None, car: str | None, opponents: int) -> dict:
     """Pick the benchmark track and cars from the event catalog (default: Aspen route_0 with frx, no opponents)."""
     if route_text is None and car is None and not opponents:
@@ -458,7 +469,7 @@ def restore_player_hardware(target: Path, backup: Path, original_hash: str, reta
 
 def protected_state(game: Path) -> dict[str, str]:
     paths = [game / "dirt3_game.exe", game / "steam_api.dll",
-             game / RESTRICTIONS_NAME, game / SPECTATOR_NAME,
+             game / RESTRICTIONS_NAME, game / SPECTATOR_NAME, game / SEAT_NAME,
              game / "hardwaresettings/hardware_settings_config.xml",
              game / "hardwaresettings/hardware_settings_info.xml"]
     documents = documents_dir() / "My Games/DiRT3"
@@ -501,6 +512,9 @@ def main() -> int:
     parser.add_argument("--car", metavar="CODE", help="The (first) car, a catalog code; default frx, or the route discipline's first car")
     parser.add_argument("--opponents", type=int, default=0, metavar="N",
                         help="Add N more cars (0-7) of the route's discipline from the catalog")
+    parser.add_argument("--seat-test", type=parse_seat_offset, metavar="SIDE,UP,FORWARD",
+                        help="Research: journaled change of cars/models/frx/cameras.xml that starts the car in its cockpit "
+                             "view with the eye point moved by these metres (0,0,0 = cockpit start only)")
     parser.add_argument("--player-copies", type=int, choices=range(1, 9), default=1, metavar="K",
                         help="number= on the first <car>: the player's car plus K-1 AI copies of it")
     parser.add_argument("--direct-difficulty", type=int, choices=range(0, 6), metavar="N",
@@ -574,6 +588,11 @@ def main() -> int:
     restrictions = preflight_serial_render(game) if args.serial_render else None
     xr_runtime = preflight_xr_manifest(args.xr_runtime) if args.xr_runtime else None
     spectator = preflight_replacement(game, SPECTATOR_NAME) if args.spectator_human_switch else None
+    if args.seat_test is not None:
+        if "frx" not in scene["cars"][:1]:
+            parser.error("--seat-test changes the frx camera file; use the frx as the (first) car")
+        diagnostic_files.SEAT_TEST_OFFSET = args.seat_test
+    seat = preflight_replacement(game, SEAT_NAME) if args.seat_test is not None else None
     preflight = {"gameSha256": EXPECTED_EXE, "proxySha256": hashlib.sha256(proxy_bytes).hexdigest(),
                  "mode": "headset-prototype" if xr_runtime else "desktop-eye-replay" if args.replay_pair else "desktop-observation",
                  "stereo": False, "sceneObserver": args.scene_observer,
@@ -617,6 +636,8 @@ def main() -> int:
             transaction.apply_serial_render(restrictions[0])
         if spectator:
             transaction.apply_replacement(SPECTATOR_NAME, spectator[0])
+        if seat:
+            transaction.apply_replacement(SEAT_NAME, seat[0])
         if args.player_hardware_settings:
             # The game reads and rewrites this file; its original is in protected-originals.
             hardware_name = hardware_source.name

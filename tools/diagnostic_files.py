@@ -14,6 +14,8 @@ from pathlib import Path
 import uuid
 import xml.etree.ElementTree as ET
 
+import seat_cameras
+
 RESTRICTIONS_NAME = "system/hardware_settings_restrictions.xml"
 RESTRICTIONS_SHA256 = "45257db5fa64d833575d569ec6f3b03344b5f40be25830960a8d11783276470b"
 SPECTATOR_NAME = "cutscene/spectator_startsequence.xml"
@@ -105,11 +107,26 @@ def spectator_human_switch(data: bytes) -> bytes:
     return applied
 
 
+SEAT_NAME = "cars/models/frx/cameras.xml"
+SEAT_SHA256 = "c8c989e557dd6729345a6baf564907e3e2fe4e2b07e9428d756fafbf4a981c58"
+# Research seat test (metres sideways, up, forward); set by run_benchmark.py --seat-test.
+# A --recover of such a run needs the same value to recognise the applied file.
+SEAT_TEST_OFFSET = (0.0, 0.0, 0.0)
+
+
+def seat_test(data: bytes) -> bytes:
+    """Research: start the frx in its cockpit view, with the eye point moved by SEAT_TEST_OFFSET."""
+    if hashlib.sha256(data).hexdigest() != SEAT_SHA256:
+        raise ValueError("Unexpected frx camera definitions")
+    return seat_cameras.offset_seat(seat_cameras.start_in_cockpit(data), *SEAT_TEST_OFFSET)
+
+
 # Every replaceable original: its pinned hash (looked up when used, so tests can pin
 # fixtures), backup prefix and exact applied transform.
 REPLACEMENTS = {
     RESTRICTIONS_NAME: ("RESTRICTIONS_SHA256", "restrictions-original", serial_render_restrictions),
     SPECTATOR_NAME: ("SPECTATOR_SHA256", "spectator-original", spectator_human_switch),
+    SEAT_NAME: ("SEAT_SHA256", "seat-original", seat_test),
 }
 
 
