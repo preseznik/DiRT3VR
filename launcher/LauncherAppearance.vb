@@ -57,10 +57,12 @@ Public Module LauncherAppearance
         root.SuspendLayout()
         Try
             If styled Then
-                root.BackColor = If(TypeOf root Is TextBoxBase OrElse TypeOf root Is ListControl OrElse TypeOf root Is ListView, Cell, Surface)
+                ' Selectable status lines are read-only text that should look like labels, not input fields.
+                Dim inputCell = (TypeOf root Is TextBoxBase OrElse TypeOf root Is ListControl OrElse TypeOf root Is ListView) AndAlso Not TypeOf root Is SelectableStatusText
+                root.BackColor = If(inputCell, Cell, Surface)
                 root.ForeColor = Ink
             Else
-                Dim inputSurface = TypeOf root Is TextBoxBase OrElse TypeOf root Is ListControl OrElse TypeOf root Is ListView
+                Dim inputSurface = (TypeOf root Is TextBoxBase OrElse TypeOf root Is ListControl OrElse TypeOf root Is ListView) AndAlso Not TypeOf root Is SelectableStatusText
                 root.BackColor = If(Dark AndAlso Not SystemInformation.HighContrast, Color.FromArgb(32, 32, 32), If(inputSurface, SystemColors.Window, SystemColors.Control))
                 root.ForeColor = If(Dark AndAlso Not SystemInformation.HighContrast, Color.White, If(inputSurface, SystemColors.WindowText, SystemColors.ControlText))
             End If

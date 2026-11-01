@@ -222,7 +222,7 @@ Module RecoveryConflictTests
                                             Return answer
                                         End Function
             Dim restore = DirectCast(form.Controls.Find("RestoreFiles", True).Single(), Button)
-            Dim notice = DirectCast(form.Controls.Find("Notice", True).Single(), Label)
+            Dim notice = form.Controls.Find("Notice", True).Single()
             Dim clickAndWait = Function() As Boolean
                                    notice.Text = "waiting"
                                    Threading.SynchronizationContext.SetSynchronizationContext(New WindowsFormsSynchronizationContext())

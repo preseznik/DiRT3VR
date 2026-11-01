@@ -44,7 +44,7 @@ Module DefaultsTests
         Using form As New MainForm(ctx)
             form.ShowInTaskbar = False : form.StartPosition = FormStartPosition.Manual : form.Location = New Drawing.Point(-30000, -30000)
             form.Show() : Application.DoEvents()
-            Dim notice = DirectCast(form.Controls.Find("Notice", True).Single(), Label)
+            Dim notice = form.Controls.Find("Notice", True).Single()
             Dim questions As New List(Of String)
             Dim answer = False
             form.ConfirmPrompt = Function(caption, body)

@@ -88,7 +88,11 @@ report is investigated.
    locations and the experimental VR opt-in. Both ask first and, like loading
    a profile, change only the controls until **Save settings** or Launch.
 6. Use **Save settings**, **Restore original files**, and **Open logs** from
-   the persistent footer when needed.
+   the persistent footer when needed. Resting the pointer on a disabled button
+   says why it is disabled. The status line and messages can be selected and
+   copied (Ctrl+A, Ctrl+C or right-click) to paste into a report.
+   **Settings → Diagnostics → Diagnostic logging** adds a presentation trace
+   to the next VR session's log; leave it off unless asked for diagnostics.
 7. **?** opens About, updates and instructions. The instructions are split into
    topics (a list beside the text, or a dropdown in a narrow window), and the
    **Instructions** link on each tab opens that tab's topic. Installed versions check GitHub

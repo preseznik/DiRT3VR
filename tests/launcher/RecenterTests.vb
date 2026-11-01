@@ -65,7 +65,7 @@ Module RecenterTests
             Dim tabs = DirectCast(form.Controls.Find("LauncherTabs", True).Single(), TabControl)
             Dim button = DirectCast(form.Controls.Find("RecenterKey", True).Single(), Button)
             Dim hint = DirectCast(form.Controls.Find("RecenterHint", True).Single(), Label)
-            Dim notice = DirectCast(form.Controls.Find("Notice", True).Single(), Label)
+            Dim notice = form.Controls.Find("Notice", True).Single()
             tabs.SelectedTab = tabs.TabPages.Cast(Of TabPage)().Single(Function(page) page.Contains(button)) : Application.DoEvents()
             check(button.Text = "F10" AndAlso hint.Text.Contains("Press F10") AndAlso Not form.HasUnsavedSettings(), "Controls shows the F10 default without unsaved changes")
             check(Not form.CaptureRecenterKey(Keys.R Or Keys.Control), "keys pass through until the recenter button is clicked")
