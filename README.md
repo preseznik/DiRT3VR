@@ -153,7 +153,8 @@ uses DiRT 3's own benchmark start with DiRT3VR's renderer keeping you in
 control. Circuits (rallycross, Land Rush) take 1 to 5 laps. It works with
 **Launch** (on the monitor) and **Launch VR**, for now without opponents, and
 DiRT 3 closes by itself a few seconds after the finish (launch again for
-another run). Normal launch stays the default.
+another run). During the run, Esc opens DiRT 3's pause menu: Restart goes back
+to the start line, Retire ends the run. Normal launch stays the default.
 **Stop VR** turns the headset off and keeps DiRT 3 running on the monitor; it
 keeps the temporary VR graphics settings until it closes. **End session**
 closes DiRT 3. Either way the original files are restored once DiRT 3 closes.
