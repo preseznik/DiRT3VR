@@ -207,6 +207,11 @@ Module RecoveryConflictTests
         Dim changes = Deploy(ctx)
         File.WriteAllBytes(ctx.GraphicsPath, Rewritten(changes("graphics"), userChange:=True))
         Call New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = ""}.Save(ctx)
+        ' Without Application.Run, Windows Forms falls back to a plain SynchronizationContext between
+        ' message pumps, so the async Restore handler resumed on the thread pool and finished after the
+        ' form was disposed (a crash on Windows; not seen under Wine). The launcher itself always runs
+        ' under Application.Run, so each click gets the same Windows Forms context here.
+        Dim previousContext = Threading.SynchronizationContext.Current
         Using form As New MainForm(ctx)
             form.ShowInTaskbar = False : form.StartPosition = FormStartPosition.Manual : form.Location = New Drawing.Point(-30000, -30000)
             form.Show() : Application.DoEvents()
@@ -220,6 +225,7 @@ Module RecoveryConflictTests
             Dim notice = DirectCast(form.Controls.Find("Notice", True).Single(), Label)
             Dim clickAndWait = Function() As Boolean
                                    notice.Text = "waiting"
+                                   Threading.SynchronizationContext.SetSynchronizationContext(New WindowsFormsSynchronizationContext())
                                    restore.PerformClick()
                                    Dim deadline = System.Diagnostics.Stopwatch.StartNew()
                                    While (notice.Text = "waiting" OrElse Not restore.Enabled) AndAlso deadline.Elapsed < TimeSpan.FromSeconds(20)
@@ -235,5 +241,6 @@ Module RecoveryConflictTests
                   "keeping DiRT 3's changes finishes recovery from the launcher (" & notice.Text & ")")
             form.Close()
         End Using
+        Threading.SynchronizationContext.SetSynchronizationContext(previousContext)
     End Sub
 End Module
