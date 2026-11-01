@@ -207,7 +207,8 @@ def diagnostic_environment(directory: Path, *, scene_observer: bool = False, rep
     return env
 
 
-def summarize_benchmark(path: Path, *, serial_render: bool = False) -> dict:
+def summarize_benchmark(path: Path, *, serial_render: bool = False, track: str = "aspen", route: str = "route_0",
+                        cars_expected: tuple[str, ...] = ("frx",)) -> dict:
     """Check game-produced results instead of treating a filename as acceptance."""
     root = ET.parse(path).getroot()
     tracks = root.findall("track")
@@ -215,10 +216,10 @@ def summarize_benchmark(path: Path, *, serial_render: bool = False) -> dict:
     results = root.find("track/results")
     cars = settings.findall("car") if settings is not None else []
     confirmed = bool(root.tag == "benchmark" and len(tracks) == 1
-                     and settings is not None and settings.get("name") == "aspen"
-                     and settings.get("route") == "route_0" and len(cars) == 1
-                     and cars[0].get("name") == "frx" and results is not None
-                     and int(results.get("samples", "0")) > 0)
+                     and settings is not None and settings.get("name") == track
+                     and settings.get("route") == route
+                     and tuple(car.get("name") for car in cars) == tuple(cars_expected)
+                     and results is not None and int(results.get("samples", "0")) > 0)
     hardware = root.find("hardware_settings_config")
     expected = {"graphics_card/directx": {"forcedx9": "false"},
                 "graphics_card/stereo": {"enabled": "false"},
@@ -412,6 +413,30 @@ def bmp_to_png(source: Path) -> Path:
     return target
 
 
+CATALOG = ROOT / "tools/data/event-catalog.json"
+
+
+def choose_scene(route_text: str | None, car: str | None, opponents: int) -> dict:
+    """Pick the benchmark track and cars from the event catalog (default: Aspen route_0 with frx, no opponents)."""
+    if route_text is None and car is None and not opponents:
+        return {"country": "usa", "track": "aspen", "route": "route_0", "discipline": "rallycross", "cars": ["frx"]}
+    catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
+    country, track, route = (route_text or "usa/aspen/route_0").split("/") if (route_text or "").count("/") in (0, 2) else (None, None, None)
+    matches = [r for r in catalog["routes"] if (r["country"], r["track"], r["route"]) == (country, track, route)]
+    if len(matches) != 1:
+        raise ValueError("--route must be COUNTRY/TRACK/ROUTE from tools/data/event-catalog.json")
+    discipline = matches[0]["discipline"]
+    cars = {c["code"]: c for c in catalog["cars"]}
+    player = car or ("frx" if route_text is None else next(c["code"] for c in catalog["cars"] if c["discipline"] == discipline))
+    if player not in cars:
+        raise ValueError("--car must be a car code from tools/data/event-catalog.json")
+    others = [c["code"] for c in catalog["cars"] if c["discipline"] == discipline and c["code"] != player]
+    if not 0 <= opponents <= min(7, len(others)):
+        raise ValueError(f"--opponents must be 0-{min(7, len(others))} for {discipline}")
+    return {"country": country, "track": track, "route": route, "discipline": discipline,
+            "cars": [player] + others[:opponents]}
+
+
 def restore_player_hardware(target: Path, backup: Path, original_hash: str, retained: Path) -> bool:
     """Put the player's settings file back byte-exact after the game rewrote it, keeping the game's copy."""
     for path in (target, backup, retained):
@@ -471,6 +496,13 @@ def main() -> int:
     parser.add_argument("--screenshots", metavar="SECONDS",
                         help="Comma-separated, ascending seconds after the first frame (e.g. 40,100,160): the renderer saves the "
                              "game's frame at each, converted to screenshot-<n>-<s>s.png in the run directory")
+    parser.add_argument("--route", metavar="COUNTRY/TRACK/ROUTE",
+                        help="Start on this catalog route instead of usa/aspen/route_0")
+    parser.add_argument("--car", metavar="CODE", help="The (first) car, a catalog code; default frx, or the route discipline's first car")
+    parser.add_argument("--opponents", type=int, default=0, metavar="N",
+                        help="Add N more cars (0-7) of the route's discipline from the catalog")
+    parser.add_argument("--player-copies", type=int, choices=range(1, 9), default=1, metavar="K",
+                        help="number= on the first <car>: the player's car plus K-1 AI copies of it")
     parser.add_argument("--direct-return", action="store_true",
                         help="The renderer's return-to-menus change (DIRT3VR_DIRECT_RETURN): after the finish DiRT 3 goes to its "
                              "menus instead of quitting; implies --stay-after-result")
@@ -501,6 +533,10 @@ def main() -> int:
                 or any(not 1 <= int(t) <= 3600 for t in times)
                 or any(int(a) >= int(b) for a, b in zip(times, times[1:]))):
             parser.error("--screenshots needs up to 16 ascending whole seconds between 1 and 3600, e.g. 40,100,160")
+    try:
+        scene = choose_scene(args.route, args.car, args.opponents)
+    except (ValueError, StopIteration) as error:
+        parser.error(str(error) or "no car for that route's discipline")
     if args.direct_laps and not args.direct_practice:
         parser.error("--direct-laps requires --direct-practice")
     if args.player_hardware_settings and args.serial_render:
@@ -542,7 +578,7 @@ def main() -> int:
                  "serialRender": args.serial_render, "replayPair": args.replay_pair,
                  "xrRuntime": xr_runtime, "backgroundPlay": args.background_play, "researchPatch": args.research_patch,
                  "spectatorHumanSwitch": args.spectator_human_switch, "directPractice": args.direct_practice,
-                 "playerHardwareSettings": args.player_hardware_settings, "directLaps": args.direct_laps, "directReturn": args.direct_return,
+                 "playerHardwareSettings": args.player_hardware_settings, "directLaps": args.direct_laps, "directReturn": args.direct_return, "scene": scene,
                  "durationSeconds": args.seconds}
     if restrictions:
         preflight["restrictionsOriginalSha256"] = hashlib.sha256(restrictions[0]).hexdigest()
@@ -588,8 +624,10 @@ def main() -> int:
             hardware_path = transaction.add(hardware_name, hardware_input.read_bytes())
         benchmark = ET.Element("config", {"skipreplays": "true", "outputfilename": f"DiRT3VR_{run_id}",
                                            "hardwaresettings": hardware_name})
-        track = ET.SubElement(benchmark, "track", {"country": "usa", "name": "aspen", "route": "route_0"})
-        ET.SubElement(track, "car", {"name": "frx", "number": "1"})
+        track = ET.SubElement(benchmark, "track", {"country": scene["country"], "name": scene["track"], "route": scene["route"]})
+        for index, code in enumerate(scene["cars"]):
+            # "number" is how many copies of this car race (the game's example_benchmark.xml), not a grid slot.
+            ET.SubElement(track, "car", {"name": code, "number": str(args.player_copies if index == 0 else 1)})
         benchmark_path = transaction.add(f"dirt3vr-benchmark-{run_id}.xml", ET.tostring(benchmark, encoding="utf-8", xml_declaration=True))
         transaction.add("d3d11.dll", proxy_bytes)
         env = diagnostic_environment(run, scene_observer=args.scene_observer, replay_pair=args.replay_pair,
@@ -699,7 +737,8 @@ def main() -> int:
         for result in results:
             if result.is_file():
                 (run / result.name).write_bytes(result.read_bytes())
-                summary = summarize_benchmark(result, serial_render=args.serial_render)
+                summary = summarize_benchmark(result, serial_render=args.serial_render, track=scene["track"],
+                                              route=scene["route"], cars_expected=tuple(scene["cars"]))
                 report["benchmarkSummary"] = summary
                 report["benchmarkConfirmed"] = summary["sceneConfirmed"]
                 report["serialRenderVerified"] = summary["serialRenderVerified"]
