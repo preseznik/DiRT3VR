@@ -196,5 +196,78 @@ class SerialRenderTransactionTests(unittest.TestCase):
         self.assertEqual(list(self.target.parent.glob("*.tmp")), [])
 
 
+SPECTATOR_FIXTURE = (b'<?xml version="1.0" encoding="UTF-8" ?>\r\n<Cutscene>\r\n\t<Timeline>\r\n'
+                     b'\t\t<Keyframe name="kf_start" time="0.000000" timeType="absolute">\r\n'
+                     b'\t\t\t<Event type="StartLights" object="core_game_startlight_">\r\n\t\t\t\t<Reset>\r\n'
+                     b'\t\t\t\t\t<State texture="start_lights_6_green_e.tga" type="green" />\r\n\t\t\t\t</Reset>\r\n'
+                     b'\t\t\t</Event>\r\n\t\t</Keyframe>\r\n\t</Timeline>\r\n</Cutscene>\r\n')
+
+
+class SpectatorSwitchTransactionTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.game = self.root / "game"
+        (self.game / "system").mkdir(parents=True)
+        (self.game / "cutscene").mkdir()
+        self.restrictions = restrictions_fixture()
+        (self.game / df.RESTRICTIONS_NAME).write_bytes(self.restrictions)
+        self.target = self.game / df.SPECTATOR_NAME
+        self.target.write_bytes(SPECTATOR_FIXTURE)
+        for name, data in (("RESTRICTIONS_SHA256", self.restrictions), ("SPECTATOR_SHA256", SPECTATOR_FIXTURE)):
+            pin = patch.object(df, name, hashlib.sha256(data).hexdigest())
+            pin.start()
+            self.addCleanup(pin.stop)
+        self.run_id = "c" * 32
+        self.journal = self.root / "deployment.json"
+
+    def recover(self):
+        return df.DiagnosticFiles.recover(self.journal, self.game)
+
+    def test_switch_hands_the_car_to_the_player_and_keeps_every_other_byte(self):
+        applied = df.spectator_human_switch(SPECTATOR_FIXTURE)
+        self.assertEqual(applied.replace(df.HUMAN_SWITCH, b""), SPECTATOR_FIXTURE)
+        events = ET.fromstring(applied).findall("Timeline/Keyframe/Event")
+        self.assertEqual([e.get("type") for e in events], ["StartLights", "Controller"])
+        self.assertEqual(events[1].find("Switch").get("type"), "human")
+        with self.assertRaises(ValueError):
+            df.spectator_human_switch(SPECTATOR_FIXTURE + b" ")
+
+    def test_both_replacements_restore_byte_exact(self):
+        transaction = df.DiagnosticFiles(self.game, self.journal, self.run_id)
+        transaction.add("d3d11.dll", b"owned proxy")
+        transaction.apply_serial_render(self.restrictions)
+        transaction.apply_replacement(df.SPECTATOR_NAME, SPECTATOR_FIXTURE)
+        self.assertEqual(self.target.read_bytes(), df.spectator_human_switch(SPECTATOR_FIXTURE))
+        with self.assertRaises(ValueError):
+            transaction.apply_replacement(df.SPECTATOR_NAME, SPECTATOR_FIXTURE)
+        self.assertEqual(self.recover(), [])
+        self.assertEqual(self.target.read_bytes(), SPECTATOR_FIXTURE)
+        self.assertEqual((self.game / df.RESTRICTIONS_NAME).read_bytes(), self.restrictions)
+        self.assertFalse((self.game / "d3d11.dll").exists())
+
+    def test_changed_start_sequence_is_a_conflict_and_keeps_everything(self):
+        transaction = df.DiagnosticFiles(self.game, self.journal, self.run_id)
+        transaction.add("d3d11.dll", b"owned proxy")
+        transaction.apply_replacement(df.SPECTATOR_NAME, SPECTATOR_FIXTURE)
+        self.target.write_bytes(b"game update")
+        self.assertEqual(self.recover(), [str(self.target)])
+        self.assertEqual(self.target.read_bytes(), b"game update")
+        self.assertTrue((self.game / "d3d11.dll").exists())
+        self.assertEqual((self.root / f"spectator-original-{self.run_id}.bin").read_bytes(), SPECTATOR_FIXTURE)
+
+    def test_unknown_or_duplicate_replacement_entries_are_refused(self):
+        transaction = df.DiagnosticFiles(self.game, self.journal, self.run_id)
+        transaction.apply_replacement(df.SPECTATOR_NAME, SPECTATOR_FIXTURE)
+        record = json.loads(self.journal.read_text())
+        for replacements in ([dict(record["replacements"][0], name="cutscene/other.xml")],
+                             record["replacements"] * 2, []):
+            self.journal.write_text(json.dumps(dict(record, replacements=replacements)))
+            with self.subTest(replacements=len(replacements)), self.assertRaises(ValueError):
+                self.recover()
+            self.assertEqual(self.target.read_bytes(), df.spectator_human_switch(SPECTATOR_FIXTURE))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -16,6 +16,11 @@ import xml.etree.ElementTree as ET
 
 RESTRICTIONS_NAME = "system/hardware_settings_restrictions.xml"
 RESTRICTIONS_SHA256 = "45257db5fa64d833575d569ec6f3b03344b5f40be25830960a8d11783276470b"
+SPECTATOR_NAME = "cutscene/spectator_startsequence.xml"
+SPECTATOR_SHA256 = "dbe2e0278b3c09b93042295cd7e78fc8f700172ac2f6df5a84e7c7aa5100b957"
+# The same controller hand-over a normal race's startsequence.xml performs at its lights.
+HUMAN_SWITCH = (b'\t\t\t<Event type="Controller">\r\n\t\t\t\t<Camera enabled="true" />\r\n'
+                b'\t\t\t\t<Vehicle enabled="true" />\r\n\t\t\t\t<Switch type="human" />\r\n\t\t\t</Event>\r\n')
 
 
 def sha256(path: Path) -> str:
@@ -87,6 +92,42 @@ def serial_render_restrictions(data: bytes) -> bytes:
     if xml_semantics(applied) != xml_semantics(ET.tostring(root)):
         raise ValueError("Serial-render transformation changed unrelated XML settings")
     return applied
+
+
+def spectator_human_switch(data: bytes) -> bytes:
+    """Research: hand the spectator start sequence's car to the player, as startsequence.xml does."""
+    if hashlib.sha256(data).hexdigest() != SPECTATOR_SHA256 or data.count(b"\t\t</Keyframe>") != 1:
+        raise ValueError("Unexpected spectator start-sequence signature")
+    applied = data.replace(b"\t\t</Keyframe>", HUMAN_SWITCH + b"\t\t</Keyframe>")
+    events = ET.fromstring(applied).findall("Timeline/Keyframe/Event")
+    if [e.get("type") for e in events] != ["StartLights", "Controller"] or events[1].find("Switch").get("type") != "human":
+        raise ValueError("Spectator start-sequence transformation failed")
+    return applied
+
+
+# Every replaceable original: its pinned hash (looked up when used, so tests can pin
+# fixtures), backup prefix and exact applied transform.
+REPLACEMENTS = {
+    RESTRICTIONS_NAME: ("RESTRICTIONS_SHA256", "restrictions-original", serial_render_restrictions),
+    SPECTATOR_NAME: ("SPECTATOR_SHA256", "spectator-original", spectator_human_switch),
+}
+
+
+def replacement(name: str):
+    pin, prefix, transform = REPLACEMENTS[name]
+    return globals()[pin], prefix, transform
+
+
+def preflight_replacement(game: Path, name: str) -> tuple[bytes, bytes]:
+    pinned, _, transform = replacement(name)
+    target = game / name
+    no_links(target)
+    original = target.read_bytes()
+    if hashlib.sha256(original).hexdigest() != pinned:
+        raise ValueError(f"Unsupported {name}; no change applied")
+    if getattr(target.stat(), "st_file_attributes", 0) & 1:
+        raise PermissionError(f"{name} is read-only; it was preserved")
+    return original, transform(original)
 
 
 def preflight_serial_render(game: Path) -> tuple[bytes, bytes]:
@@ -176,14 +217,20 @@ class DiagnosticFiles:
         save_json(self.journal, self.record)
 
     def apply_serial_render(self, original: bytes) -> Path:
+        return self.apply_replacement(RESTRICTIONS_NAME, original)
+
+    def apply_replacement(self, name: str, original: bytes) -> Path:
         """Journal one supported replacement before changing the installed file."""
-        if self.record.get("replacements"):
-            raise ValueError("Serial-render restrictions are already recorded")
-        observed, applied = preflight_serial_render(self.game)
+        if name not in REPLACEMENTS:
+            raise ValueError("Unsupported replacement")
+        replacements = self.record.setdefault("replacements", [])
+        if any(item["name"] == name for item in replacements):
+            raise ValueError(f"{name} is already recorded")
+        observed, applied = preflight_replacement(self.game, name)
         if observed != original:
-            raise ValueError("Hardware restrictions changed since preflight")
-        target = self.game / RESTRICTIONS_NAME
-        backup_name = f"restrictions-original-{self.run_id}.bin"
+            raise ValueError(f"{name} changed since preflight")
+        target = self.game / name
+        backup_name = f"{replacement(name)[1]}-{self.run_id}.bin"
         backup = self.journal.parent / backup_name
         no_links(backup)
         with backup.open("xb") as stream:
@@ -192,10 +239,10 @@ class DiagnosticFiles:
             os.fsync(stream.fileno())
         original_hash = hashlib.sha256(original).hexdigest()
         if sha256(backup) != original_hash:
-            raise IOError("Hardware restrictions backup verification failed")
-        self.record.update(schema=3, replacements=[{
-            "name": RESTRICTIONS_NAME, "backup": backup_name,
-            "originalSha256": original_hash, "appliedSha256": hashlib.sha256(applied).hexdigest()}])
+            raise IOError(f"{name} backup verification failed")
+        replacements.append({"name": name, "backup": backup_name,
+                             "originalSha256": original_hash, "appliedSha256": hashlib.sha256(applied).hexdigest()})
+        self.record["schema"] = 3
         save_json(self.journal, self.record)
         replace_verified(target, applied, original_hash)
         return target
@@ -254,31 +301,35 @@ class DiagnosticFiles:
         names = set()
         conflicts = []
         replacements = record.get("replacements", [])
-        if (not isinstance(replacements, list) or len(replacements) > 1
+        if (not isinstance(replacements, list) or len(replacements) > len(REPLACEMENTS)
                 or (record["schema"] < 3 and "replacements" in record)
-                or (record["schema"] == 3 and len(replacements) != 1)):
+                or (record["schema"] == 3 and not replacements)):
             raise ValueError("Invalid diagnostic replacement list")
         originals = []
+        seen = set()
         for entry in replacements:
-            expected_backup = f"restrictions-original-{run_id}.bin"
-            if (not isinstance(entry, dict) or entry.get("name") != RESTRICTIONS_NAME
-                    or entry.get("backup") != expected_backup
-                    or entry.get("originalSha256") != RESTRICTIONS_SHA256
+            name = entry.get("name") if isinstance(entry, dict) else None
+            if name not in REPLACEMENTS or name in seen:
+                raise ValueError("Invalid replacement recovery entry")
+            seen.add(name)
+            pinned, prefix, transform = replacement(name)
+            expected_backup = f"{prefix}-{run_id}.bin"
+            if (entry.get("backup") != expected_backup or entry.get("originalSha256") != pinned
                     or not isinstance(entry.get("appliedSha256"), str)
                     or not re.fullmatch(r"[a-f0-9]{64}", entry["appliedSha256"])):
-                raise ValueError("Invalid hardware restrictions recovery entry")
-            target = game / RESTRICTIONS_NAME
+                raise ValueError(f"Invalid {name} recovery entry")
+            target = game / name
             backup = journal.parent / expected_backup
             no_links(target)
             no_links(backup)
             if not backup.is_file() or sha256(backup) != entry["originalSha256"]:
-                raise ValueError("Original hardware restrictions backup is missing or changed")
+                raise ValueError(f"Original {name} backup is missing or changed")
             original = backup.read_bytes()
             if hashlib.sha256(original).hexdigest() != entry["originalSha256"]:
-                raise ValueError("Original hardware restrictions backup changed during preflight")
-            applied = serial_render_restrictions(original)
+                raise ValueError(f"Original {name} backup changed during preflight")
+            applied = transform(original)
             if hashlib.sha256(applied).hexdigest() != entry["appliedSha256"]:
-                raise ValueError("Hardware restrictions applied-state signature mismatch")
+                raise ValueError(f"{name} applied-state signature mismatch")
             if not target.is_file() or sha256(target) not in (entry["originalSha256"], entry["appliedSha256"]):
                 conflicts.append(str(target))
             originals.append((target, original, entry))

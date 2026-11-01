@@ -20,7 +20,7 @@ import time
 import uuid
 import xml.etree.ElementTree as ET
 
-from diagnostic_files import (DiagnosticFiles, RESTRICTIONS_NAME, no_links,
+from diagnostic_files import (DiagnosticFiles, RESTRICTIONS_NAME, SPECTATOR_NAME, preflight_replacement, no_links,
                               preflight_serial_render, restore_xml_formatting, save_json, sha256)
 
 EXPECTED_EXE = "c502b495bb34a097440756769c80dcb36a79b618943f739e20d591d54171ff98"
@@ -307,7 +307,7 @@ def documents_dir() -> Path:
 
 def protected_state(game: Path) -> dict[str, str]:
     paths = [game / "dirt3_game.exe", game / "steam_api.dll",
-             game / RESTRICTIONS_NAME,
+             game / RESTRICTIONS_NAME, game / SPECTATOR_NAME,
              game / "hardwaresettings/hardware_settings_config.xml",
              game / "hardwaresettings/hardware_settings_info.xml"]
     documents = documents_dir() / "My Games/DiRT3"
@@ -336,6 +336,8 @@ def main() -> int:
                         help="Opt into the headset prototype with an explicit x86 runtime manifest; requires --serial-render and --scene-observer; incompatible with --replay-pair")
     parser.add_argument("--background-play", action="store_true",
                         help="Keep the game running when it loses focus (suppresses its focus-loss pause in memory) and start its window without activating it")
+    parser.add_argument("--spectator-human-switch", action="store_true",
+                        help="Research: temporarily add the normal race's 'Controller / Switch type=human' event to cutscene/spectator_startsequence.xml (journaled and restored)")
     parser.add_argument("--research-patch", metavar="RVA:ORIGINAL:REPLACEMENT",
                         help="Research only: in-memory code change applied by the research proxy (build/native/bin/research/d3d11.dll, pass it with --proxy) after its original bytes match")
     parser.add_argument("--recover", type=Path, metavar="JOURNAL")
@@ -374,11 +376,13 @@ def main() -> int:
     hardware_bytes = diagnostic_hardware(hardware_source.read_bytes(), serial_render=args.serial_render)
     restrictions = preflight_serial_render(game) if args.serial_render else None
     xr_runtime = preflight_xr_manifest(args.xr_runtime) if args.xr_runtime else None
+    spectator = preflight_replacement(game, SPECTATOR_NAME) if args.spectator_human_switch else None
     preflight = {"gameSha256": EXPECTED_EXE, "proxySha256": hashlib.sha256(proxy_bytes).hexdigest(),
                  "mode": "headset-prototype" if xr_runtime else "desktop-eye-replay" if args.replay_pair else "desktop-observation",
                  "stereo": False, "sceneObserver": args.scene_observer,
                  "serialRender": args.serial_render, "replayPair": args.replay_pair,
                  "xrRuntime": xr_runtime, "backgroundPlay": args.background_play, "researchPatch": args.research_patch,
+                 "spectatorHumanSwitch": args.spectator_human_switch,
                  "durationSeconds": args.seconds}
     if restrictions:
         preflight["restrictionsOriginalSha256"] = hashlib.sha256(restrictions[0]).hexdigest()
@@ -411,6 +415,8 @@ def main() -> int:
     try:
         if restrictions:
             transaction.apply_serial_render(restrictions[0])
+        if spectator:
+            transaction.apply_replacement(SPECTATOR_NAME, spectator[0])
         hardware_name = f"dirt3vr-hardware-{run_id}.xml"
         hardware_input.write_bytes(hardware_bytes)
         hardware_path = transaction.add(hardware_name, hardware_input.read_bytes())
