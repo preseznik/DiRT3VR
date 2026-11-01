@@ -41,6 +41,17 @@ void XrRuntime::ReportOrientation(const char* reason) noexcept {
             f.angleLeft,f.angleRight,f.angleUp,f.angleDown,centerUp.y,relativeUp.y);
     } catch(...) { } // Diagnostics never change frame eligibility.
 }
+// Diagnostics only: a missing extension or a failed query never affects the session.
+void XrRuntime::ReportRefreshRate(bool enabled) noexcept {
+    if(!enabled) { Report("XR display refresh rate unavailable: runtime lacks %s",XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME); return; }
+    PFN_xrGetDisplayRefreshRateFB query{};
+    float rate{};
+    if(XR_SUCCEEDED(xrGetInstanceProcAddr(instance_,"xrGetDisplayRefreshRateFB",reinterpret_cast<PFN_xrVoidFunction*>(&query))) && query &&
+       XR_SUCCEEDED(query(session_,&rate)) && std::isfinite(rate) && rate>0.f && rate<1000.f)
+        Report("XR display refresh rate=%.2f Hz",double(rate));
+    else
+        Report("XR display refresh rate unavailable: query failed");
+}
 XrRuntime::~XrRuntime() { Shutdown(); }
 bool XrRuntime::Initialize(ID3D11Device* device,float scale,uint32_t expectedWidth,uint32_t expectedHeight,bool overlay) noexcept {
     if((expectedWidth || expectedHeight) && (scale!=1.f || !ValidHeadsetSize(expectedWidth,expectedHeight))) return false;
@@ -54,11 +65,20 @@ bool XrRuntime::Initialize(ID3D11Device* device,float scale,uint32_t expectedWid
     Shutdown(); failed_=true; return false;
 }
 bool XrRuntime::InitializeResources(ID3D11Device* device,float scale,uint32_t expectedWidth,uint32_t expectedHeight) {
-    const char* extensions[]={XR_KHR_D3D11_ENABLE_EXTENSION_NAME};
+    // XR_FB_display_refresh_rate is optional and only reported for the launcher's Graphics tab.
+    bool refreshRate{};
+    uint32_t available{};
+    if(XR_SUCCEEDED(xrEnumerateInstanceExtensionProperties(nullptr,0,&available,nullptr)) && available && available<=1024) {
+        std::vector<XrExtensionProperties> properties(available,{XR_TYPE_EXTENSION_PROPERTIES});
+        if(XR_SUCCEEDED(xrEnumerateInstanceExtensionProperties(nullptr,available,&available,properties.data())))
+            for(uint32_t i=0;i<available && i<properties.size();++i)
+                refreshRate|=strcmp(properties[i].extensionName,XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME)==0;
+    }
+    const char* extensions[]={XR_KHR_D3D11_ENABLE_EXTENSION_NAME,XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME};
     XrInstanceCreateInfo create{XR_TYPE_INSTANCE_CREATE_INFO};
     strcpy_s(create.applicationInfo.applicationName,"DiRT3VR");
     create.applicationInfo.apiVersion=XR_MAKE_VERSION(1,0,0);
-    create.enabledExtensionCount=1; create.enabledExtensionNames=extensions;
+    create.enabledExtensionCount=refreshRate ? 2 : 1; create.enabledExtensionNames=extensions;
     if(!Check(xrCreateInstance(&create,&instance_),"create instance")) return false;
     XrSystemGetInfo get{XR_TYPE_SYSTEM_GET_INFO}; get.formFactor=XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
     if(!Check(xrGetSystem(instance_,&get,&system_),"get system")) return false;
@@ -76,6 +96,7 @@ bool XrRuntime::InitializeResources(ID3D11Device* device,float scale,uint32_t ex
     XrGraphicsBindingD3D11KHR binding{XR_TYPE_GRAPHICS_BINDING_D3D11_KHR}; binding.device=device;
     XrSessionCreateInfo session{XR_TYPE_SESSION_CREATE_INFO}; session.next=&binding; session.systemId=system_;
     if(!Check(xrCreateSession(instance_,&session,&session_),"create session")) return false;
+    ReportRefreshRate(refreshRate);
     uint32_t count{};
     if(!Check(xrEnumerateEnvironmentBlendModes(instance_,system_,XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,0,&count,nullptr),"blend modes") || !count || count>16) return false;
     std::vector<XrEnvironmentBlendMode> blends(count);

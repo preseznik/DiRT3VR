@@ -81,7 +81,9 @@ report is investigated.
    height per eye. Output stays at that recommendation while the slider changes
    scene detail. The launcher rechecks the headset before every VR launch.
    Unsupported sizes are refused; the displayed maximum depends on the headset.
-   Changes apply on the next VR launch.
+   Changes apply on the next VR launch. Below it, **Last VR session** shows the
+   headset refresh rate (when the runtime reports it) and whether DiRT 3
+   rendered the requested scene size.
    **Graphics → Restore graphics defaults…** sets the desktop choices to
    **Use game setting** and VR render scale to 100%. **Settings → Restore
    launcher defaults…** resets every launcher choice except the VR runtime

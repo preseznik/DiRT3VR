@@ -45,6 +45,7 @@ Public Class MainForm
     Private ReadOnly desktopVSync As New ComboBox With {.Name = "DesktopVSync", .DropDownStyle = ComboBoxStyle.DropDownList}
     Private headsetResolution As HeadsetResolution
     Private ReadOnly resolutionSummary As New Label With {.Name = "VrResolutionSummary", .AutoSize = True}
+    Private ReadOnly lastSessionSummary As New Label With {.Name = "LastVrSession", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12)}
     Private ReadOnly refreshHeadset As New Button With {.Name = "RefreshHeadset", .Text = "Refresh headset resolution", .AutoSize = True}
     Private ReadOnly graphicsDefaultsButton As New Button With {.Name = "GraphicsDefaults", .Text = "Restore graphics defaults…", .AutoSize = True}
     Private ReadOnly launcherDefaultsButton As New Button With {.Name = "LauncherDefaults", .Text = "Restore launcher defaults…", .AutoSize = True}
@@ -336,6 +337,8 @@ Public Class MainForm
         vrSettings.Controls.Add(Info("100% renders at the connected headset's recommended resolution per eye. Output stays at that recommendation; this slider changes scene detail. Applies on the next VR launch. Unsupported sizes are refused, and original game settings are restored afterward."))
         vrSettings.Controls.Add(resolutionSummary)
         vrSettings.Controls.Add(refreshHeadset)
+        vrSettings.Controls.Add(lastSessionSummary)
+        UpdateLastSession()
         vrSettings.Controls.Add(Info("Changing game graphics during VR can leave a recovery conflict; the launcher preserves your changes and the original backup."))
         Field(content, "Game graphics file", graphicsPath)
         content.Controls.Add(graphicsDefaultsButton)
@@ -346,6 +349,12 @@ Public Class MainForm
     Private Sub InvalidateHeadset()
         headsetResolution = Nothing
         UpdateResolutionLabels()
+    End Sub
+
+    ' What the last VR session ran with: headset refresh rate and requested vs actual scene size.
+    Private Sub UpdateLastSession()
+        Dim last = LastVrSession.Load(context)
+        lastSessionSummary.Text = If(last Is Nothing, "No VR session with rendering has been recorded yet. After one, its headset refresh rate and scene size appear here.", last.Describe())
     End Sub
 
     Private Sub UpdateResolutionLabels()
@@ -682,7 +691,7 @@ Public Class MainForm
             recenterWatcher?.Dispose() : recenterWatcher = Nothing
             launchProgress?.Dispose() : launchProgress = Nothing
             interactive = Nothing
-            RefreshState() : LoadDiagnostics()
+            RefreshState() : LoadDiagnostics() : UpdateLastSession()
         End Try
         FinishBackground(failed)
     End Sub
@@ -910,6 +919,7 @@ Public Class MainForm
             New HelpTopic(HelpGraphics,
                 "Desktop: display mode, resolution and VSync for Launch. Use game setting leaves that option unchanged. Borderless fills the main display at its current resolution. Desktop choices stay in the game's graphics file; an exact backup is saved under desktop-backups in the preferences folder before each change." & vbCrLf & vbCrLf &
                 "VR rendering: one VR render scale from 50% to 300%. At 100% the scene matches the connected headset's recommended resolution per eye; output stays at that recommendation while the slider changes scene detail. Refresh headset resolution shows the detected sizes. The launcher checks the headset again before every VR launch and refuses unsupported sizes." & vbCrLf & vbCrLf &
+                "Below it, Last VR session shows the headset refresh rate (when the runtime reports it) and whether DiRT 3 rendered the scene size DiRT3VR asked for, read from that session's log." & vbCrLf & vbCrLf &
                 "Restore graphics defaults sets the desktop choices to Use game setting and the render scale to 100%. It asks first and changes only the controls until Save settings or Launch."),
             New HelpTopic(HelpControls,
                 "Use your existing keyboard, controller or wheel bindings in DiRT 3." & vbCrLf & vbCrLf &
