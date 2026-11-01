@@ -61,6 +61,8 @@ void CompleteScreen(XrRuntime::Frame& frame) {
 }
 }
 extern "C" {
+// No optional extensions: the session must work without XR_FB_display_refresh_rate.
+XRAPI_ATTR XrResult XRAPI_CALL xrEnumerateInstanceExtensionProperties(const char*,uint32_t,uint32_t* count,XrExtensionProperties*) { *count=0; return XR_SUCCESS; }
 XRAPI_ATTR XrResult XRAPI_CALL xrCreateInstance(const XrInstanceCreateInfo*,XrInstance* instance) { *instance=XrInstance(1); return XR_SUCCESS; }
 XRAPI_ATTR XrResult XRAPI_CALL xrDestroyInstance(XrInstance) { ++destroyedInstances; return XR_SUCCESS; }
 XRAPI_ATTR XrResult XRAPI_CALL xrGetSystem(XrInstance,const XrSystemGetInfo*,XrSystemId* system) { *system=1; return XR_SUCCESS; }
