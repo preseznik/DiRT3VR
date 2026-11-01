@@ -192,7 +192,7 @@ def diagnostic_environment(directory: Path, *, scene_observer: bool = False, rep
                            xr_runtime: Path | None = None, background_play: bool = False) -> dict:
     env = dict(os.environ, DIRT3VR_DIAGNOSTICS="1", DIRT3VR_LOG_DIR=str(directory), SteamAppId="321040")
     for flag in ("DIRT3VR_ENABLE_VR", "DIRT3VR_SCENE_DIAGNOSTICS", "DIRT3VR_REPLAY_DIAGNOSTICS",
-                 "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH", "DIRT3VR_RESEARCH_FILE_TRACE", "DIRT3VR_DIRECT_PRACTICE", "DIRT3VR_DIRECT_LAPS", "DIRT3VR_RESEARCH_LAPS", "DIRT3VR_SCREENSHOT_SECONDS"):
+                 "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH", "DIRT3VR_RESEARCH_FILE_TRACE", "DIRT3VR_DIRECT_PRACTICE", "DIRT3VR_DIRECT_LAPS", "DIRT3VR_DIRECT_RETURN", "DIRT3VR_RESEARCH_LAPS", "DIRT3VR_SCREENSHOT_SECONDS"):
         env.pop(flag, None)
     if background_play:
         env["DIRT3VR_BACKGROUND_PLAY"] = "1"
@@ -307,6 +307,75 @@ def documents_dir() -> Path:
     return Path(buffer.value)
 
 
+FOCUS_KEYS = {"esc": (0x01, False), "enter": (0x1C, False), "up": (0x48, True), "down": (0x50, True),
+              "left": (0x4B, True), "right": (0x4D, True), "space": (0x39, False)}
+
+
+def parse_focus_keys(text: str) -> list[tuple[float, str]]:
+    """'40:esc,44:down,47:enter' -> ascending (seconds, key) pairs."""
+    result = []
+    for item in text.split(","):
+        seconds, _, key = item.partition(":")
+        try:
+            value = float(seconds)
+        except ValueError:
+            raise argparse.ArgumentTypeError("use SECONDS:KEY[,SECONDS:KEY...], e.g. 40:esc,44:down") from None
+        if not 1 <= value <= 3600 or key not in FOCUS_KEYS or (result and value <= result[-1][0]) or len(result) == 32:
+            raise argparse.ArgumentTypeError(f"ascending SECONDS:KEY pairs (1-3600 s, at most 32) with keys {', '.join(FOCUS_KEYS)}")
+        result.append((value, key))
+    return result
+
+
+class _KeyboardInput(ctypes.Structure):
+    _fields_ = [("wVk", wintypes.WORD), ("wScan", wintypes.WORD), ("dwFlags", wintypes.DWORD),
+                ("time", wintypes.DWORD), ("dwExtraInfo", ctypes.c_size_t)]
+
+
+class _Input(ctypes.Structure):
+    class _Union(ctypes.Union):
+        _fields_ = [("ki", _KeyboardInput), ("padding", ctypes.c_byte * 32)]
+    _anonymous_ = ("u",)
+    _fields_ = [("type", wintypes.DWORD), ("u", _Union)]
+
+
+def press_in_focused_game(pid: int, key: str) -> str:
+    """Bring the game forward and press one key, but only while the game really is the foreground window."""
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    user32.GetForegroundWindow.restype = wintypes.HWND
+    windows: list[int] = []
+    callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+    def collect(hwnd, _):
+        owner = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
+        if owner.value == pid and user32.IsWindowVisible(hwnd):
+            windows.append(hwnd)
+        return True
+
+    def foreground_is_game() -> bool:
+        owner = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(user32.GetForegroundWindow(), ctypes.byref(owner))
+        return owner.value == pid
+
+    user32.EnumWindows(callback_type(collect), 0)
+    if not windows:
+        return "no-window"
+    if not foreground_is_game():
+        user32.ShowWindow(windows[0], 9)  # SW_RESTORE
+        user32.SetForegroundWindow(windows[0])
+        time.sleep(0.3)
+    if not foreground_is_game():
+        return "not-foreground"  # never type into another program
+    scan, extended = FOCUS_KEYS[key]
+    flags = 0x0008 | (0x0001 if extended else 0)  # KEYEVENTF_SCANCODE (+ EXTENDEDKEY)
+    for up in (False, True):
+        event = _Input(type=1)
+        event.ki = _KeyboardInput(0, scan, flags | (0x0002 if up else 0), 0, 0)
+        user32.SendInput(1, ctypes.byref(event), ctypes.sizeof(_Input))
+        time.sleep(0.1)
+    return "sent"
+
+
 def bmp_to_png(source: Path) -> Path:
     """Convert the renderer's 32-bit top-down BMP screenshot to an RGB PNG next to it."""
     data = source.read_bytes()
@@ -391,6 +460,14 @@ def main() -> int:
     parser.add_argument("--screenshots", metavar="SECONDS",
                         help="Comma-separated, ascending seconds after the first frame (e.g. 40,100,160): the renderer saves the "
                              "game's frame at each, converted to screenshot-<n>-<s>s.png in the run directory")
+    parser.add_argument("--direct-return", action="store_true",
+                        help="The renderer's return-to-menus change (DIRT3VR_DIRECT_RETURN): after the finish DiRT 3 goes to its "
+                             "menus instead of quitting; implies --stay-after-result")
+    parser.add_argument("--stay-after-result", action="store_true",
+                        help="Research: keep the game running after its benchmark result appears (until it exits or --seconds)")
+    parser.add_argument("--focus-keys", type=parse_focus_keys, metavar="SECONDS:KEY,...",
+                        help="Research, intrusive: brings DiRT 3 to the front and presses real keys (scan codes) at the given "
+                             "seconds after start; keys are only sent while the game is the foreground window")
     parser.add_argument("--direct-laps", type=int, choices=range(1, 21), metavar="N",
                         help="With --direct-practice: the renderer sets the race to N laps (DIRT3VR_DIRECT_LAPS)")
     parser.add_argument("--research-laps", type=int, choices=range(1, 21), metavar="N",
@@ -454,7 +531,7 @@ def main() -> int:
                  "serialRender": args.serial_render, "replayPair": args.replay_pair,
                  "xrRuntime": xr_runtime, "backgroundPlay": args.background_play, "researchPatch": args.research_patch,
                  "spectatorHumanSwitch": args.spectator_human_switch, "directPractice": args.direct_practice,
-                 "playerHardwareSettings": args.player_hardware_settings, "directLaps": args.direct_laps,
+                 "playerHardwareSettings": args.player_hardware_settings, "directLaps": args.direct_laps, "directReturn": args.direct_return,
                  "durationSeconds": args.seconds}
     if restrictions:
         preflight["restrictionsOriginalSha256"] = hashlib.sha256(restrictions[0]).hexdigest()
@@ -514,6 +591,8 @@ def main() -> int:
             env["DIRT3VR_DIRECT_PRACTICE"] = "1"
         if args.direct_laps:
             env["DIRT3VR_DIRECT_LAPS"] = str(args.direct_laps)
+        if args.direct_return:
+            env["DIRT3VR_DIRECT_RETURN"] = "1"
         if args.screenshots:
             env["DIRT3VR_SCREENSHOT_SECONDS"] = args.screenshots
         if args.research_laps:
@@ -528,8 +607,15 @@ def main() -> int:
         save_json(run / "run.json", report)
         print(f"Diagnostic running: pid={process.pid}; log directory={run}", flush=True)
         result_seen_at = None
+        pending_keys = list(args.focus_keys or [])
+        if args.focus_keys:
+            report["focusKeys"] = []
         while process.poll() is None and time.monotonic() - started < args.seconds:
-            time.sleep(1)
+            time.sleep(0.2 if pending_keys else 1)
+            while pending_keys and time.monotonic() - started >= pending_keys[0][0]:
+                _, key = pending_keys.pop(0)
+                report["focusKeys"].append({"key": key, "atSeconds": round(time.monotonic() - started, 2),
+                                            "result": press_in_focused_game(process.pid, key)})
             if (xr_runtime and not report.get("xrShutdownRequested")
                     and time.monotonic() - started >= min(90, args.seconds - 10)):
                 # The benchmark may exit naturally. Stop XR while its render thread
@@ -539,7 +625,7 @@ def main() -> int:
                 report["xrShutdownAcknowledged"] = request_xr_shutdown(process, run)
             if benchmark_results.exists() and any(benchmark_results.glob(f"DiRT3VR_{run_id}*")):
                 result_seen_at = result_seen_at or time.monotonic()
-                if time.monotonic() - result_seen_at >= 5:
+                if time.monotonic() - result_seen_at >= 5 and not (args.stay_after_result or args.direct_return):
                     break  # Allow the game to finish flushing its completed result.
         if process.poll() is None:
             if xr_runtime and not report.get("xrShutdownAcknowledged"):
@@ -570,6 +656,11 @@ def main() -> int:
                     bmp.unlink()
                 except (OSError, ValueError) as error:
                     report["errors"].append("Screenshot conversion failed: " + str(error))
+        if args.direct_return:
+            report["directReturnInstalled"] = "Direct practice return: the finish leads back to DiRT 3's menus" in logs
+            report["directReturnBenchmarkEnded"] = "benchmark mode off, heading to DiRT 3's menus" in logs
+            if not report["directReturnInstalled"]:
+                report["errors"].append("Return to menus was requested but the renderer did not install it")
         if args.direct_laps:
             report["directLapsWritten"] = f"Direct practice laps: benchmark count 0 -> {args.direct_laps}" in logs
             if not report["directLapsWritten"]:

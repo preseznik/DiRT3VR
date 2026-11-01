@@ -126,12 +126,40 @@ fullscreen, vsync, 4× MSAA, 120 Hz in the result), completed normally, and left
 byte-identical. The launcher's direct practice uses it, so VR's temporary graphics
 changes and quality choices apply as in normal play.
 
+## How a session ends
+
+Run 18 (AI, 1 lap, `--screenshots`): after the finish line the game shows a letterboxed
+finish camera with the time animating in for about 8 s. It then writes the benchmark
+result (the track counter `+0xefc` reaches `+0xef8`, `0x6a8720`) and quits to the desktop
+by itself, with exit code 0. There is no results screen, Restart or return to the menus;
+the launcher's cleanup runs after the exit.
+
+The quit is code, not the flow files: after the last track `0x6a87d8` writes the result
+and, for a command-line benchmark (config `+0x81`), `0x6a87ec` calls `ExitProcess(0)`.
+`flow.bin` itself would take a `skipfe` race back to the main menu
+(`last_raced_career_decision` → `skipfe` → `exit_zone` → `main_cutscene`).
+
+`DIRT3VR_DIRECT_RETURN=1` makes the renderer jump past that call (the `je` at RVA
+`0x2a87e4`, byte-checked with the relocated import slot) and, on the first Present after
+the result is written (completed tracks `+0xefc` reach requested `+0xef8`), switches the
+benchmark flags `+0x80` and `+0x81` off, so the menus and any race started from them run
+as a normal session. Run 20 (the jump alone) and run 21 (`--direct-return`, real
+renderer, AI driving) went from the finish camera to DiRT 3's main menu and stayed there.
+That the menus then behave normally (starting another event, Exit) still needs real input.
+
+Pause is blocked deliberately: the race's next-state check (`0x51f3f0`) returns "pause"
+when a pause is requested, except while the benchmark flag is set (`0x51f456`).
+
+Run 19 posted Esc to the game window at 40 s: no pause menu appeared and the timer kept
+running. That doesn't settle whether the benchmark can pause: DiRT 3 reads the keyboard
+directly, so window messages likely never reach it. The pause menu still has to be checked
+with real input.
+
 ## Still open
 
-- How a direct session ends: the benchmark counts finished tracks (`+0xefc` against
-  `+0xef8`, `0x6a8720`) and writes its result file; what happens after a player finishes
-  (restart, results, return to menus) is not yet observed. DiRT2VR patched
-  `flow.bin`/`states.bin` for a finish menu.
+- Verify with real input that the menus work after a return, and allow the pause menu
+  (`0x51f456`) and check what its entries do in a benchmark start. A Restart at the finish
+  would need more (DiRT2VR patched `flow.bin`/`states.bin` for a finish menu).
 - Opponents (more `<car>` entries, as DiRT2VR's race grid), and which disciplines and
   routes start correctly. The event catalog is #5b02d01b.
 - Not yet tried in VR.
