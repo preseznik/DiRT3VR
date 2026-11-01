@@ -22,7 +22,7 @@ import xml.etree.ElementTree as ET
 import zlib
 
 import diagnostic_files
-from diagnostic_files import (DiagnosticFiles, RESTRICTIONS_NAME, SEAT_NAME, SPECTATOR_NAME, preflight_replacement, no_links,
+from diagnostic_files import (DiagnosticFiles, FLOW_NAME, RESTRICTIONS_NAME, SEAT_NAME, SPECTATOR_NAME, preflight_replacement, no_links,
                               preflight_serial_render, replace_verified, restore_xml_formatting, save_json, sha256)
 
 EXPECTED_EXE = "c502b495bb34a097440756769c80dcb36a79b618943f739e20d591d54171ff98"
@@ -469,7 +469,7 @@ def restore_player_hardware(target: Path, backup: Path, original_hash: str, reta
 
 def protected_state(game: Path) -> dict[str, str]:
     paths = [game / "dirt3_game.exe", game / "steam_api.dll",
-             game / RESTRICTIONS_NAME, game / SPECTATOR_NAME, game / SEAT_NAME,
+             game / RESTRICTIONS_NAME, game / SPECTATOR_NAME, game / SEAT_NAME, game / FLOW_NAME,
              game / "hardwaresettings/hardware_settings_config.xml",
              game / "hardwaresettings/hardware_settings_info.xml"]
     documents = documents_dir() / "My Games/DiRT3"
@@ -512,6 +512,9 @@ def main() -> int:
     parser.add_argument("--car", metavar="CODE", help="The (first) car, a catalog code; default frx, or the route discipline's first car")
     parser.add_argument("--opponents", type=int, default=0, metavar="N",
                         help="Add N more cars (0-7) of the route's discipline from the catalog")
+    parser.add_argument("--load-profile", action="store_true",
+                        help="Research: journaled system/flow.bin change that makes the benchmark start load the player's "
+                             "profile (skipfe normally skips it)")
     parser.add_argument("--seat-test", type=parse_seat_offset, metavar="SIDE,UP,FORWARD",
                         help="Research: journaled change of cars/models/frx/cameras.xml that starts the car in its cockpit "
                              "view with the eye point moved by these metres (0,0,0 = cockpit start only)")
@@ -593,6 +596,7 @@ def main() -> int:
             parser.error("--seat-test changes the frx camera file; use the frx as the (first) car")
         diagnostic_files.SEAT_TEST_OFFSET = args.seat_test
     seat = preflight_replacement(game, SEAT_NAME) if args.seat_test is not None else None
+    profile_flow = preflight_replacement(game, FLOW_NAME) if args.load_profile else None
     preflight = {"gameSha256": EXPECTED_EXE, "proxySha256": hashlib.sha256(proxy_bytes).hexdigest(),
                  "mode": "headset-prototype" if xr_runtime else "desktop-eye-replay" if args.replay_pair else "desktop-observation",
                  "stereo": False, "sceneObserver": args.scene_observer,
@@ -638,6 +642,8 @@ def main() -> int:
             transaction.apply_replacement(SPECTATOR_NAME, spectator[0])
         if seat:
             transaction.apply_replacement(SEAT_NAME, seat[0])
+        if profile_flow:
+            transaction.apply_replacement(FLOW_NAME, profile_flow[0])
         if args.player_hardware_settings:
             # The game reads and rewrites this file; its original is in protected-originals.
             hardware_name = hardware_source.name

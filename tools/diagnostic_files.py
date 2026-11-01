@@ -121,12 +121,38 @@ def seat_test(data: bytes) -> bytes:
     return seat_cameras.offset_seat(seat_cameras.start_in_cockpit(data), *SEAT_TEST_OFFSET)
 
 
+FLOW_NAME = "system/flow.bin"
+FLOW_SHA256 = "270e958a75df8845e5d22560cb5a436fd1ea8e589ebfcbfa13f1a76205526f20"
+
+
+def profile_load_redirect(data: bytes) -> bytes:
+    """Research: send a skipfe start through the normal profile load.
+
+    The skipfe-only node 32e (profile_reset_p2) links next to 10 (clear_pchange_select),
+    skipping C (create_protected_data_context) -> load_profile_dataset_to_ep ->
+    begin_load_profile -> wait_for_load_profile, which the normal start runs and which
+    leads back to 10. Only that one link target changes."""
+    if hashlib.sha256(data).hexdigest() != FLOW_SHA256:
+        raise ValueError("Unexpected flow.bin")
+    document = seat_cameras.decode(data, max_bytes=4 * 1024 * 1024)
+    nodes = {document.attributes_of(i).get("id"): i for i in range(len(document.elements)) if document.name(i) == "node"}
+    if (document.attributes_of(nodes["32e"]).get("state") != "profile_reset_p2"
+            or document.attributes_of(nodes["C"]).get("state") != "create_protected_data_context"):
+        raise ValueError("Unexpected flow.bin profile nodes")
+    links = [c for c in document.children(nodes["32e"]) if document.name(c) == "link"]
+    if len(links) != 1 or document.attributes_of(links[0]) != {"id": "next", "target": "10", "type": "exit_cross_fade"}:
+        raise ValueError("Unexpected skipfe profile link")
+    document.set_attribute(links[0], "target", "C")
+    return seat_cameras.encode(document)
+
+
 # Every replaceable original: its pinned hash (looked up when used, so tests can pin
 # fixtures), backup prefix and exact applied transform.
 REPLACEMENTS = {
     RESTRICTIONS_NAME: ("RESTRICTIONS_SHA256", "restrictions-original", serial_render_restrictions),
     SPECTATOR_NAME: ("SPECTATOR_SHA256", "spectator-original", spectator_human_switch),
     SEAT_NAME: ("SEAT_SHA256", "seat-original", seat_test),
+    FLOW_NAME: ("FLOW_SHA256", "flow-original", profile_load_redirect),
 }
 
 
