@@ -64,6 +64,7 @@ Public Class OwnedFileTransaction
     Private Function TargetPath(target As String) As String
         Select Case target
             Case "proxy" : Return Path.Combine(context.GameRoot, "d3d11.dll")
+            Case "direct" : Return DirectPractice.ConfigPath(context)
             Case "graphics" : Return context.GraphicsPath
             Case "restrictions" : Return Path.Combine(context.GameRoot, "system", "hardware_settings_restrictions.xml")
             Case "startup" : Return Path.Combine(context.GameRoot, "system", "states.bin")
@@ -78,10 +79,13 @@ Public Class OwnedFileTransaction
         Dim hasStartup = changes.ContainsKey("startup")
         Dim quality = GraphicsCatalog.Current.Normalize(vrQuality)
         If quality.Count > 0 AndAlso Not (experimental AndAlso changes.ContainsKey("graphics")) Then Throw New IOException("VR graphics quality belongs to a VR session.")
-        Dim journal As New RecoveryJournal With {.Schema = If(hasStartup, 3, If(experimental, 2, 1)), .InstallId = context.Id, .GraphicsPath = context.GraphicsPath, .GraphicsQuality = If(quality.Count > 0, quality, Nothing)}
+        ' Schema 4: a VR session with a direct practice config (and optionally startup).
+        Dim hasDirect = changes.ContainsKey("direct")
+        If hasDirect AndAlso Not experimental Then Throw New IOException("Direct practice belongs to a VR session.")
+        Dim journal As New RecoveryJournal With {.Schema = If(hasDirect, 4, If(hasStartup, 3, If(experimental, 2, 1))), .InstallId = context.Id, .GraphicsPath = context.GraphicsPath, .GraphicsQuality = If(quality.Count > 0, quality, Nothing)}
         Dim prepared = journal.Schema >= 2
         If experimental Then
-            Dim required = If(hasStartup, {"graphics", "proxy", "restrictions", "startup"}, {"graphics", "proxy", "restrictions"})
+            Dim required = {"graphics", "proxy", "restrictions"}.Concat(If(hasStartup, {"startup"}, Array.Empty(Of String)())).Concat(If(hasDirect, {"direct"}, Array.Empty(Of String)())).Order().ToArray()
             If Not changes.Keys.Order().SequenceEqual(required) Then Throw New IOException("The experimental session requires its complete set of fixed targets.")
         ElseIf hasStartup AndAlso Not changes.Keys.SequenceEqual({"startup"}) Then
             Throw New IOException("A desktop startup session may change only the startup movie definitions.")
@@ -92,13 +96,15 @@ Public Class OwnedFileTransaction
             SafeFiles.NoLinks(target)
             If pair.Key = "restrictions" AndAlso Not experimental Then Throw New IOException("Restrictions require an experimental session journal.")
             If pair.Key = "proxy" AndAlso File.Exists(target) Then Throw New IOException("An existing d3d11.dll was preserved. Another graphics mod must be removed using its own instructions.")
-            If prepared AndAlso pair.Key <> "proxy" AndAlso Not File.Exists(target) Then Throw New IOException("The original settings file is missing: " & target)
+            If pair.Key = "direct" AndAlso File.Exists(target) Then Throw New IOException("A " & DirectPractice.FileName & " already exists in the game folder; it was preserved. Remove it if it isn't needed, then launch again.")
+            If prepared AndAlso Not Created(pair.Key) AndAlso Not File.Exists(target) Then Throw New IOException("The original settings file is missing: " & target)
             If prepared Then ValidateApplied(pair.Key, If(File.Exists(target), File.ReadAllBytes(target), Array.Empty(Of Byte)()), pair.Value, journal.GraphicsQuality)
         Next
         For Each pair In changes
             Dim target = TargetPath(pair.Key)
             SafeFiles.NoLinks(target)
             If pair.Key = "proxy" AndAlso File.Exists(target) Then Throw New IOException("An existing d3d11.dll was preserved. Another graphics mod must be removed using its own instructions.")
+            If pair.Key = "direct" AndAlso File.Exists(target) Then Throw New IOException("A " & DirectPractice.FileName & " already exists in the game folder; it was preserved.")
             Dim entry As New RecoveryEntry With {.Target = pair.Key, .OriginalExists = File.Exists(target), .AppliedHash = SafeFiles.HashBytes(pair.Value), .Backup = Guid.NewGuid().ToString("N") & ".bin"}
             If entry.OriginalExists Then
                 ' Read-only files stay read-only while applied (WriteAtomic keeps attributes); recovery puts the recorded flag back.
@@ -146,6 +152,7 @@ Public Class OwnedFileTransaction
                 expected = ExperimentalFiles.Graphics(original, size.Width, size.Height, vrQuality)
             Case "restrictions" : expected = ExperimentalFiles.Restrictions(original)
             Case "startup" : expected = StartupMovies.Patch(original)
+            Case "direct" : DirectPractice.Validate(applied) : expected = applied
             Case "proxy"
                 Dim payload = Path.Combine(context.PackageRoot, "payload", "d3d11.dll")
                 SafeFiles.NoLinks(payload) : expected = File.ReadAllBytes(payload)
@@ -156,7 +163,7 @@ Public Class OwnedFileTransaction
 
     Private Function LoadJournal() As RecoveryJournal
         Dim journal = SafeFiles.ReadJson(Of RecoveryJournal)(JournalPath)
-        If Not {1, 2, 3}.Contains(journal.Schema) OrElse journal.InstallId <> context.Id OrElse journal.Entries Is Nothing OrElse journal.Entries.Count < 1 OrElse journal.Entries.Count > If(journal.Schema = 3, 4, If(journal.Schema = 2, 3, 2)) OrElse journal.Entries.Any(Function(entry) entry Is Nothing) OrElse journal.Entries.Select(Function(e) e.Target).Distinct().Count() <> journal.Entries.Count Then Throw New IOException("Invalid recovery journal. Backups were preserved.")
+        If Not {1, 2, 3, 4}.Contains(journal.Schema) OrElse journal.InstallId <> context.Id OrElse journal.Entries Is Nothing OrElse journal.Entries.Count < 1 OrElse journal.Entries.Count > If(journal.Schema = 4, 5, If(journal.Schema = 3, 4, If(journal.Schema = 2, 3, 2))) OrElse journal.Entries.Any(Function(entry) entry Is Nothing) OrElse journal.Entries.Select(Function(e) e.Target).Distinct().Count() <> journal.Entries.Count Then Throw New IOException("Invalid recovery journal. Backups were preserved.")
         If Not String.Equals(journal.GraphicsPath, context.GraphicsPath, StringComparison.OrdinalIgnoreCase) Then Throw New IOException("Graphics recovery belongs to the Windows account that started this session. The original backup was preserved.")
         Dim targets = journal.Entries.Select(Function(entry) entry.Target).Order().ToArray()
         Select Case journal.Schema
@@ -166,8 +173,15 @@ Public Class OwnedFileTransaction
                 If Not targets.SequenceEqual({"graphics", "proxy", "restrictions"}) Then Throw New IOException("Incomplete experimental recovery journal.")
             Case 3
                 If Not targets.SequenceEqual({"startup"}) AndAlso Not targets.SequenceEqual({"graphics", "proxy", "restrictions", "startup"}) Then Throw New IOException("Incomplete startup recovery journal.")
+            Case 4
+                If Not targets.SequenceEqual({"direct", "graphics", "proxy", "restrictions"}) AndAlso Not targets.SequenceEqual({"direct", "graphics", "proxy", "restrictions", "startup"}) Then Throw New IOException("Incomplete direct practice recovery journal.")
         End Select
         Return journal
+    End Function
+
+    ' Targets DiRT3VR creates for a session (no original to back up; recovery deletes them).
+    Private Shared Function Created(target As String) As Boolean
+        Return target = "proxy" OrElse target = "direct"
     End Function
 
     Private Shared Function ValidBackup(name As String) As Boolean
@@ -324,7 +338,7 @@ Public Class OwnedFileTransaction
             If Not ValidBackup(entry.Backup) Then Throw New IOException("Invalid recovery backup name.")
             If entry.AppliedHash Is Nothing OrElse entry.OriginalHash Is Nothing OrElse Not System.Text.RegularExpressions.Regex.IsMatch(entry.AppliedHash, "\A[a-f0-9]{64}\z") OrElse (entry.OriginalExists AndAlso Not System.Text.RegularExpressions.Regex.IsMatch(entry.OriginalHash, "\A[a-f0-9]{64}\z")) Then Throw New IOException("Invalid recovery hashes.")
             If (entry.Target = "restrictions" OrElse entry.Target = "startup") AndAlso journal.Schema = 1 Then Throw New IOException("Invalid legacy recovery target.")
-            If journal.Schema >= 2 AndAlso (entry.OriginalExists <> (entry.Target <> "proxy")) Then Throw New IOException("Invalid original-file ownership.")
+            If journal.Schema >= 2 AndAlso entry.OriginalExists = Created(entry.Target) Then Throw New IOException("Invalid original-file ownership.")
             If entry.OriginalExists Then
                 Dim backup = Path.Combine(Folder, entry.Backup)
                 SafeFiles.NoLinks(backup)

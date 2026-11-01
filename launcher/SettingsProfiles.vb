@@ -19,6 +19,9 @@ Public Class ProfileValues
     ' (desktop) or the same as desktop (VR).
     Public Property GraphicsQuality As New Dictionary(Of String, String)
     Public Property VrGraphicsQuality As New Dictionary(Of String, String)
+    Public Property LaunchMode As String = "normal"
+    Public Property DirectRoute As Integer
+    Public Property DirectCar As String = ""
 
     Public Shared Function Capture(value As LauncherSettings) As ProfileValues
         value.Validate()
@@ -29,7 +32,8 @@ Public Class ProfileValues
             .DesktopDisplayMode = value.DesktopDisplayMode, .DesktopVSync = value.DesktopVSync, .SkipStartupMovies = value.SkipStartupMovies,
             .RecenterKey = value.RecenterKey, .RecenterModifiers = value.RecenterModifiers,
             .GraphicsQuality = New Dictionary(Of String, String)(value.GraphicsQuality),
-            .VrGraphicsQuality = New Dictionary(Of String, String)(value.VrGraphicsQuality)}
+            .VrGraphicsQuality = New Dictionary(Of String, String)(value.VrGraphicsQuality),
+            .LaunchMode = value.LaunchMode, .DirectRoute = value.DirectRoute, .DirectCar = value.DirectCar}
     End Function
 
     Public Function ApplyTo(local As LauncherSettings) As LauncherSettings
@@ -42,7 +46,8 @@ Public Class ProfileValues
             .DesktopDisplayMode = DesktopDisplayMode, .DesktopVSync = DesktopVSync, .SkipStartupMovies = SkipStartupMovies,
             .RecenterKey = RecenterKey, .RecenterModifiers = RecenterModifiers,
             .GraphicsQuality = New Dictionary(Of String, String)(If(GraphicsQuality, New Dictionary(Of String, String))),
-            .VrGraphicsQuality = New Dictionary(Of String, String)(If(VrGraphicsQuality, New Dictionary(Of String, String)))}
+            .VrGraphicsQuality = New Dictionary(Of String, String)(If(VrGraphicsQuality, New Dictionary(Of String, String))),
+            .LaunchMode = If(LaunchMode, "normal"), .DirectRoute = DirectRoute, .DirectCar = If(DirectCar, "")}
         result.Validate()
         Return result
     End Function
@@ -63,6 +68,7 @@ Public Class SettingsProfile
         If Schema = 1 AndAlso Settings.SkipStartupMovies Then Throw New IOException("Startup choices require settings profile schema 2.")
         If Schema < 3 AndAlso (Settings.RecenterKey <> RecenterShortcut.DefaultKey OrElse Settings.RecenterModifiers <> 0) Then Throw New IOException("Recenter keys require settings profile schema 3.")
         If Schema < 4 AndAlso ((Settings.GraphicsQuality IsNot Nothing AndAlso Settings.GraphicsQuality.Count > 0) OrElse (Settings.VrGraphicsQuality IsNot Nothing AndAlso Settings.VrGraphicsQuality.Count > 0)) Then Throw New IOException("Graphics quality choices require settings profile schema 4.")
+        If Schema < 4 AndAlso (If(Settings.LaunchMode, "normal") <> "normal" OrElse Settings.DirectRoute <> 0 OrElse If(Settings.DirectCar, "") <> "") Then Throw New IOException("Direct practice requires settings profile schema 4.")
         Settings.ApplyTo(New LauncherSettings())
     End Sub
 End Class

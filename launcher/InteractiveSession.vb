@@ -50,6 +50,11 @@ Public Class InteractiveSession
         End If
         start.Environment("XR_RUNTIME_JSON") = runtime.ManifestPath
         VrApiLayers.Configure(start, layers)
+        If settings.LaunchMode = "direct" Then
+            ' The renderer keeps the benchmark's car under the player's control (#a1d31909).
+            start.Environment("DIRT3VR_DIRECT_PRACTICE") = "1"
+            start.ArgumentList.Add("-benchmark") : start.ArgumentList.Add(DirectPractice.FileName)
+        End If
         Return start
     End Function
 
@@ -85,7 +90,9 @@ Public Class InteractiveSession
             ' VR transaction below records the quality-applied file as the original to restore.
             DesktopGraphics.Apply(context, DesktopGraphics.QualityOnly(settings), Drawing.Size.Empty)
             ' VR-only quality goes into the session's temporary graphics changes and is undone when VR ends.
-            Dim changes = ExperimentalFiles.Changes(context, scene.Width, scene.Height, settings.SkipStartupMovies, settings.VrGraphicsQuality)
+            Dim changes = ExperimentalFiles.Changes(context, scene.Width, scene.Height, settings.SkipStartupMovies, settings.VrGraphicsQuality).ToDictionary(Function(pair) pair.Key, Function(pair) pair.Value)
+            ' Direct practice: DiRT 3's benchmark start on the chosen route, removed with the other changes.
+            If settings.LaunchMode = "direct" Then changes.Add("direct", DirectPractice.Config(settings))
             directory = Path.Combine(context.UserRoot, "logs", "session-" & Guid.NewGuid().ToString("N"))
             SafeFiles.NoLinks(directory) : IO.Directory.CreateDirectory(directory)
             settings.Save(context)
@@ -96,7 +103,7 @@ Public Class InteractiveSession
             game = Process.Start(StartInfo(context, runtime, directory, settings, headset, preflight.Bypasses))
             If game Is Nothing Then Throw New IOException("DiRT 3 could not start.")
             Dim result As New InteractiveSession(context, game, directory, lease)
-            SafeFiles.SaveJson(Path.Combine(directory, "session.json"), New With {.schema = 1, .mode = "experimental-interactive", .processId = game.Id, .startedUtc = result.StartedUtc, .runtime = runtime.Mode, .vrRenderScale = settings.VrRenderScale, .headsetWidth = headset.Width, .headsetHeight = headset.Height, .sceneWidth = scene.Width, .sceneHeight = scene.Height, .stereoVerified = False, .disabledApiLayers = preflight.Bypasses.Select(Function(layer) layer.LayerName).ToArray(), .layerWarning = preflight.Warning})
+            SafeFiles.SaveJson(Path.Combine(directory, "session.json"), New With {.schema = 1, .mode = "experimental-interactive", .processId = game.Id, .startedUtc = result.StartedUtc, .runtime = runtime.Mode, .vrRenderScale = settings.VrRenderScale, .headsetWidth = headset.Width, .headsetHeight = headset.Height, .sceneWidth = scene.Width, .sceneHeight = scene.Height, .stereoVerified = False, .launchMode = settings.LaunchMode, .directRoute = If(settings.LaunchMode = "direct", settings.DirectRoute, 0), .directCar = If(settings.LaunchMode = "direct", settings.DirectCar, ""), .disabledApiLayers = preflight.Bypasses.Select(Function(layer) layer.LayerName).ToArray(), .layerWarning = preflight.Warning})
             Session.WriteLaunchStatus(context, "starting", "Waiting for the game window and native headset output.", game.Id, result.StartedUtc, mode:="experimental-interactive")
             Return result
         Catch ex As Exception
@@ -193,6 +200,7 @@ Public Class InteractiveSession
             Await Game.WaitForExitAsync()
             Dim exitCode = Game.ExitCode
             Dim restored As Boolean
+            DirectPractice.RemoveResults(context)
             Try
                 restored = Await RecoveryWorker.RecoverAsync(context)
             Catch ex As Exception

@@ -167,6 +167,10 @@ Public Class LauncherSettings
     Public Property GraphicsQuality As New Dictionary(Of String, String)
     ' VR-only quality per field, applied inside the VR session's temporary changes; absent = same as desktop.
     Public Property VrGraphicsQuality As New Dictionary(Of String, String)
+    ' "normal" (DiRT 3's menus) or "direct" (direct practice: straight onto DirectRoute with DirectCar).
+    Public Property LaunchMode As String = "normal"
+    Public Property DirectRoute As Integer
+    Public Property DirectCar As String = ""
     ' Optional controller/wheel button; machine-specific, so never part of settings profiles.
     Public Property RecenterDevice As RecenterDeviceBinding
 
@@ -182,6 +186,10 @@ Public Class LauncherSettings
         DesktopGraphics.Validate(Me)
         GraphicsQuality = GraphicsCatalog.Current.Normalize(GraphicsQuality)
         VrGraphicsQuality = GraphicsCatalog.Current.Normalize(VrGraphicsQuality)
+        If LaunchMode <> "normal" AndAlso LaunchMode <> "direct" Then Throw New IOException("Choose Normal launch or Direct practice.")
+        If DirectRoute <> 0 AndAlso EventCatalog.Current.FindRoute(DirectRoute) Is Nothing Then Throw New IOException("Choose a listed route for direct practice.")
+        If DirectCar Is Nothing OrElse (DirectCar <> "" AndAlso EventCatalog.Current.FindCar(DirectCar) Is Nothing) Then Throw New IOException("Choose a listed car for direct practice.")
+        If LaunchMode = "direct" AndAlso (DirectRoute = 0 OrElse DirectCar = "") Then Throw New IOException("Choose a route and a car for direct practice.")
     End Sub
 
     Public Shared Function Load(context As InstallContext) As LauncherSettings
