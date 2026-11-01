@@ -86,9 +86,33 @@ no prompt blocked the start, the race began normally, and the Steam Cloud saves 
 unchanged. Whether the profile actually loaded is still open: the difficulty lookup
 still answered 0 (which may be iztok's real setting), and Steam Cloud reads don't show
 up in the in-process file trace (runs 45/46 opened the same 1263 files with and without
-the change). Next: iztok's real difficulty level, or a research hook on
-`StateBeginLoad` (factory `0x523f60`, vtable `0xe9cb28`; overridden slots 1, 2, 3, 6, 7
-against the base vtable `0xe90028`) to log that the load runs.
+the change). iztok's profile is at difficulty level 1 of 6 (star 0) with all
+assists off (Custom), so difficulty can't tell a loaded profile from the defaults.
+
+Research traces (`run_benchmark.py --settings-trace`, research renderer only):
+- the profile-setting lookup `0x5ba530` is only asked for `difficulty` in a direct
+  session (0 in runs 47/48, with and without the redirect);
+- `ISteamRemoteStorage` (version 012) `FileRead`/`FileExists`/`GetFileSize` hooks saw no
+  Steam Cloud access at all in runs 49/50, with or without the redirect.
+
+Positive control, run 51 (`--normal-start`, Enter at Press Start; focus test with
+iztok's OK): the normal start checks and reads all of the profile's Steam Cloud files
+through `ISteamRemoteStorage` (`FileExists`/`GetFileSize`/`FileRead`
+`savegame@profile0#QKRHMYXE`, then 18 more, the largest ~279 KB). So the trace works, and
+**the redirect at `32e` does not load the profile.**
+
+Why: the benchmark start takes `skip_no_garage` at the first `skipfe_decision` (`n`), to
+`32o`: `start_dlc_timer` → DLC enumerate/reset/load/restrictions → `wait_dlc_timer…`
+(`32t`) → `shutters_slide_off` (`32u`) → `update_in_network_game` (`2Q`) → race. That
+route has no profile reset or load at all; `32e` is on the `skip` branch it never takes.
+
+Next: a profile load on the `skip_no_garage` route. The existing load nodes (`C` →
+`D` → `E` → `F` → `G`) are shared with the normal start and continue into the front end
+(garage, main menu), which this route never loads, so they can't simply be linked to.
+The fix is DiRT2VR's: copies of those nodes with new ids (same `state` names), inserted
+after `32t`/`32u` and returning to `2Q`. In the binary flow file that means inserting
+elements and renumbering the element table's child ranges, a bigger edit than changing a
+value.
 
 ## Recommendation
 

@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <MinHook.h>
 #include <atomic>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
@@ -43,6 +44,84 @@ void InstallFileTrace(void (*log)(const char*,...)) {
     const auto enabled=MH_EnableHook(MH_ALL_HOOKS);
     log("Research file trace installed wide=%d narrow=%d enabled=%d",wide,narrow,enabled);
 }
+
+// Profile settings trace: 0x5ba530 looks a named setting up in the loaded profile's settings
+// (e.g. "difficulty"; -1 when absent). Logs each distinct name=value once.
+using SettingFn=int(__thiscall*)(void*,const char*);
+SettingFn realSetting{};
+std::mutex settingsMutex;
+std::string settingsSeen;
+int __fastcall TraceSetting(void* self,void*,const char* name) {
+    const int value=realSetting(self,name);
+    if(name && traceLog) {
+        char entry[160];
+        std::snprintf(entry,sizeof(entry),"|%.120s=%d|",name,value);
+        std::lock_guard lock(settingsMutex);
+        if(settingsSeen.size()<64*1024 && settingsSeen.find(entry)==std::string::npos) {
+            settingsSeen+=entry;
+            traceLog("Research setting %.120s=%d",name,value);
+        }
+    }
+    return value;
+}
+// Steam Cloud trace: profile saves are read through ISteamRemoteStorage (version 012 in this
+// game's steam_api.dll), not ordinary file opens. Logs each name passed to FileRead (slot 1),
+// FileExists (10) and GetFileSize (12) once, with the result.
+using NameFn=int(__thiscall*)(void*,const char*);
+using ReadFn=int(__thiscall*)(void*,const char*,void*,int);
+ReadFn realFileRead{};
+NameFn realFileExists{},realFileSize{};
+std::string cloudSeen;
+void CloudLog(const char* call,const char* name,int result) {
+    if(!name || !traceLog) return;
+    char entry[200];
+    std::snprintf(entry,sizeof(entry),"|%s %.150s|",call,name);
+    std::lock_guard lock(settingsMutex);
+    if(cloudSeen.size()<64*1024 && cloudSeen.find(entry)==std::string::npos) {
+        cloudSeen+=entry;
+        traceLog("Research cloud %s %.150s -> %d",call,name,result);
+    }
+}
+int __fastcall CloudFileRead(void* self,void*,const char* name,void* data,int size) {
+    const int result=realFileRead(self,name,data,size); CloudLog("FileRead",name,result); return result;
+}
+int __fastcall CloudFileExists(void* self,void*,const char* name) {
+    const int result=realFileExists(self,name); CloudLog("FileExists",name,result&0xff); return result;
+}
+int __fastcall CloudFileSize(void* self,void*,const char* name) {
+    const int result=realFileSize(self,name); CloudLog("GetFileSize",name,result); return result;
+}
+void InstallCloudTrace(void (*log)(const char*,...)) {
+    wchar_t flag[8]{};
+    if(GetEnvironmentVariableW(L"DIRT3VR_RESEARCH_SETTINGS_TRACE",flag,8)!=1 || flag[0]!=L'1') return;
+    const HMODULE steam=GetModuleHandleW(L"steam_api.dll");
+    using StorageFn=void*(__cdecl*)();
+    const auto storage=steam ? reinterpret_cast<StorageFn>(GetProcAddress(steam,"SteamRemoteStorage")) : nullptr;
+    void* remote=storage ? storage() : nullptr;
+    if(!remote) { log("Research cloud trace unavailable: no SteamRemoteStorage"); return; }
+    traceLog=log;
+    auto** table=*reinterpret_cast<void***>(remote);
+    const auto read=MH_CreateHook(table[1],reinterpret_cast<void*>(&CloudFileRead),reinterpret_cast<void**>(&realFileRead));
+    const auto exists=MH_CreateHook(table[10],reinterpret_cast<void*>(&CloudFileExists),reinterpret_cast<void**>(&realFileExists));
+    const auto size=MH_CreateHook(table[12],reinterpret_cast<void*>(&CloudFileSize),reinterpret_cast<void**>(&realFileSize));
+    const auto enabled=MH_EnableHook(MH_ALL_HOOKS);
+    log("Research cloud trace installed read=%d exists=%d size=%d enabled=%d",read,exists,size,enabled);
+}
+
+void InstallSettingsTrace(void (*log)(const char*,...)) {
+    wchar_t flag[8]{};
+    if(GetEnvironmentVariableW(L"DIRT3VR_RESEARCH_SETTINGS_TRACE",flag,8)!=1 || flag[0]!=L'1') return;
+    static const uint8_t entry[]{0x55,0x8b,0xec,0x53,0x56,0x8b,0xf1,0x8b,0x46,0x08,0x83,0xcb,0xff,0x85,0xc0,0x74};
+    auto* target=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr))+0x1ba530;
+    if(std::memcmp(target,entry,sizeof(entry))!=0) { log("Research settings trace refused: lookup instructions differ"); return; }
+    traceLog=log;
+    const auto initialized=MH_Initialize();
+    if(initialized!=MH_OK && initialized!=MH_ERROR_ALREADY_INITIALIZED) { log("Research settings trace unavailable: MinHook=%d",initialized); return; }
+    const auto created=MH_CreateHook(target,reinterpret_cast<void*>(&TraceSetting),reinterpret_cast<void**>(&realSetting));
+    const auto enabled=created==MH_OK ? MH_EnableHook(target) : created;
+    log("Research settings trace installed created=%d enabled=%d",created,enabled);
+    InstallCloudTrace(log);
+}
 }
 void Tick(void (*log)(const char*,...)) {
     static const unsigned laps=[] {
@@ -67,6 +146,7 @@ void Apply(void (*log)(const char*,...)) {
     static std::once_flag once;
     std::call_once(once,[log] {
         InstallFileTrace(log);
+        InstallSettingsTrace(log);
         char text[513]{};
         const auto length=GetEnvironmentVariableA("DIRT3VR_RESEARCH_PATCH",text,sizeof(text));
         if(!length) return;
