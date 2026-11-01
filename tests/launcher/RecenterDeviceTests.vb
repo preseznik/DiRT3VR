@@ -103,8 +103,15 @@ Module RecenterDeviceTests
         Dim headset As New HeadsetResolution("vdxr", "Test headset", 2400, 2600)
         Dim runtime As New RuntimeInfo With {.Mode = "vdxr", .ManifestPath = "C:\runtime\virtualdesktop-openxr-32.json"}
         Dim logs = Path.Combine(ctx.UserRoot, "logs", "fixture")
-        Dim game = InteractiveSession.StartInfo(ctx, runtime, logs, New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = ""}, headset)
-        check(game.Environment("DIRT3VR_RECENTER_REQUEST_FILE") = Path.Combine(logs, "recenter.request"), "the renderer is told where controller recenter requests appear")
+        Dim game = InteractiveSession.StartInfo(ctx, runtime, logs, New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = "", .RecenterDevice = found}, headset)
+        check(game.Environment("DIRT3VR_RECENTER_REQUEST_FILE") = Path.Combine(logs, "recenter.request"), "with a bound button, the renderer is told where controller recenter requests appear")
+        Environment.SetEnvironmentVariable("DIRT3VR_RECENTER_REQUEST_FILE", "C:\stale\recenter.request")
+        Try
+            Dim unbound = InteractiveSession.StartInfo(ctx, runtime, logs, New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = ""}, headset)
+            check(Not unbound.Environment.ContainsKey("DIRT3VR_RECENTER_REQUEST_FILE"), "without a bound button the renderer gets no request path (so it never polls for the file), even if one was inherited")
+        Finally
+            Environment.SetEnvironmentVariable("DIRT3VR_RECENTER_REQUEST_FILE", Nothing)
+        End Try
     End Sub
 
     Public Sub RunUi(root As String, check As Action(Of Boolean, String))

@@ -41,7 +41,12 @@ Public Class InteractiveSession
         start.Environment("DIRT3VR_LOG_DIR") = directory
         start.Environment("DIRT3VR_XR_STOP_FILE") = Path.Combine(directory, "xr-stop.request")
         ' A bound controller/wheel button asks for a recenter by creating this file; the renderer removes it.
-        start.Environment("DIRT3VR_RECENTER_REQUEST_FILE") = Path.Combine(directory, "recenter.request")
+        ' Without a binding the renderer gets no path, so it doesn't try to delete a file every frame.
+        If settings.RecenterDevice IsNot Nothing Then
+            start.Environment("DIRT3VR_RECENTER_REQUEST_FILE") = Path.Combine(directory, "recenter.request")
+        Else
+            start.Environment.Remove("DIRT3VR_RECENTER_REQUEST_FILE")
+        End If
         start.Environment("XR_RUNTIME_JSON") = runtime.ManifestPath
         VrApiLayers.Configure(start, layers)
         Return start
