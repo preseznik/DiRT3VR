@@ -1,0 +1,81 @@
+# Direct launch into an event with the player in control
+
+Target: Steam DiRT 3 Complete Edition `dirt3_game.exe`, SHA-256
+`c502b495bb34a097440756769c80dcb36a79b618943f739e20d591d54171ff98`, image base `0x400000`.
+Research for #a1d31909 (direct Practice / Race launch, #8e0203c0), 2026-10-31 to 2026-11-01.
+
+## Result
+
+DiRT 3 can start straight into a chosen track with `-benchmark <file>`, and with one
+in-memory byte change **the player drives**. iztok confirmed this in run 8
+(2026-11-01 15:38, Aspen route 0, car `frx`): the car responded to his input.
+
+The renderer applies the change with `DIRT3VR_DIRECT_PRACTICE=1` (`src/direct_practice.*`,
+native test `direct_practice_site`). `tools/run_benchmark.py --direct-practice` uses it.
+
+## How the benchmark start works
+
+- `-benchmark <file>` (and the fixed AMD showcase modes `-demo`, `-amd_g`, `-amd_v`, which
+  read `system/amd*.xml`) is parsed by `0x6aa900` into a static config object at
+  `0xf9ce70`. Attributes: `skipreplays`, `outputfilename`, `hardwaresettings`; per
+  `<track country name route>` up to 8 `<car name number>`. There is no control or laps
+  attribute.
+- The parser sets `[0xf9ce70+0x80]` = `0xf9cef0` ("benchmark active") and
+  `[+0x81]` = `0xf9cef1` (1 from the command-line parsers, 0 from the in-game graphics
+  benchmark at `0x620bc4`).
+- With both set, `0x55982c` switches the career to `skipfe` ("skip front end", career
+  ID 5) through `0x429720`. `0x604931` then takes country, track and route from the
+  benchmark config instead of `track_model.skipfe_track`. `0x61f22d` adds a benchmark
+  session object (`0x61d5d0`, vtable `0xeb7540`); the race crashes without it (run 4).
+- The hardware-settings loader reads `0xfd8a50` to use the benchmark's own settings file
+  (see `observer-followup.md`).
+
+## Why the AI drove, and the fix
+
+DiRT 3's controller update at `0xb29f80` is the exact counterpart of DiRT 2's
+`0x72a580` (DiRT2VR `src/trace.cpp`):
+
+```
+b29f9b  cmp  byte ptr [ecx+0x1c],1
+b29fa5  jne  ...
+b29fab  cmp  byte ptr [0xf9cef0],0      ; benchmark active
+b29fb2  mov  eax,[ecx+0xc]
+b29fb8  je   b29fc0                     ; 74 06  ->  EB 06
+b29fba  mov  byte ptr [ecx+0x2c],1      ; force AI
+b29fbe  jmp  b29fc4
+b29fc0  mov  byte ptr [ecx+0x2c],0
+```
+
+While the benchmark flag is set, every update forces the controller to AI. Making the
+`je` unconditional keeps the human/AI choice the game made when it created the
+participants. Outside a benchmark start the game takes that branch anyway.
+
+## What was ruled out on the way
+
+All desktop `-benchmark` runs with `--background-play`, no input sent, every file
+journaled and restored (`artifacts/diagnostics/20261101-*`):
+
+| Run | Change | Result |
+|---|---|---|
+| 2 | `[obj+0x10b8]` list kept at mode 2 (`0x6970bf`) | AI drove |
+| 3 | `cutscene/spectator_startsequence.xml` given the normal race's `Controller / Switch type="human"` | AI drove |
+| 4 | skip the benchmark session object (`0x61f234`) | crash after 20 s |
+| 5–6 | file trace | all `cutscene/*.xml` load at startup as a library |
+| 7 | start-sequence `Switch type="ai"` writes human (`0x5fc1ba`) | AI drove |
+| 8 | **`0xb29fb8` je → jmp** | **player drives (iztok)**; no result written |
+
+Useful facts from those runs: the start-sequence `Controller` event (parser `0x5e6760`,
+apply `0x5fc070`) writes the player's control mode to `[component(0xff67d8)+0x16c]`
+(0 ai, 1 human); a normal race's `startsequence.xml` switches to human at the lights.
+
+## Still open
+
+- How a direct session ends: the benchmark counts finished tracks (`+0xefc` against
+  `+0xef8`, `0x6a8720`) and writes its result file; what happens after a player finishes
+  (restart, results, return to menus) is not yet observed. DiRT2VR patched
+  `flow.bin`/`states.bin` for a finish menu.
+- Laps for circuit events, opponents (more `<car>` entries, as DiRT2VR's race grid), and
+  which disciplines and routes start correctly. The event catalog is #5b02d01b.
+- The benchmark always runs at the benchmark's hardware settings file; the launcher must
+  supply one (as `run_benchmark.py` does) or point it at the player's own file.
+- Not yet tried in VR.
