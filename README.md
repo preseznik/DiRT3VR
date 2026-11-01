@@ -139,6 +139,12 @@ Windows' 'prefer system32 images' rule applied, or Windows used its own copy
 (install the Visual C++ 2015-2022 Redistributable, x86). It refuses to start VR
 when that rule would apply anyway.
 Use **Launch VR** and select any camera through DiRT 3's native controls.
+**Launcher → Launch mode → Direct practice** starts DiRT 3 straight on a
+chosen route with your car, without the menus (discipline, route, and a car
+list with search, class filter and an option for other disciplines' cars). It
+uses DiRT 3's own benchmark start with DiRT3VR's renderer keeping you in
+control; for now it starts with Launch VR, without opponents, and laps and the
+end of the session follow the benchmark start. Normal launch stays the default.
 **Stop VR** turns the headset off and keeps DiRT 3 running on the monitor; it
 keeps the temporary VR graphics settings until it closes. **End session**
 closes DiRT 3. Either way the original files are restored once DiRT 3 closes.

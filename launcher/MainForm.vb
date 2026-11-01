@@ -48,6 +48,7 @@ Public Class MainForm
     Private ReadOnly resolutionSummary As New Label With {.Name = "VrResolutionSummary", .AutoSize = True}
     Private ReadOnly lastSessionSummary As New Label With {.Name = "LastVrSession", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12)}
     Private ReadOnly refreshHeadset As New Button With {.Name = "RefreshHeadset", .Text = "Refresh headset resolution", .AutoSize = True}
+    Private directPicker As DirectPracticePicker
     Private WithEvents desktopQuality As QualityChoices
     Private WithEvents vrQuality As QualityChoices
     Private ReadOnly potatoPreset As New Button With {.Name = "PotatoPreset", .Text = "Potato / Low-End", .AutoSize = True}
@@ -313,8 +314,10 @@ Public Class MainForm
         Dim columns As New ResponsiveColumns()
         content.Controls.Add(columns)
         Dim launch = Section(columns.First, "Launch mode")
-        launch.Controls.Add(Info("Normal Launch", True))
-        launch.Controls.Add(Info("Choose your career, event, car and track in DiRT 3. Launch uses the original desktop game and its saved settings."))
+        directPicker = New DirectPracticePicker(launch)
+        launch.Controls.Add(Info("Direct practice starts DiRT 3 straight on the chosen route with your car, through DiRT 3's own benchmark start: no menus, no opponents. For now it starts with Launch VR, and laps and the end of the session follow the benchmark start. Normal launch keeps DiRT 3's menus for careers, events and multiplayer."))
+        launch.Controls.Add(TopicLink(HelpDirect))
+        AddHandler directPicker.Changed, Sub() RefreshState()
         Dim startup = Section(columns.First, "Startup")
         startup.Controls.Add(skipStartupMovies)
         startup.Controls.Add(Info("Applies to Launch and Launch VR. Copyright and Press Start remain. DiRT3VR restores the original startup file when the game closes, also when you close this window (it stays in the notification area until then). Leave this option off for multiplayer until compatibility is checked."))
@@ -661,6 +664,7 @@ Public Class MainForm
         renderScale.Value = settings.VrRenderScale
         applyingPreset = True
         desktopQuality.Values = settings.GraphicsQuality : vrQuality.Values = settings.VrGraphicsQuality
+        directPicker.Apply(settings.LaunchMode, settings.DirectRoute, settings.DirectCar)
         applyingPreset = False
         ClearPresetUndo()
         desktopMode.SelectedIndex = Array.IndexOf({"game", "windowed", "fullscreen", "borderless"}, settings.DesktopDisplayMode)
@@ -682,7 +686,8 @@ Public Class MainForm
             .DesktopWidth = If(resolution Is Nothing, 0, resolution.Size.Width), .DesktopHeight = If(resolution Is Nothing, 0, resolution.Size.Height),
             .DesktopDisplayMode = {"game", "windowed", "fullscreen", "borderless"}(Math.Max(0, desktopMode.SelectedIndex)), .DesktopVSync = {"game", "off", "on"}(Math.Max(0, desktopVSync.SelectedIndex)), .SkipStartupMovies = skipStartupMovies.Checked,
             .RecenterKey = recenterKey, .RecenterModifiers = recenterModifiers, .RecenterDevice = recenterDevice, .RecenterKeepLevel = recenterKeepLevel.Checked,
-            .GraphicsQuality = desktopQuality.Values, .VrGraphicsQuality = vrQuality.Values}
+            .GraphicsQuality = desktopQuality.Values, .VrGraphicsQuality = vrQuality.Values,
+            .LaunchMode = directPicker.Mode, .DirectRoute = directPicker.RouteId, .DirectCar = directPicker.CarCode}
     End Function
 
     Private Sub RememberSavedSettings()
@@ -745,7 +750,8 @@ Public Class MainForm
         If Not busy AndAlso interactive IsNot Nothing AndAlso interactive.VrStopped Then state.Text = "VR stopped · DiRT 3 runs on the monitor · original files will be restored after exit."
         If background.Active Then background.UpdateStatus(state.Text)
         desktop.Text = If(running AndAlso launchProgress Is Nothing, "Show game", "Launch")
-        desktop.Enabled = Not busy AndAlso launchProgress Is Nothing AndAlso (running OrElse Not pending)
+        Dim directMode = directPicker IsNot Nothing AndAlso directPicker.Mode = "direct"
+        desktop.Enabled = Not busy AndAlso launchProgress Is Nothing AndAlso (running OrElse (Not pending AndAlso Not directMode))
         vr.Text = If(interactive IsNot Nothing, "End session", "Launch VR")
         vr.Enabled = Not busy AndAlso (interactive IsNot Nothing OrElse (Not running AndAlso Not pending AndAlso reason = ""))
         stopVrButton.Visible = interactive IsNot Nothing
@@ -756,7 +762,7 @@ Public Class MainForm
         Dim wait = If(busy, "Wait until the current task finishes.", "")
         Dim pendingReason = "Files from an earlier session still need restoring. Use Restore original files first."
         launchTips.Update(desktop, If(running AndAlso launchProgress Is Nothing, "Bring the DiRT 3 window to the front.", "Start the game with your desktop graphics choices and saved driving controls. No headset is required."),
-                          If(wait <> "", wait, If(launchProgress IsNot Nothing, "DiRT 3 is starting.", pendingReason)))
+                          If(wait <> "", wait, If(launchProgress IsNot Nothing, "DiRT 3 is starting.", If(pending, pendingReason, "Direct practice starts with Launch VR for now. Choose Normal launch to play on the monitor."))))
         launchTips.Update(vr, If(interactive IsNot Nothing, "Close DiRT 3 and restore the original files.", "Start a temporary experimental VDXR session."),
                           If(wait <> "", wait, If(running, "Close DiRT 3 first. Launch VR starts it with DiRT3VR's renderer.", If(pending, pendingReason, reason))))
         launchTips.Update(stopVrButton, "Turn VR off and keep playing DiRT 3 on the monitor. Original files are restored when DiRT 3 closes.",
@@ -990,6 +996,11 @@ Public Class MainForm
                 "Launch VR starts an experimental VR session (see " & HelpVr & "). While DiRT 3 runs, Launch becomes Show game, which brings the game window to the front." & vbCrLf & vbCrLf &
                 "Save settings keeps the current controls as the launcher's settings for next time, as Launch does. It never changes the game or a settings profile." & vbCrLf & vbCrLf &
                 "The ? button opens this window: updates at the top, these topics below. The Instructions link on each tab opens that tab's topic."),
+            New HelpTopic(HelpDirect,
+                "Launcher → Launch mode → Direct practice starts DiRT 3 straight on a route with your car, without its menus, through the game's own benchmark start; DiRT3VR's renderer keeps the car under your control." & vbCrLf & vbCrLf &
+                "Choose the discipline (rally, rallycross, trailblazer or Land Rush), the location and route, and the car. Cars are those of the route's discipline; Show cars from other disciplines lists the rest, which are untested. Search finds cars by name, code or class, and Class narrows the list." & vbCrLf & vbCrLf &
+                "For now direct practice starts with Launch VR, there are no opponents, and laps and the end of the session follow the benchmark start (quit from the game when you are done). The short config file it writes into the game folder, dirt3vr-direct.xml, is removed with DiRT3VR's other temporary changes, and DiRT 3's benchmark result file is deleted afterwards." & vbCrLf & vbCrLf &
+                "Normal launch keeps DiRT 3's menus for careers, events and multiplayer."),
             New HelpTopic(HelpStartup,
                 "Launcher → Skip startup logo movies temporarily replaces the AMD and DiRT 3 logo movie states for desktop and VR launches. Copyright, Press Start and other movies remain." & vbCrLf & vbCrLf &
                 "The original startup file is backed up first and restored when the game exits, also when you close this window during the session (DiRT3VR then waits in the notification area)." & vbCrLf & vbCrLf &
@@ -1048,6 +1059,7 @@ Public Class MainForm
                 "The native WinForms layout and appearance are adapted from DiRT2VR, with yellow DiRT3VR accents. Instructions as topics, recentering with a controller, live input, update checks and the notification-area session follow DiRT2VR and GRID2VR.")}
     End Function
 
+    Public Const HelpDirect As String = "Direct practice"
     Public Const HelpStart As String = "Getting started", HelpStartup As String = "Startup logo skipping", HelpVr As String = "Experimental VR",
         HelpSession As String = "During a session", HelpGraphics As String = "Graphics", HelpControls As String = "Controls and recentering",
         HelpRuntime As String = "VR runtime and headset check", HelpSettings As String = "Settings, profiles and defaults",
