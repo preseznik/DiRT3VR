@@ -504,6 +504,7 @@ Module Program
         BackgroundTests.RunUi(root, AddressOf Check)
         RecoveryConflictTests.RunUi(root, AddressOf Check)
         DefaultsTests.RunUi(root, AddressOf Check)
+        HelpTests.RunUi(root, AddressOf Check)
         WheelGuardTests.Run(root, AddressOf Check)
         InstallerTests.RunUi(AddressOf Check)
         SectionCollapseTests.Run(root, AddressOf Check)
