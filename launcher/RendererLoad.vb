@@ -128,7 +128,7 @@ Public NotInheritable Class RendererLoad
     ' protection can force it for dirt3_game.exe. Empty when nothing blocks the launch.
     Public Shared Function LaunchBlock(context As InstallContext) As String
         If ExploitProtectionForces(Path.Combine(context.GameRoot, "dirt3_game.exe")) Then
-            Return "DiRT3VR did not start DiRT 3: Windows exploit protection forces 'prefer system32 images' (PreferSystem32) for dirt3_game.exe, so the game would use Windows' own d3d11.dll instead of DiRT3VR's. Remove that exploit-protection setting for dirt3_game.exe, then launch VR again."
+            Return "DiRT3VR did not start DiRT 3: Windows exploit protection forces 'prefer system32 images' (PreferSystem32) for dirt3_game.exe, so the game would use Windows' own d3d11.dll instead of DiRT3VR's. Remove that exploit-protection setting for dirt3_game.exe, then launch again."
         End If
         If PrefersSystem32Images(Environment.ProcessId) = True Then
             Return "DiRT3VR did not start DiRT 3: DiRT3VR itself was started with the Windows rule 'prefer system32 images', which DiRT 3 would inherit and then use Windows' own d3d11.dll. Close DiRT3VR and start it again from its Start menu shortcut, not through another launcher (if that is Steam, exit Steam completely and start it again first)."

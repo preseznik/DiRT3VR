@@ -143,7 +143,7 @@ Public Class MainForm
                                                                    Dim borderlessBounds = If(selected.DesktopDisplayMode = "borderless", DesktopDisplay.MainBounds(), Rectangle.Empty)
                                                                    Dim game As Process
                                                                    Try
-                                                                       If selected.SkipStartupMovies Then
+                                                                       If DesktopStartupSession.NeedsSession(selected) Then
                                                                            desktopStartup = Await DesktopStartupSession.StartAsync(context, selected, borderlessBounds.Size)
                                                                            game = desktopStartup.Game
                                                                        Else
@@ -166,7 +166,9 @@ Public Class MainForm
                                                                                                                  notice.Text = message
                                                                                                                  RefreshState()
                                                                                                              End Sub
-                                                                       notice.Text = If(desktopStartup Is Nothing, "Starting DiRT 3… Closing this launcher leaves the game running.", "Starting DiRT 3… The original startup file is restored after exit, even if you close this window.")
+                                                                       notice.Text = If(desktopStartup Is Nothing, "Starting DiRT 3… Closing this launcher leaves the game running.",
+                                                                                        If(selected.LaunchMode = "direct", "Starting direct practice on the monitor… DiRT3VR's temporary files are removed after exit, even if you close this window.",
+                                                                                           "Starting DiRT 3… The original startup file is restored after exit, even if you close this window."))
                                                                        launchProgress.Start()
                                                                    Finally
                                                                        If desktopStartup IsNot Nothing Then ObserveDesktopStartup()
@@ -315,7 +317,7 @@ Public Class MainForm
         content.Controls.Add(columns)
         Dim launch = Section(columns.First, "Launch mode")
         directPicker = New DirectPracticePicker(launch)
-        launch.Controls.Add(Info("Direct practice starts DiRT 3 straight on the chosen route with your car, through DiRT 3's own benchmark start: no menus, no opponents. For now it starts with Launch VR; laps apply to circuits, and the end of the session follows the benchmark start. Normal launch keeps DiRT 3's menus for careers, events and multiplayer."))
+        launch.Controls.Add(Info("Direct practice starts DiRT 3 straight on the chosen route with your car, through DiRT 3's own benchmark start: no menus, no opponents. It works with Launch (on the monitor) and Launch VR; laps apply to circuits, and the end of the session follows the benchmark start. Normal launch keeps DiRT 3's menus for careers, events and multiplayer."))
         launch.Controls.Add(TopicLink(HelpDirect))
         AddHandler directPicker.Changed, Sub() RefreshState()
         Dim startup = Section(columns.First, "Startup")
@@ -746,12 +748,11 @@ Public Class MainForm
         Dim pending = New OwnedFileTransaction(context).Pending
         Dim reason = RuntimeCapabilities.ExperimentalReason(context, CurrentSettings())
         state.Text = If(busy, "Working…", If(interactive IsNot Nothing, InteractiveSession.OutputStatus(interactive.ReadNativeTail()), If(launchProgress IsNot Nothing, "Starting DiRT 3…", If(pending, "Recovery pending — close DiRT 3, then restore original files.", If(running, "DiRT 3 is running.", If(reason = "", "Ready · experimental VDXR enabled", reason))))))
-        If Not busy AndAlso desktopStartup IsNot Nothing Then state.Text = "DiRT 3 startup session · original startup files will be restored after exit."
+        If Not busy AndAlso desktopStartup IsNot Nothing Then state.Text = "DiRT 3 desktop session · DiRT3VR's temporary files will be removed after exit."
         If Not busy AndAlso interactive IsNot Nothing AndAlso interactive.VrStopped Then state.Text = "VR stopped · DiRT 3 runs on the monitor · original files will be restored after exit."
         If background.Active Then background.UpdateStatus(state.Text)
         desktop.Text = If(running AndAlso launchProgress Is Nothing, "Show game", "Launch")
-        Dim directMode = directPicker IsNot Nothing AndAlso directPicker.Mode = "direct"
-        desktop.Enabled = Not busy AndAlso launchProgress Is Nothing AndAlso (running OrElse (Not pending AndAlso Not directMode))
+        desktop.Enabled = Not busy AndAlso launchProgress Is Nothing AndAlso (running OrElse Not pending)
         vr.Text = If(interactive IsNot Nothing, "End session", "Launch VR")
         vr.Enabled = Not busy AndAlso (interactive IsNot Nothing OrElse (Not running AndAlso Not pending AndAlso reason = ""))
         stopVrButton.Visible = interactive IsNot Nothing
@@ -762,7 +763,7 @@ Public Class MainForm
         Dim wait = If(busy, "Wait until the current task finishes.", "")
         Dim pendingReason = "Files from an earlier session still need restoring. Use Restore original files first."
         launchTips.Update(desktop, If(running AndAlso launchProgress Is Nothing, "Bring the DiRT 3 window to the front.", "Start the game with your desktop graphics choices and saved driving controls. No headset is required."),
-                          If(wait <> "", wait, If(launchProgress IsNot Nothing, "DiRT 3 is starting.", If(pending, pendingReason, "Direct practice starts with Launch VR for now. Choose Normal launch to play on the monitor."))))
+                          If(wait <> "", wait, If(launchProgress IsNot Nothing, "DiRT 3 is starting.", pendingReason)))
         launchTips.Update(vr, If(interactive IsNot Nothing, "Close DiRT 3 and restore the original files.", "Start a temporary experimental VDXR session."),
                           If(wait <> "", wait, If(running, "Close DiRT 3 first. Launch VR starts it with DiRT3VR's renderer.", If(pending, pendingReason, reason))))
         launchTips.Update(stopVrButton, "Turn VR off and keep playing DiRT 3 on the monitor. Original files are restored when DiRT 3 closes.",
@@ -798,7 +799,7 @@ Public Class MainForm
         Try
             message = Await owned.WaitAndRestoreAsync()
         Catch ex As Exception
-            message = "DiRT 3 closed. Startup file recovery is pending: " & ex.Message
+            message = "DiRT 3 closed. File recovery is pending: " & ex.Message
             failed = True
         Finally
             launchProgress?.Dispose() : launchProgress = Nothing
@@ -999,7 +1000,7 @@ Public Class MainForm
             New HelpTopic(HelpDirect,
                 "Launcher → Launch mode → Direct practice starts DiRT 3 straight on a route with your car, without its menus, through the game's own benchmark start; DiRT3VR's renderer keeps the car under your control." & vbCrLf & vbCrLf &
                 "Choose the discipline (rally, rallycross, trailblazer or Land Rush), the location and route, and the car. Cars are those of the route's discipline; Show cars from other disciplines lists the rest, which are untested. Search finds cars by name, code or class, and Class narrows the list." & vbCrLf & vbCrLf &
-                "Laps (1 to 5) apply to circuits (rallycross and Land Rush); point-to-point stages are one run. For now direct practice starts with Launch VR, there are no opponents, and the end of the session follows the benchmark start (quit from the game when you are done). The short config file it writes into the game folder, dirt3vr-direct.xml, is removed with DiRT3VR's other temporary changes, and DiRT 3's benchmark result file is deleted afterwards." & vbCrLf & vbCrLf &
+                "Laps (1 to 5) apply to circuits (rallycross and Land Rush); point-to-point stages are one run. Direct practice works with Launch (on the monitor) and Launch VR. There are no opponents for now, and the end of the session follows the benchmark start (quit from the game when you are done). The short config file it writes into the game folder, dirt3vr-direct.xml, is removed with DiRT3VR's other temporary changes, and DiRT 3's benchmark result file is deleted afterwards." & vbCrLf & vbCrLf &
                 "Normal launch keeps DiRT 3's menus for careers, events and multiplayer."),
             New HelpTopic(HelpStartup,
                 "Launcher → Skip startup logo movies temporarily replaces the AMD and DiRT 3 logo movie states for desktop and VR launches. Copyright, Press Start and other movies remain." & vbCrLf & vbCrLf &

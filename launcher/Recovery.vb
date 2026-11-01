@@ -79,14 +79,17 @@ Public Class OwnedFileTransaction
         Dim hasStartup = changes.ContainsKey("startup")
         Dim quality = GraphicsCatalog.Current.Normalize(vrQuality)
         If quality.Count > 0 AndAlso Not (experimental AndAlso changes.ContainsKey("graphics")) Then Throw New IOException("VR graphics quality belongs to a VR session.")
-        ' Schema 4: a VR session with a direct practice config (and optionally startup).
+        ' Schema 4: a VR session with a direct practice config (and optionally startup). Schema 5: a desktop
+        ' direct practice session (config and renderer, optionally startup; no graphics or restrictions).
         Dim hasDirect = changes.ContainsKey("direct")
-        If hasDirect AndAlso Not experimental Then Throw New IOException("Direct practice belongs to a VR session.")
-        Dim journal As New RecoveryJournal With {.Schema = If(hasDirect, 4, If(hasStartup, 3, If(experimental, 2, 1))), .InstallId = context.Id, .GraphicsPath = context.GraphicsPath, .GraphicsQuality = If(quality.Count > 0, quality, Nothing)}
+        Dim journal As New RecoveryJournal With {.Schema = If(hasDirect, If(experimental, 4, 5), If(hasStartup, 3, If(experimental, 2, 1))), .InstallId = context.Id, .GraphicsPath = context.GraphicsPath, .GraphicsQuality = If(quality.Count > 0, quality, Nothing)}
         Dim prepared = journal.Schema >= 2
         If experimental Then
             Dim required = {"graphics", "proxy", "restrictions"}.Concat(If(hasStartup, {"startup"}, Array.Empty(Of String)())).Concat(If(hasDirect, {"direct"}, Array.Empty(Of String)())).Order().ToArray()
             If Not changes.Keys.Order().SequenceEqual(required) Then Throw New IOException("The experimental session requires its complete set of fixed targets.")
+        ElseIf hasDirect Then
+            Dim required = {"direct", "proxy"}.Concat(If(hasStartup, {"startup"}, Array.Empty(Of String)())).Order().ToArray()
+            If Not changes.Keys.Order().SequenceEqual(required) Then Throw New IOException("A desktop direct practice session changes only its config, DiRT3VR's renderer and optionally the startup movie definitions.")
         ElseIf hasStartup AndAlso Not changes.Keys.SequenceEqual({"startup"}) Then
             Throw New IOException("A desktop startup session may change only the startup movie definitions.")
         End If
@@ -163,7 +166,7 @@ Public Class OwnedFileTransaction
 
     Private Function LoadJournal() As RecoveryJournal
         Dim journal = SafeFiles.ReadJson(Of RecoveryJournal)(JournalPath)
-        If Not {1, 2, 3, 4}.Contains(journal.Schema) OrElse journal.InstallId <> context.Id OrElse journal.Entries Is Nothing OrElse journal.Entries.Count < 1 OrElse journal.Entries.Count > If(journal.Schema = 4, 5, If(journal.Schema = 3, 4, If(journal.Schema = 2, 3, 2))) OrElse journal.Entries.Any(Function(entry) entry Is Nothing) OrElse journal.Entries.Select(Function(e) e.Target).Distinct().Count() <> journal.Entries.Count Then Throw New IOException("Invalid recovery journal. Backups were preserved.")
+        If Not {1, 2, 3, 4, 5}.Contains(journal.Schema) OrElse journal.InstallId <> context.Id OrElse journal.Entries Is Nothing OrElse journal.Entries.Count < 1 OrElse journal.Entries.Count > MaxEntries(journal.Schema) OrElse journal.Entries.Any(Function(entry) entry Is Nothing) OrElse journal.Entries.Select(Function(e) e.Target).Distinct().Count() <> journal.Entries.Count Then Throw New IOException("Invalid recovery journal. Backups were preserved.")
         If Not String.Equals(journal.GraphicsPath, context.GraphicsPath, StringComparison.OrdinalIgnoreCase) Then Throw New IOException("Graphics recovery belongs to the Windows account that started this session. The original backup was preserved.")
         Dim targets = journal.Entries.Select(Function(entry) entry.Target).Order().ToArray()
         Select Case journal.Schema
@@ -175,8 +178,20 @@ Public Class OwnedFileTransaction
                 If Not targets.SequenceEqual({"startup"}) AndAlso Not targets.SequenceEqual({"graphics", "proxy", "restrictions", "startup"}) Then Throw New IOException("Incomplete startup recovery journal.")
             Case 4
                 If Not targets.SequenceEqual({"direct", "graphics", "proxy", "restrictions"}) AndAlso Not targets.SequenceEqual({"direct", "graphics", "proxy", "restrictions", "startup"}) Then Throw New IOException("Incomplete direct practice recovery journal.")
+            Case 5
+                If Not targets.SequenceEqual({"direct", "proxy"}) AndAlso Not targets.SequenceEqual({"direct", "proxy", "startup"}) Then Throw New IOException("Incomplete desktop direct practice recovery journal.")
         End Select
         Return journal
+    End Function
+
+    Private Shared Function MaxEntries(schema As Integer) As Integer
+        Select Case schema
+            Case 1 : Return 2
+            Case 2 : Return 3
+            Case 3 : Return 4
+            Case 4 : Return 5
+            Case Else : Return 3
+        End Select
     End Function
 
     ' Targets DiRT3VR creates for a session (no original to back up; recovery deletes them).
