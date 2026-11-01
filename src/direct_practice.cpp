@@ -1,5 +1,6 @@
 #include "direct_practice.h"
 #include <windows.h>
+#include <MinHook.h>
 #include <atomic>
 #include <mutex>
 
@@ -96,6 +97,52 @@ bool Install(void (*log)(const char*,...)) {
         }
     });
     return installed.load(std::memory_order_acquire);
+}
+
+int RequestedDifficulty() {
+    wchar_t text[4]{};
+    const auto length=GetEnvironmentVariableW(L"DIRT3VR_DIRECT_DIFFICULTY",text,4);
+    return length==1 && text[0]>=L'0' && text[0]<=L'0'+maxDifficulty ? int(text[0]-L'0') : -1;
+}
+
+namespace {
+using DifficultyFn=int (__thiscall*)(void*);
+DifficultyFn realDifficulty{};
+void (*difficultyLog)(const char*,...){};
+int requestedDifficulty=-1;
+std::atomic<unsigned> difficultyReports{};
+
+int __fastcall Difficulty(void* self,void*) {
+    const int original=realDifficulty(self);
+    const auto* image=reinterpret_cast<const uint8_t*>(GetModuleHandleW(nullptr));
+    const auto active=*reinterpret_cast<const volatile uint8_t*>(image+benchmarkFlagRva);
+    const int answer=DifficultyAnswer(active,requestedDifficulty,original);
+    if(answer!=original && difficultyReports.fetch_add(1)<4)
+        difficultyLog("Direct practice difficulty: AI level %d instead of the profile's %d",answer,original);
+    return answer;
+}
+}
+
+bool InstallDifficulty(void (*log)(const char*,...)) {
+    static std::once_flag once;
+    static std::atomic<bool> hooked{};
+    std::call_once(once,[log] {
+        requestedDifficulty=RequestedDifficulty();
+        if(requestedDifficulty<0) return;
+        auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+        if(!DifficultySiteMatches(image)) { log("Direct practice difficulty refused: difficulty lookup instructions differ; the profile's setting applies"); return; }
+        const auto init=MH_Initialize();
+        if(init!=MH_OK && init!=MH_ERROR_ALREADY_INITIALIZED) { log("Direct practice difficulty refused: MinHook=%d",int(init)); return; }
+        difficultyLog=log;
+        auto* target=image+difficultyRva;
+        if(MH_CreateHook(target,reinterpret_cast<void*>(&Difficulty),reinterpret_cast<void**>(&realDifficulty))!=MH_OK) { log("Direct practice difficulty refused: hook not created"); return; }
+        if(MH_EnableHook(target)!=MH_OK) { MH_RemoveHook(target); log("Direct practice difficulty refused: hook not enabled"); return; }
+        HMODULE pinned{};
+        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,reinterpret_cast<LPCWSTR>(&Difficulty),&pinned);
+        hooked.store(true,std::memory_order_release);
+        log("Direct practice difficulty: AI level %d during the benchmark start",requestedDifficulty);
+    });
+    return hooked.load(std::memory_order_acquire);
 }
 
 bool InstallReturn(void (*log)(const char*,...)) {

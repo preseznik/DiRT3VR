@@ -37,7 +37,11 @@ bool InstalledGameMatches(const char* path) {
     std::vector<uint8_t> pause(dp::pauseCheckRva+13);
     file.seekg(static_cast<std::streamoff>(dp::pauseCheckRva-0x1000+0x400));
     file.read(reinterpret_cast<char*>(pause.data()+dp::pauseCheckRva),13);
-    return file && dp::PauseSiteMatches(pause.data(),0x400000);
+    if(!file || !dp::PauseSiteMatches(pause.data(),0x400000)) return false;
+    std::vector<uint8_t> lookup(dp::difficultyRva+0x23);
+    file.seekg(static_cast<std::streamoff>(dp::difficultyRva-0x1000+0x400));
+    file.read(reinterpret_cast<char*>(lookup.data()+dp::difficultyRva),0x23);
+    return file && dp::DifficultySiteMatches(lookup.data());
 }
 
 std::vector<uint8_t> ExitImage(uintptr_t loadedBase) {
@@ -110,6 +114,19 @@ int main(int argc,char** argv) {
             Require(!dp::AllowPause(pause.data(),base),"Already-changed pause code was accepted again");
         }
         Require(dp::pauseBranchRva==dp::pauseCheckRva+7,"Pause branch is not the je after the flag compare");
+
+        {
+            std::vector<uint8_t> lookup(dp::difficultyRva+64,0xcc);
+            std::copy(std::begin(dp::difficultyEntry),std::end(dp::difficultyEntry),lookup.begin()+dp::difficultyRva);
+            std::copy(std::begin(dp::difficultyBranch),std::end(dp::difficultyBranch),lookup.begin()+dp::difficultyRva+0x15);
+            std::copy(std::begin(dp::difficultyTail),std::end(dp::difficultyTail),lookup.begin()+dp::difficultyRva+0x1c);
+            Require(dp::DifficultySiteMatches(lookup.data()),"Difficulty lookup not recognised");
+            lookup[dp::difficultyRva+0x1d]=0xe9;
+            Require(!dp::DifficultySiteMatches(lookup.data()),"Difficulty lookup with another call accepted");
+        }
+        Require(dp::DifficultyAnswer(1,0,3)==0 && dp::DifficultyAnswer(1,5,-1)==5,"Requested difficulty not used in a benchmark start");
+        Require(dp::DifficultyAnswer(0,5,2)==2,"Difficulty changed outside a benchmark start");
+        Require(dp::DifficultyAnswer(1,-1,2)==2 && dp::DifficultyAnswer(1,6,2)==2,"Unset or invalid difficulty request applied");
 
         uint8_t active=1,commandLine=1;
         Require(!dp::EndBenchmark(active,commandLine,1,0) && active==1,"Benchmark ended before the track was complete");

@@ -192,7 +192,7 @@ def diagnostic_environment(directory: Path, *, scene_observer: bool = False, rep
                            xr_runtime: Path | None = None, background_play: bool = False) -> dict:
     env = dict(os.environ, DIRT3VR_DIAGNOSTICS="1", DIRT3VR_LOG_DIR=str(directory), SteamAppId="321040")
     for flag in ("DIRT3VR_ENABLE_VR", "DIRT3VR_SCENE_DIAGNOSTICS", "DIRT3VR_REPLAY_DIAGNOSTICS",
-                 "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH", "DIRT3VR_RESEARCH_FILE_TRACE", "DIRT3VR_DIRECT_PRACTICE", "DIRT3VR_DIRECT_LAPS", "DIRT3VR_DIRECT_RETURN", "DIRT3VR_RESEARCH_LAPS", "DIRT3VR_SCREENSHOT_SECONDS"):
+                 "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH", "DIRT3VR_RESEARCH_FILE_TRACE", "DIRT3VR_DIRECT_PRACTICE", "DIRT3VR_DIRECT_LAPS", "DIRT3VR_DIRECT_RETURN", "DIRT3VR_DIRECT_DIFFICULTY", "DIRT3VR_RESEARCH_LAPS", "DIRT3VR_SCREENSHOT_SECONDS"):
         env.pop(flag, None)
     if background_play:
         env["DIRT3VR_BACKGROUND_PLAY"] = "1"
@@ -503,6 +503,8 @@ def main() -> int:
                         help="Add N more cars (0-7) of the route's discipline from the catalog")
     parser.add_argument("--player-copies", type=int, choices=range(1, 9), default=1, metavar="K",
                         help="number= on the first <car>: the player's car plus K-1 AI copies of it")
+    parser.add_argument("--direct-difficulty", type=int, choices=range(0, 6), metavar="N",
+                        help="AI difficulty level 0-5 for the benchmark start (renderer, DIRT3VR_DIRECT_DIFFICULTY)")
     parser.add_argument("--direct-return", action="store_true",
                         help="The renderer's return-to-menus change (DIRT3VR_DIRECT_RETURN): after the finish DiRT 3 goes to its "
                              "menus instead of quitting; implies --stay-after-result")
@@ -642,6 +644,8 @@ def main() -> int:
             env["DIRT3VR_DIRECT_LAPS"] = str(args.direct_laps)
         if args.direct_return:
             env["DIRT3VR_DIRECT_RETURN"] = "1"
+        if args.direct_difficulty is not None:
+            env["DIRT3VR_DIRECT_DIFFICULTY"] = str(args.direct_difficulty)
         if args.screenshots:
             env["DIRT3VR_SCREENSHOT_SECONDS"] = args.screenshots
         if args.research_laps:
@@ -705,6 +709,12 @@ def main() -> int:
                     bmp.unlink()
                 except (OSError, ValueError) as error:
                     report["errors"].append("Screenshot conversion failed: " + str(error))
+        if args.direct_difficulty is not None:
+            report["directDifficultyHooked"] = "Direct practice difficulty: AI level" in logs
+            used = re.findall(r"AI level (\d) instead of the profile's (-?\d+)", logs)
+            report["directDifficultyAnswers"] = [{"level": int(a), "profile": int(b)} for a, b in used]
+            if not report["directDifficultyHooked"]:
+                report["errors"].append("AI difficulty was requested but the renderer did not hook it")
         if args.direct_return:
             report["directReturnInstalled"] = "Direct practice return: the finish leads back to DiRT 3's menus" in logs
             report["directReturnBenchmarkEnded"] = "benchmark mode off, heading to DiRT 3's menus" in logs

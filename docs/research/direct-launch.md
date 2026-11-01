@@ -190,10 +190,28 @@ starts, so the player races the clock. On a stage, a car that never leaves the s
 ended after about 45 s of race time, with a result written, with or without opponents
 (run 35); on circuits a waiting car is left alone (runs 10, 17).
 
+## AI difficulty
+
+The race setup (`0x69ca05`) asks `0x5ba5c0` for the profile's `"difficulty"` setting
+(`"ss_difficulty"` in split screen; −1 when absent), the star level the player picks under
+Single Race → Difficulty and Assists. `0x5c9560` turns it into the AI pace ratio from the
+database's `difficulty` table (`star_level` 0–5 per season; `ai_ratio` about 0 at star 0 up
+to 1.0 at star 5; flashbacks 5 → 0; season falls back to
+`game_settings.difficulty_default_season` = 5). A benchmark start therefore uses the
+player's saved difficulty; on this PC it is 0, the easiest.
+
+`DIRT3VR_DIRECT_DIFFICULTY=N` (0–5) hooks `0x5ba5c0` (byte-checked, MinHook) and answers N
+while the benchmark flag is set; otherwise the profile's value passes through unchanged.
+Runs 36–37 (Aspen, AI driving `frx` with 3 opponents): at level 5 the game asked three
+times and got 5 instead of the profile's 0, and the race went differently (the AI-driven
+player car 2nd of 4 at 40 s on the clock, against 4th of 4 at level 0, since the AI on the
+player's car follows the same level). How much faster the opponents are against a human
+still needs a drive.
+
 ## Still open
 
 - Confirm that the main menu works after a return (starting another event, Exit).
-- AI difficulty for opponents.
+- Opponent pace per difficulty level against a human driver.
 - Opponents (more `<car>` entries, as DiRT2VR's race grid), and which disciplines and
   routes start correctly. The event catalog is #5b02d01b.
 - Not yet tried in VR.
