@@ -12,6 +12,7 @@ Public Module Session
 
     Public Function LaunchDesktop(context As InstallContext, settings As LauncherSettings, Optional monitor As Drawing.Size = Nothing) As Process
         If settings.SkipStartupMovies Then Throw New IOException("Startup logo skipping requires the managed startup session.")
+        If settings.LaunchMode = "direct" Then Throw New IOException("Direct practice requires the managed desktop session.")
         Using lease = InteractiveSession.AcquireLease(context)
         context.RequireClosed() : context.ValidateGame()
         If New OwnedFileTransaction(context).Pending Then Throw New IOException("File recovery is pending. Choose Restore original files before launching.")

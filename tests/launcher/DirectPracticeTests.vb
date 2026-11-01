@@ -69,7 +69,7 @@ Module DirectPracticeTests
         Dim tampered = New Dictionary(Of String, Byte())(changes)
         tampered("direct") = Encoding.UTF8.GetBytes(config.Replace("frx", "zzz"))
         check(Refused(Sub() transaction.Prepare(tampered, experimental:=True, apply:=False)) AndAlso Not transaction.Pending, "a config that isn't the launcher's own is refused before anything is staged")
-        check(Refused(Sub() transaction.Prepare(New Dictionary(Of String, Byte()) From {{"direct", changes("direct")}})), "direct practice belongs to a VR session")
+        check(Refused(Sub() transaction.Prepare(New Dictionary(Of String, Byte()) From {{"direct", changes("direct")}})) AndAlso Not transaction.Pending, "a direct practice config never goes into the game folder without DiRT3VR's renderer")
 
         Dim headset As New HeadsetResolution("vdxr", "Test headset", 2400, 2600)
         Dim runtime As New RuntimeInfo With {.Mode = "vdxr", .ManifestPath = "C:\runtime\virtualdesktop-openxr-32.json"}
@@ -84,6 +84,43 @@ Module DirectPracticeTests
         check(Not InteractiveSession.StartInfo(ctx, runtime, logs, stage, headset).Environment.ContainsKey("DIRT3VR_DIRECT_LAPS") AndAlso DirectPractice.Laps(stage) = 0, "point-to-point stages get no lap count")
         check(Refused(Sub() Call New LauncherSettings With {.DirectLaps = 6}.Validate()) AndAlso Refused(Sub() Call New LauncherSettings With {.DirectLaps = 0}.Validate()), "laps are 1 to 5")
         check(normalStart.ArgumentList.Count = 0 AndAlso Not normalStart.Environment.ContainsKey("DIRT3VR_DIRECT_PRACTICE"), "a normal launch is unchanged")
+
+        ' Launch (desktop): the renderer as a plain pass-through with the player-control fix, journaled with
+        ' the config as a schema 5 journal; no graphics or restrictions changes, no XR.
+        Dim desktopCtx = Context(root, "desktop")
+        check(DesktopStartupSession.NeedsSession(settings) AndAlso Not DesktopStartupSession.NeedsSession(New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = ""}), "desktop direct practice uses the managed desktop session; a plain launch doesn't")
+        check(Refused(Sub() Session.LaunchDesktop(desktopCtx, settings)), "a plain desktop launch can't start direct practice")
+        Dim desktopChanges = DesktopStartupSession.Changes(desktopCtx, settings)
+        check(desktopChanges.Keys.Order().SequenceEqual({"direct", "proxy"}) AndAlso desktopChanges("proxy").SequenceEqual(File.ReadAllBytes(Path.Combine(desktopCtx.PackageRoot, "payload", "d3d11.dll"))), "desktop direct practice changes only its config and DiRT3VR's renderer")
+        Dim desktopTransaction As New OwnedFileTransaction(desktopCtx)
+        Dim originalGraphics = File.ReadAllBytes(desktopCtx.GraphicsPath)
+        For Each extra In {"graphics", "restrictions"}
+            Dim widened = New Dictionary(Of String, Byte())(desktopChanges)
+            widened.Add(extra, changes(extra))
+            check(Refused(Sub() desktopTransaction.Prepare(widened, apply:=False)) AndAlso Not desktopTransaction.Pending, "a desktop direct practice session refuses VR's " & extra & " change")
+        Next
+        desktopTransaction.Prepare(desktopChanges, apply:=False)
+        check(SafeFiles.ReadJson(Of RecoveryJournal)(desktopTransaction.JournalPath).Schema = 5 AndAlso Not File.Exists(DirectPractice.ConfigPath(desktopCtx)), "desktop direct practice writes a schema 5 journal before anything is deployed")
+        ' Deployed as the elevated worker would (ApplyPrepared needs the real game executable).
+        File.WriteAllBytes(DirectPractice.ConfigPath(desktopCtx), desktopChanges("direct"))
+        File.WriteAllBytes(Path.Combine(desktopCtx.GameRoot, "d3d11.dll"), desktopChanges("proxy"))
+        Dim journalText = File.ReadAllText(desktopTransaction.JournalPath)
+        Dim relabelled = System.Text.RegularExpressions.Regex.Replace(journalText, """Schema"":\s*5", """Schema"": 4")
+        check(relabelled <> journalText, "the test relabels the journal")
+        File.WriteAllText(desktopTransaction.JournalPath, relabelled)
+        check(Refused(Sub() desktopTransaction.Recover()) AndAlso File.Exists(DirectPractice.ConfigPath(desktopCtx)), "a desktop journal relabelled as a VR one is refused and its files preserved")
+        File.WriteAllText(desktopTransaction.JournalPath, journalText)
+        check(desktopTransaction.Recover() AndAlso Not File.Exists(DirectPractice.ConfigPath(desktopCtx)) AndAlso Not File.Exists(Path.Combine(desktopCtx.GameRoot, "d3d11.dll")) AndAlso File.ReadAllBytes(desktopCtx.GraphicsPath).SequenceEqual(originalGraphics), "recovery removes the config and the renderer and leaves the player's graphics file alone")
+        Dim desktopLogs = Path.Combine(desktopCtx.UserRoot, "logs", "session-fixture")
+        Dim desktopStart = DesktopStartupSession.StartInfo(desktopCtx, settings, desktopLogs)
+        Dim dirt3vrVariables = desktopStart.Environment.Keys.Where(Function(key) key.StartsWith("DIRT3VR_", StringComparison.OrdinalIgnoreCase)).Order().ToArray()
+        check(desktopStart.ArgumentList.SequenceEqual({"-benchmark", "dirt3vr-direct.xml"}) AndAlso dirt3vrVariables.SequenceEqual({"DIRT3VR_DIAGNOSTICS", "DIRT3VR_DIRECT_LAPS", "DIRT3VR_DIRECT_PRACTICE", "DIRT3VR_LOG_DIR"}) AndAlso
+              desktopStart.Environment("DIRT3VR_DIRECT_PRACTICE") = "1" AndAlso desktopStart.Environment("DIRT3VR_DIRECT_LAPS") = "3" AndAlso desktopStart.Environment("DIRT3VR_DIAGNOSTICS") = "1" AndAlso desktopStart.Environment("DIRT3VR_LOG_DIR") = desktopLogs AndAlso Not desktopStart.Environment.ContainsKey("XR_RUNTIME_JSON"),
+              "desktop direct practice starts the benchmark with the player-control switch, laps and the observer log, and nothing for VR (" & String.Join(", ", dirt3vrVariables) & ")")
+        check(Not DesktopStartupSession.StartInfo(desktopCtx, stage, desktopLogs).Environment.ContainsKey("DIRT3VR_DIRECT_LAPS"), "a desktop stage gets no lap count")
+        Dim plainStart = DesktopStartupSession.StartInfo(desktopCtx, New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = "", .SkipStartupMovies = True}, desktopLogs)
+        check(plainStart.ArgumentList.Count = 0 AndAlso Not plainStart.Environment.Keys.Any(Function(key) key.StartsWith("DIRT3VR_", StringComparison.OrdinalIgnoreCase)), "a startup-skip desktop session starts DiRT 3 as before")
+        check(Refused(Sub() DesktopStartupSession.StartInfo(desktopCtx, settings, "logs")), "the desktop session log path must be absolute")
 
         ' DiRT 3's result file for the session is removed; other benchmark results stay.
         Dim results = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(ctx.GraphicsPath)), "benchmarks")
@@ -117,7 +154,7 @@ Module DirectPracticeTests
             check(normal.Checked AndAlso Not discipline.Enabled AndAlso Not car.Enabled AndAlso desktop.Enabled AndAlso form.CurrentSettings().LaunchMode = "normal" AndAlso Not form.HasUnsavedSettings(), "Normal launch is the default and the picker is off")
             direct.Checked = True : Application.DoEvents()
             check(discipline.Enabled AndAlso route.Items.Count > 0 AndAlso car.Items.Count > 0 AndAlso form.CurrentSettings().LaunchMode = "direct" AndAlso form.HasUnsavedSettings(), "choosing Direct practice turns the picker on")
-            check(Not desktop.Enabled AndAlso desktop.AccessibleDescription.Contains("Launch VR"), "desktop Launch explains that direct practice starts with Launch VR for now")
+            check(desktop.Enabled, "Launch stays available in direct practice (it starts on the monitor)")
             discipline.SelectedItem = EventCatalog.Current.FindDiscipline("rallycross") : Application.DoEvents()
             check(route.Items.Cast(Of EventCatalog.EventRoute)().All(Function(item) item.Discipline = "rallycross") AndAlso car.Items.Cast(Of EventCatalog.EventCar)().All(Function(item) item.Discipline = "rallycross"), "routes and cars follow the discipline")
             Dim rallycrossCars = car.Items.Count
