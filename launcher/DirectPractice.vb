@@ -18,6 +18,8 @@ Public NotInheritable Class DirectPractice
     ' Opponent car choices: the player's class within the route's discipline, any car of that
     ' discipline, or the player's own model.
     Public Shared ReadOnly OpponentCarChoices As String() = {"class", "mixed", "same"}
+    ' DiRT 3's six AI levels (shown as stars in the game); the renderer answers the game's lookup.
+    Public Const MaxDifficulty As Integer = 5
 
     Private Sub New()
     End Sub
@@ -52,6 +54,20 @@ Public NotInheritable Class DirectPractice
         Next
         Return pool.Where(Function(car) counts(car.Code) > 0).Select(Function(car) (car.Code, counts(car.Code))).ToArray()
     End Function
+
+    ' The AI level the renderer reports while opponents race; -1 leaves DiRT 3's own setting.
+    Public Shared Function Difficulty(settings As LauncherSettings) As Integer
+        Return If(Opponents(settings) > 0, Math.Clamp(settings.DirectDifficulty, -1, MaxDifficulty), -1)
+    End Function
+
+    ' The benchmark start and the renderer's direct practice switches, for Launch and Launch VR.
+    Public Shared Sub AddStart(start As ProcessStartInfo, settings As LauncherSettings)
+        start.Environment("DIRT3VR_DIRECT_PRACTICE") = "1"
+        Dim lapCount = Laps(settings), level = Difficulty(settings)
+        If lapCount > 0 Then start.Environment("DIRT3VR_DIRECT_LAPS") = Number(lapCount)
+        If level >= 0 Then start.Environment("DIRT3VR_DIRECT_DIFFICULTY") = Number(level)
+        start.ArgumentList.Add("-benchmark") : start.ArgumentList.Add(FileName)
+    End Sub
 
     Public Shared Function ConfigPath(context As InstallContext) As String
         Return Path.Combine(context.GameRoot, FileName)
