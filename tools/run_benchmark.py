@@ -191,7 +191,7 @@ def diagnostic_environment(directory: Path, *, scene_observer: bool = False, rep
                            xr_runtime: Path | None = None, background_play: bool = False) -> dict:
     env = dict(os.environ, DIRT3VR_DIAGNOSTICS="1", DIRT3VR_LOG_DIR=str(directory), SteamAppId="321040")
     for flag in ("DIRT3VR_ENABLE_VR", "DIRT3VR_SCENE_DIAGNOSTICS", "DIRT3VR_REPLAY_DIAGNOSTICS",
-                 "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH"):
+                 "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH", "DIRT3VR_RESEARCH_FILE_TRACE"):
         env.pop(flag, None)
     if background_play:
         env["DIRT3VR_BACKGROUND_PLAY"] = "1"
@@ -340,6 +340,8 @@ def main() -> int:
                         help="Research: temporarily add the normal race's 'Controller / Switch type=human' event to cutscene/spectator_startsequence.xml (journaled and restored)")
     parser.add_argument("--research-patch", metavar="RVA:ORIGINAL:REPLACEMENT",
                         help="Research only: in-memory code change applied by the research proxy (build/native/bin/research/d3d11.dll, pass it with --proxy) after its original bytes match")
+    parser.add_argument("--file-trace", action="store_true",
+                        help="Research only: the research proxy logs every file the game opens after device creation")
     parser.add_argument("--recover", type=Path, metavar="JOURNAL")
     args = parser.parse_args()
     if args.replay_pair and not (args.serial_render and args.scene_observer):
@@ -430,6 +432,8 @@ def main() -> int:
                                      xr_runtime=args.xr_runtime, background_play=args.background_play)
         if args.research_patch:
             env["DIRT3VR_RESEARCH_PATCH"] = args.research_patch
+        if args.file_trace:
+            env["DIRT3VR_RESEARCH_FILE_TRACE"] = "1"
         startup = None
         if args.background_play:
             # Ask Windows not to activate the game window; DiRT 3 may still bring itself forward.
