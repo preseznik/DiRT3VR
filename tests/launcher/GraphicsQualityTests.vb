@@ -150,13 +150,37 @@ Module GraphicsQualityTests
             Dim vrPreset = DirectCast(form.Controls.Find("VrQualityPreset", True).Single(), ComboBox)
             Dim vrShadows = DirectCast(form.Controls.Find("VrQualityShadows", True).Single(), ComboBox)
             check(vrPreset.SelectedIndex = 0 AndAlso vrPreset.Text = "Same as desktop" AndAlso vrShadows.Text = "Same as desktop" AndAlso form.CurrentSettings().VrGraphicsQuality.Count = 0, "VR quality starts on Same as desktop")
-            vrPreset.SelectedIndex = 2 ' Low
+            check(vrPreset.Items(1).ToString() = "VR Balanced", "the VR picker offers VR Balanced first")
+            vrPreset.SelectedIndex = vrPreset.Items.IndexOf("Low")
             check(form.CurrentSettings().VrGraphicsQuality.Count = 15 AndAlso form.CurrentSettings().VrGraphicsQuality("Shadows") = "low" AndAlso form.CurrentSettings().GraphicsQuality("Shadows") = "high", "choosing a VR preset leaves the desktop choices alone")
             DirectCast(form.Controls.Find("SaveSettings", True).Single(), Button).PerformClick()
             check(LauncherSettings.Load(ctx).GraphicsQuality.Count = 15 AndAlso LauncherSettings.Load(ctx).VrGraphicsQuality("Water") = "low", "Save settings keeps desktop and VR quality")
             form.ConfirmPrompt = Function(caption, body) True
             form.RestoreDefaults(graphicsOnly:=True)
             check(preset.SelectedIndex = 0 AndAlso vrPreset.SelectedIndex = 0 AndAlso form.CurrentSettings().GraphicsQuality.Count = 0 AndAlso form.CurrentSettings().VrGraphicsQuality.Count = 0, "Restore graphics defaults resets desktop and VR quality")
+
+            ' Quick presets with Undo (VR only).
+            Dim undo = DirectCast(form.Controls.Find("UndoGraphicsPreset", True).Single(), Button)
+            Dim scale = DirectCast(form.Controls.Find("VrRenderScale", True).Single(), ValueSlider)
+            check(Not undo.Enabled, "nothing to undo after restoring defaults")
+            form.ApplyQuickPreset("potato")
+            Dim ultraLow = catalog.Presets(0)
+            check(scale.Value = 70 AndAlso ultraLow.Values.All(Function(pair) form.CurrentSettings().VrGraphicsQuality(pair.Key) = pair.Value) AndAlso form.CurrentSettings().GraphicsQuality.Count = 0 AndAlso undo.Enabled AndAlso vrPreset.Text = "Ultra Low",
+                  "Potato / Low-End sets VR quality to Ultra Low and render scale to 70%, leaving desktop alone")
+            form.UndoGraphicsPreset()
+            check(scale.Value = 100 AndAlso form.CurrentSettings().VrGraphicsQuality.Count = 0 AndAlso Not undo.Enabled, "Undo preset brings back the VR quality and render scale")
+            form.ApplyQuickPreset("vrbalanced")
+            Dim balanced = form.CurrentSettings().VrGraphicsQuality
+            check(vrPreset.Text = "VR Balanced" AndAlso balanced("Crowd") = "low" AndAlso balanced("Shadows") = "high" AndAlso balanced.Count = 15 AndAlso scale.Value = 100, "VR Balanced is High with the crowd one step lower and keeps the render scale; the picker names it")
+            DirectCast(form.Controls.Find("VrQualityWater", True).Single(), ComboBox).SelectedIndex = 1
+            check(Not undo.Enabled AndAlso vrPreset.Text = "Custom", "changing an option yourself drops the Undo copy and shows Custom")
+            preset.SelectedIndex = 5
+            check(undo.Enabled AndAlso form.CurrentSettings().GraphicsQuality("Shadows") = "ultra", "choosing a desktop preset can be undone too")
+            form.UndoGraphicsPreset()
+            check(form.CurrentSettings().GraphicsQuality.Count = 0 AndAlso form.CurrentSettings().VrGraphicsQuality("Water") = "low", "Undo returns to the choices just before that preset")
+            scale.Value = 120
+            form.ApplyQuickPreset("potato") : scale.Value = 90
+            check(Not undo.Enabled, "moving the render scale yourself also drops the Undo copy")
             form.Close()
         End Using
     End Sub
