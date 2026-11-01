@@ -8,6 +8,15 @@ using EgoEngineLibrary.Language;
 // Read-only: nothing in the game folder is changed.
 //   dump    <game> <schema.xml> <output.json> <table> [table ...]   all columns of the named tables
 //   catalog <game> <schema.xml> <output.json>                       the direct-launch event catalog
+// xml <binary xml file> <output.xml>: converts one of the game's binary XML files (flow, states) for reading.
+if (args.Length == 3 && args[0] == "xml")
+{
+    using var input = File.OpenRead(args[1]);
+    var file = new EgoEngineLibrary.Xml.XmlFile(input);
+    file.Document.Save(args[2]);
+    Console.WriteLine($"wrote {args[2]}");
+    return 0;
+}
 if (args.Length < 4 || (args[0] != "dump" && args[0] != "catalog"))
 {
     Console.Error.WriteLine("usage: EventCatalog dump|catalog <DiRT 3 folder> <schemaDirt3.xml> <output.json> [table ...]");

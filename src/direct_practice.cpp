@@ -4,10 +4,36 @@
 #include <mutex>
 
 namespace dirt3vr::directpractice {
-bool Requested() {
+namespace {
+bool Flag(const wchar_t* name) {
     wchar_t value[8]{};
-    return GetEnvironmentVariableW(L"DIRT3VR_DIRECT_PRACTICE",value,8)==1 && value[0]==L'1';
+    return GetEnvironmentVariableW(name,value,8)==1 && value[0]==L'1';
 }
+
+std::atomic<bool> installed{};
+std::atomic<bool> returnInstalled{};
+
+// Writes size bytes over original code. A failed write must not leave a partial behaviour
+// change behind, so any failure puts the original bytes back.
+bool WriteCode(uint8_t* target,const uint8_t* bytes,const uint8_t* original,size_t size,const char* what,void (*log)(const char*,...)) {
+    DWORD protection{},ignored{};
+    if(!VirtualProtect(target,size,PAGE_EXECUTE_READWRITE,&protection)) { log("%s refused: VirtualProtect failed",what); return false; }
+    std::memcpy(target,bytes,size);
+    const bool flushed=FlushInstructionCache(GetCurrentProcess(),target,size)!=FALSE;
+    const bool restored=VirtualProtect(target,size,protection,&ignored)!=FALSE;
+    if(flushed && restored) return true;
+    if(VirtualProtect(target,size,PAGE_EXECUTE_READWRITE,&ignored)) {
+        std::memcpy(target,original,size);
+        FlushInstructionCache(GetCurrentProcess(),target,size);
+        VirtualProtect(target,size,protection,&ignored);
+    }
+    log("%s refused: flush=%u protection_restored=%u; original code kept",what,flushed,restored);
+    return false;
+}
+}
+
+bool Requested() { return Flag(L"DIRT3VR_DIRECT_PRACTICE"); }
+bool ReturnRequested() { return Flag(L"DIRT3VR_DIRECT_RETURN"); }
 
 unsigned RequestedLaps() {
     wchar_t text[8]{};
@@ -21,22 +47,32 @@ unsigned RequestedLaps() {
     return value>=1 && value<=maxLaps ? value : 0;
 }
 
-namespace {
-std::atomic<bool> installed{};
-}
-
 void Tick(void (*log)(const char*,...)) {
     static const unsigned laps=RequestedLaps();
-    if(!laps || !installed.load(std::memory_order_acquire)) return;
+    const bool control=installed.load(std::memory_order_acquire);
+    const bool back=returnInstalled.load(std::memory_order_acquire);
+    if(!(laps && control) && !back) return;
     auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
-    const auto active=*reinterpret_cast<volatile uint8_t*>(image+benchmarkFlagRva);
-    auto* count=reinterpret_cast<volatile uint32_t*>(image+lapsRva);
-    uint32_t value=*count;
-    const auto before=value;
-    if(KeepLaps(active,value,laps)) {
-        *count=value;
-        static unsigned writes{};
-        if(++writes<=4) log("Direct practice laps: benchmark count %u -> %u",before,value);
+    auto* active=reinterpret_cast<volatile uint8_t*>(image+benchmarkFlagRva);
+    if(laps && control) {
+        auto* count=reinterpret_cast<volatile uint32_t*>(image+lapsRva);
+        uint32_t value=*count;
+        const auto before=value;
+        if(KeepLaps(*active,value,laps)) {
+            *count=value;
+            static unsigned writes{};
+            if(++writes<=4) log("Direct practice laps: benchmark count %u -> %u",before,value);
+        }
+    }
+    if(back) {
+        auto* commandLine=reinterpret_cast<volatile uint8_t*>(image+commandLineFlagRva);
+        uint8_t a=*active,c=*commandLine;
+        const uint32_t requested=*reinterpret_cast<volatile uint32_t*>(image+requestedTracksRva);
+        const uint32_t completed=*reinterpret_cast<volatile uint32_t*>(image+completedTracksRva);
+        if(EndBenchmark(a,c,requested,completed)) {
+            *active=a; *commandLine=c;
+            log("Direct practice return: result written (%u/%u tracks); benchmark mode off, heading to DiRT 3's menus",completed,requested);
+        }
     }
 }
 
@@ -46,26 +82,25 @@ bool Install(void (*log)(const char*,...)) {
         auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
         const auto base=reinterpret_cast<uintptr_t>(image);
         if(!SitesMatch(image,base)) { log("Direct practice refused: controller update instructions differ; the benchmark AI keeps the car"); return; }
-        auto* target=image+forceAiRva;
-        DWORD protection{},ignored{};
-        if(!VirtualProtect(target,1,PAGE_EXECUTE_READWRITE,&protection)) { log("Direct practice refused: VirtualProtect failed"); return; }
-        Keep(image,base);
-        const bool flushed=FlushInstructionCache(GetCurrentProcess(),target,1)!=FALSE;
-        const bool restored=VirtualProtect(target,1,protection,&ignored)!=FALSE;
-        if(!flushed || !restored) {
-            // A failed install must not leave a partial behaviour change behind.
-            if(VirtualProtect(target,1,PAGE_EXECUTE_READWRITE,&ignored)) {
-                *target=forceAi[0];
-                FlushInstructionCache(GetCurrentProcess(),target,1);
-                VirtualProtect(target,1,protection,&ignored);
-            }
-            log("Direct practice refused: flush=%u protection_restored=%u; original code kept",flushed,restored);
-            return;
-        }
+        const uint8_t jump=0xeb;
+        if(!WriteCode(image+forceAiRva,&jump,forceAi,1,"Direct practice",log)) return;
         installed.store(true,std::memory_order_release);
         log("Direct practice: benchmark start keeps the player's car under player control (base=0x%x)",static_cast<unsigned>(base));
         if(const auto laps=RequestedLaps()) log("Direct practice laps: %u requested",laps);
     });
     return installed.load(std::memory_order_acquire);
+}
+
+bool InstallReturn(void (*log)(const char*,...)) {
+    static std::once_flag once;
+    std::call_once(once,[log] {
+        auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+        const auto base=reinterpret_cast<uintptr_t>(image);
+        if(!ExitSiteMatches(image,base)) { log("Direct practice return refused: exit instructions differ; the game quits after the finish"); return; }
+        if(!WriteCode(image+exitBranchRva,skipExit,exitBranch,sizeof(skipExit),"Direct practice return",log)) return;
+        returnInstalled.store(true,std::memory_order_release);
+        log("Direct practice return: the finish leads back to DiRT 3's menus instead of quitting");
+    });
+    return returnInstalled.load(std::memory_order_acquire);
 }
 }

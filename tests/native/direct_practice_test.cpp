@@ -29,7 +29,18 @@ bool InstalledGameMatches(const char* path) {
         file.read(reinterpret_cast<char*>(image.data()+rva),static_cast<std::streamsize>(size));
         if(!file) return false;
     }
-    return dp::SitesMatch(image.data(),0x400000);
+    if(!dp::SitesMatch(image.data(),0x400000)) return false;
+    std::vector<uint8_t> exit(dp::exitCheckRva+26);
+    file.seekg(static_cast<std::streamoff>(dp::exitCheckRva-0x1000+0x400));
+    file.read(reinterpret_cast<char*>(exit.data()+dp::exitCheckRva),26);
+    return file && dp::ExitSiteMatches(exit.data(),0x400000);
+}
+
+std::vector<uint8_t> ExitImage(uintptr_t loadedBase) {
+    std::vector<uint8_t> image(dp::exitCheckRva+64,0xcc);
+    uint8_t check[26]; dp::ExitCheck(loadedBase,check);
+    std::copy(std::begin(check),std::end(check),image.begin()+dp::exitCheckRva);
+    return image;
 }
 }
 
@@ -66,6 +77,29 @@ int main(int argc,char** argv) {
         Require(!dp::KeepLaps(1,count,0) && !dp::KeepLaps(1,count,dp::maxLaps+1) && count==2,"Out-of-range lap request accepted");
         Require(!dp::KeepLaps(2,count,3) && count==2,"Unexpected benchmark flag value treated as active");
         Require(dp::lapsRva==dp::benchmarkFlagRva+0xe74,"Lap count is not config+0xef4 (flag is config+0x80)");
+
+        uint8_t preferredExit[26]; dp::ExitCheck(0x400000,preferredExit);
+        Require(preferredExit[22]==0x9c && preferredExit[23]==0x11 && preferredExit[24]==0xe0 && preferredExit[25]==0x00,"Preferred-base ExitProcess slot is not 0xe0119c");
+        Require(dp::exitBranchRva==dp::exitCheckRva+12,"Exit branch is not the je after the +0x81 compare");
+        for(const uintptr_t base:{uintptr_t{0x400000},uintptr_t{0x280000}}) {
+            auto exit=ExitImage(base);
+            const auto before=exit;
+            Require(dp::ExitSiteMatches(exit.data(),base) && !dp::ExitSiteMatches(exit.data(),base+0x10000),"Exit site not recognised for its own base only");
+            Require(dp::SkipExit(exit.data(),base),"Exit branch not replaced");
+            for(size_t i=0;i<exit.size();++i) {
+                const bool inBranch=i>=dp::exitBranchRva && i<dp::exitBranchRva+sizeof(dp::skipExit);
+                Require(inBranch ? exit[i]==dp::skipExit[i-dp::exitBranchRva] : exit[i]==before[i],"Bytes outside the exit branch changed");
+            }
+            // jmp rel32 from the branch must land where the je went (0x6a8757 = RVA 0x2a8757).
+            int32_t rel; std::memcpy(&rel,exit.data()+dp::exitBranchRva+1,4);
+            Require(dp::exitBranchRva+5+rel==0x2a8757,"Jump target differs from the je's target");
+            Require(!dp::SkipExit(exit.data(),base),"Already-changed exit code was accepted again");
+        }
+        uint8_t active=1,commandLine=1;
+        Require(!dp::EndBenchmark(active,commandLine,1,0) && active==1,"Benchmark ended before the track was complete");
+        Require(!dp::EndBenchmark(active,commandLine,0,0) && active==1,"Benchmark ended with no requested tracks");
+        Require(dp::EndBenchmark(active,commandLine,1,1) && active==0 && commandLine==0,"Benchmark mode not ended after the result");
+        Require(!dp::EndBenchmark(active,commandLine,1,1),"Inactive benchmark ended twice");
 
         if(argc>1) {
             std::ifstream probe(argv[1],std::ios::binary);
