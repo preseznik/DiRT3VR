@@ -767,9 +767,13 @@ def main() -> int:
         report["benchmarkResultFiles"] = [p.name for p in results if p.is_file()]
         for result in results:
             if result.is_file():
-                (run / result.name).write_bytes(result.read_bytes())
-                summary = summarize_benchmark(result, serial_render=args.serial_render, track=scene["track"],
+                kept = run / result.name
+                kept.write_bytes(result.read_bytes())
+                summary = summarize_benchmark(kept, serial_render=args.serial_render, track=scene["track"],
                                               route=scene["route"], cars_expected=tuple(scene["cars"]))
+                # The result is this run's own file (its run id is in the name); keep only the copy.
+                if kept.read_bytes() == result.read_bytes():
+                    result.unlink()
                 report["benchmarkSummary"] = summary
                 report["benchmarkConfirmed"] = summary["sceneConfirmed"]
                 report["serialRenderVerified"] = summary["serialRenderVerified"]
