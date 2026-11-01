@@ -216,7 +216,7 @@ bool XrRuntime::StartFrame(uint64_t sequence,FrameMode mode) noexcept {
     for(auto& eye:eyes_) { eye.completed=false; eye.acquired=eye.waited=false; }
     if(!state.shouldRender) { EndFrame(generation_,false); return false; }
     if(spaceChangeTime_ && displayTime_>=spaceChangeTime_) {
-        spaceChangeTime_=0; centered_=false; recenterPending_=true;
+        spaceChangeTime_=0; centered_=false; recenterPending_=true; recenterTilt_=false;
     }
     XrViewLocateInfo locate{XR_TYPE_VIEW_LOCATE_INFO}; locate.viewConfigurationType=XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
     locate.displayTime=displayTime_; locate.space=space_;
@@ -234,11 +234,12 @@ bool XrRuntime::StartFrame(uint64_t sequence,FrameMode mode) noexcept {
         canRecenter_=focused_ && (tracking.viewStateFlags&tracked)==tracked;
         bool recentered=false;
         if(recenterPending_ && canRecenter_) {
-            reference_=math::RecenterPose(math::CenterPose(views_),reference_);
+            const auto center=math::CenterPose(views_);
+            reference_=recenterTilt_ ? math::RecenterPoseWithTilt(center) : math::RecenterPose(center,reference_);
             ++referenceRevision_;
-            recenterPending_=false; centered_=true;
+            Report(recenterTilt_ ? "XR recentered from focused tracked pose including tilt" : "XR recentered from focused tracked pose");
+            recenterPending_=recenterTilt_=false; centered_=true;
             recentered=true;
-            Report("XR recentered from focused tracked pose");
         }
         if(!centered_) { EndFrame(generation_,false); return false; }
         const unsigned modeBit=frameMode_==FrameMode::Screen ? 2u : 1u;
@@ -346,7 +347,7 @@ void XrRuntime::Shutdown() noexcept {
     device_.Reset();
     space_={}; session_={}; instance_={}; system_={}; format_=DXGI_FORMAT_UNKNOWN;
     running_=visible_=focused_=frameOpen_=frameRenderable_=canRecenter_=centered_=false;
-    recenterPending_=true; haveGameSequence_=false; spaceChangeTime_=0;
+    recenterPending_=true; recenterTilt_=false; haveGameSequence_=false; spaceChangeTime_=0;
     orientationModes_=0;
     referenceRevision_=0;
     overlayEnabled_=false;

@@ -46,6 +46,12 @@ inline XrPosef RecenterPose(const XrPosef& center, const XrPosef& previous) {
     }
     return {heading,center.position};
 }
+// Recenter on the full head orientation (yaw, pitch and roll): the current view becomes straight
+// ahead and level. Only for an explicit request; automatic centering keeps the horizon level.
+inline XrPosef RecenterPoseWithTilt(const XrPosef& center) {
+    if(!Finite(center.position)) throw std::invalid_argument("Invalid XR recenter position");
+    return {Normalize(center.orientation),center.position};
+}
 inline XrPosef RelativePose(const XrPosef& reference, const XrPosef& pose) {
     if(!Finite(reference.position) || !Finite(pose.position)) throw std::invalid_argument("Invalid XR position");
     const auto q=Normalize(reference.orientation);

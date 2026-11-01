@@ -78,7 +78,8 @@ public:
     Frame BeginFrame(uint64_t monotonicGameSequence) noexcept { return Frame(*this,monotonicGameSequence,FrameMode::Stereo); }
     Frame BeginScreenFrame(uint64_t monotonicGameSequence) noexcept { return Frame(*this,monotonicGameSequence,FrameMode::Screen); }
     void Shutdown() noexcept;
-    void RequestRecenter() noexcept { recenterPending_=true; }
+    // includeTilt also resets pitch and roll (the player's choice); automatic centering never does.
+    void RequestRecenter(bool includeTilt=false) noexcept { recenterPending_=true; recenterTilt_=includeTilt; }
     bool Initialized() const noexcept { return session_!=XR_NULL_HANDLE && !failed_; }
     bool Running() const noexcept { return running_ && !failed_; }
     bool Exiting() const noexcept { return failed_ || exiting_; }
@@ -131,6 +132,6 @@ private:
     unsigned orientationReports_{},orientationModes_{};
     FrameMode frameMode_=FrameMode::Stereo;
     bool haveGameSequence_{},running_{},visible_{},focused_{},failed_{},exiting_{};
-    bool frameOpen_{},frameRenderable_{},frameFailed_{},canRecenter_{},centered_{},recenterPending_=true;
+    bool frameOpen_{},frameRenderable_{},frameFailed_{},canRecenter_{},centered_{},recenterPending_=true,recenterTilt_{};
 };
 }

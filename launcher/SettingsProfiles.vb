@@ -30,6 +30,7 @@ Public Class ProfileValues
         Dim result As New LauncherSettings With {
             .ModernInterface = ModernInterface, .RuntimeMode = RuntimeMode,
             .SteamRuntimeManifest = local.SteamRuntimeManifest, .VdxrRuntimeManifest = local.VdxrRuntimeManifest, .RecenterDevice = local.RecenterDevice,
+            .RecenterKeepLevel = local.RecenterKeepLevel,
             .DiagnosticLogging = DiagnosticLogging, .ExperimentalVrEnabled = ExperimentalVrEnabled,
             .VrRenderScale = VrRenderScale, .DesktopWidth = DesktopWidth, .DesktopHeight = DesktopHeight,
             .DesktopDisplayMode = DesktopDisplayMode, .DesktopVSync = DesktopVSync, .SkipStartupMovies = SkipStartupMovies,
