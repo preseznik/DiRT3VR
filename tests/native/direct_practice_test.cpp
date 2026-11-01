@@ -57,6 +57,16 @@ int main(int argc,char** argv) {
         shifted[dp::forceAiRva+4]=0x2d; // a different controller field
         Require(!dp::Keep(shifted.data(),0x400000),"Code writing another field was changed");
 
+        uint32_t count=0;
+        Require(!dp::KeepLaps(0,count,3) && count==0,"Laps written while no benchmark is active");
+        Require(dp::KeepLaps(1,count,3) && count==3,"Requested laps not written into the benchmark count");
+        Require(!dp::KeepLaps(1,count,3) && count==3,"Unchanged count rewritten");
+        count=7;
+        Require(dp::KeepLaps(1,count,2) && count==2,"Count the game changed was not restored to the request");
+        Require(!dp::KeepLaps(1,count,0) && !dp::KeepLaps(1,count,dp::maxLaps+1) && count==2,"Out-of-range lap request accepted");
+        Require(!dp::KeepLaps(2,count,3) && count==2,"Unexpected benchmark flag value treated as active");
+        Require(dp::lapsRva==dp::benchmarkFlagRva+0xe74,"Lap count is not config+0xef4 (flag is config+0x80)");
+
         if(argc>1) {
             std::ifstream probe(argv[1],std::ios::binary);
             if(probe) Require(InstalledGameMatches(argv[1]),"Installed dirt3_game.exe has a different controller update");

@@ -52,4 +52,8 @@ inline bool Parse(const std::string& text,std::vector<Patch>& patches) {
 }
 
 void Apply(void (*log)(const char*,...));
+// Called every Present: with DIRT3VR_RESEARCH_LAPS=N (1-20), writes N into the benchmark
+// config's count at RVA 0xb9dd64 (+0xef4, which the race setup at 0x608fbe uses instead
+// of 1) once the benchmark flag is set, before the race loads.
+void Tick(void (*log)(const char*,...));
 }

@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <MinHook.h>
 #include <atomic>
+#include <cstdlib>
 #include <cstring>
 #include <mutex>
 #include <string>
@@ -43,6 +44,25 @@ void InstallFileTrace(void (*log)(const char*,...)) {
     log("Research file trace installed wide=%d narrow=%d enabled=%d",wide,narrow,enabled);
 }
 }
+void Tick(void (*log)(const char*,...)) {
+    static const unsigned laps=[] {
+        char text[8]{};
+        const auto length=GetEnvironmentVariableA("DIRT3VR_RESEARCH_LAPS",text,sizeof(text));
+        const auto value=length && length<sizeof(text) ? std::strtoul(text,nullptr,10) : 0ul;
+        return value>=1 && value<=20 ? static_cast<unsigned>(value) : 0u;
+    }();
+    if(!laps) return;
+    auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+    const auto benchmarkActive=*reinterpret_cast<volatile uint8_t*>(image+0xb9cef0);
+    auto* count=reinterpret_cast<volatile uint32_t*>(image+0xb9dd64);
+    static unsigned writes{};
+    if(benchmarkActive==1 && *count!=laps) {
+        const auto before=*count;
+        *count=laps;
+        if(++writes<=4) log("Research laps: benchmark count %u -> %u",before,laps);
+    }
+}
+
 void Apply(void (*log)(const char*,...)) {
     static std::once_flag once;
     std::call_once(once,[log] {

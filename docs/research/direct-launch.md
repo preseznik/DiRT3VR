@@ -91,14 +91,47 @@ database and language hashes. `tests/test_event_catalog.py` checks consistency a
 DiRT 3 is installed, that every route and car exists. Only Aspen route 0 with `frx` has
 been driven so far; cross-discipline car choices are untested.
 
+## Laps
+
+The benchmark XML has no laps attribute, but the config has a count at `+0xef4`
+(`0xf9dd64` at the preferred base). The parser leaves it 0. The race setup at `0x608fbe`
+uses `max(1, count)` as the race's lap count while the benchmark is active. The AMD
+gymkhana showcase (`-amd_g`, `0x59c1ce`) is the only code that sets it, to 5.
+
+`DIRT3VR_DIRECT_LAPS=N` (1–20, with `DIRT3VR_DIRECT_PRACTICE=1`) makes the renderer write N
+into the count on Present while the benchmark flag is set, so it is in place before the
+race loads. Present is only hooked with `DIRT3VR_DIAGNOSTICS=1`, which VR sessions always
+set; a desktop direct launch must set it too. The launcher offers 1–5 for circuits
+(rallycross, Land Rush), as the game's Single Race does, and leaves it unset for
+point-to-point events.
+
+Evidence: Aspen route 0, AI driving, the same write from the research proxy
+(`run_benchmark.py --research-laps N`). Race time is samples ÷ average fps from the
+result file:
+
+| Run | Laps | Average fps | Race time |
+|---|---|---|---|
+| 9 | 1 (default) | 714 | 93 s |
+| 13 | 2 | 673 | 155 s |
+| 11 | 3 | 19 | 212 s |
+| 12 | 3 (player's own fullscreen settings) | 122 | 215 s |
+
+That is about 32 s of start sequence plus about 61 s per lap.
+
+## The player's hardware settings
+
+`hardwaresettings="hardware_settings_config.xml"` points the benchmark at the player's own
+file. Run 12 (`--player-hardware-settings`) started at the player's settings (1920×1080
+fullscreen, vsync, 4× MSAA, 120 Hz in the result), completed normally, and left the file
+byte-identical. The launcher's direct practice uses it, so VR's temporary graphics
+changes and quality choices apply as in normal play.
+
 ## Still open
 
 - How a direct session ends: the benchmark counts finished tracks (`+0xefc` against
   `+0xef8`, `0x6a8720`) and writes its result file; what happens after a player finishes
   (restart, results, return to menus) is not yet observed. DiRT2VR patched
   `flow.bin`/`states.bin` for a finish menu.
-- Laps for circuit events, opponents (more `<car>` entries, as DiRT2VR's race grid), and
-  which disciplines and routes start correctly. The event catalog is #5b02d01b.
-- The benchmark always runs at the benchmark's hardware settings file; the launcher must
-  supply one (as `run_benchmark.py` does) or point it at the player's own file.
+- Opponents (more `<car>` entries, as DiRT2VR's race grid), and which disciplines and
+  routes start correctly. The event catalog is #5b02d01b.
 - Not yet tried in VR.
