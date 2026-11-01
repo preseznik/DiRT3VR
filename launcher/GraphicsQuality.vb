@@ -115,3 +115,93 @@ Public NotInheritable Class GraphicsCatalog
         Return changed
     End Function
 End Class
+
+' One set of quality controls (preset picker plus a dropdown per option) for desktop or VR. The first
+' entry of each dropdown leaves the option alone: "Use game setting" for desktop, "Same as desktop" for VR.
+Public NotInheritable Class QualityChoices
+    Private ReadOnly preset As System.Windows.Forms.ComboBox
+    Private ReadOnly boxes As New Dictionary(Of String, System.Windows.Forms.ComboBox)
+    Private updating As Boolean
+    Public Event Changed()
+
+    Public Sub New(parent As System.Windows.Forms.Control, namePrefix As String, unsetOption As String, unsetPreset As String)
+        Dim catalog = GraphicsCatalog.Current
+        preset = New System.Windows.Forms.ComboBox With {.Name = namePrefix & "Preset", .DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList, .AccessibleName = namePrefix & " preset"}
+        preset.Items.Add(unsetPreset)
+        For Each item In catalog.Presets
+            preset.Items.Add(If(item.Id = "medium", item.Label & " (game default)", item.Label))
+        Next
+        preset.Items.Add("Custom")
+        StyleChoice(preset, parent)
+        Field(parent, "Preset", preset)
+        For Each category In catalog.Categories
+            Dim box As New System.Windows.Forms.ComboBox With {.Name = namePrefix & category.Field, .DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList, .AccessibleName = category.Label}
+            box.Items.Add(unsetOption)
+            For Each choice In category.Choices
+                box.Items.Add(If(choice.Id = category.Default, choice.Label & " (game default)", choice.Label))
+            Next
+            StyleChoice(box, parent)
+            Field(parent, category.Label, box)
+            boxes.Add(category.Field, box)
+            AddHandler box.SelectedIndexChanged, Sub()
+                                                     If updating Then Return
+                                                     ShowPreset()
+                                                     RaiseEvent Changed()
+                                                 End Sub
+        Next
+        AddHandler preset.SelectedIndexChanged, Sub() PresetChosen()
+        Values = Nothing
+    End Sub
+
+    ' The chosen options in catalog order; options left on the first entry are absent.
+    Public Property Values As Dictionary(Of String, String)
+        Get
+            Dim result As New Dictionary(Of String, String)
+            For Each category In GraphicsCatalog.Current.Categories
+                Dim index = boxes(category.Field).SelectedIndex
+                If index > 0 Then result.Add(category.Field, category.Choices(index - 1).Id)
+            Next
+            Return result
+        End Get
+        Set(value As Dictionary(Of String, String))
+            updating = True
+            Try
+                For Each category In GraphicsCatalog.Current.Categories
+                    Dim chosen As String = Nothing
+                    Dim index = If(value IsNot Nothing AndAlso value.TryGetValue(category.Field, chosen), category.Choices.FindIndex(Function(item) item.Id = chosen), -1)
+                    boxes(category.Field).SelectedIndex = index + 1
+                Next
+            Finally
+                updating = False
+            End Try
+            ShowPreset()
+        End Set
+    End Property
+
+    Private Sub PresetChosen()
+        If updating Then Return
+        Dim catalog = GraphicsCatalog.Current
+        Dim index = preset.SelectedIndex
+        If index = 0 Then
+            Values = New Dictionary(Of String, String)
+        ElseIf index >= 1 AndAlso index <= catalog.Presets.Count Then
+            Values = New Dictionary(Of String, String)(catalog.Presets(index - 1).Values)
+        Else
+            Return ' Custom keeps the individual choices.
+        End If
+        RaiseEvent Changed()
+    End Sub
+
+    ' The picker names the preset the options match, or Custom.
+    Private Sub ShowPreset()
+        Dim catalog = GraphicsCatalog.Current
+        Dim current = Values
+        Dim match = catalog.MatchingPreset(current)
+        updating = True
+        Try
+            preset.SelectedIndex = If(current.Count = 0, 0, If(match Is Nothing, catalog.Presets.Count + 1, catalog.Presets.IndexOf(match) + 1))
+        Finally
+            updating = False
+        End Try
+    End Sub
+End Class

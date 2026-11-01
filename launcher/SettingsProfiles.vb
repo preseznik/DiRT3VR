@@ -15,8 +15,10 @@ Public Class ProfileValues
     Public Property SkipStartupMovies As Boolean
     Public Property RecenterKey As Integer = RecenterShortcut.DefaultKey
     Public Property RecenterModifiers As Integer
-    ' Schema 4: graphics quality choices (catalog field → choice); empty = Use game setting.
+    ' Schema 4: graphics quality choices (catalog field → choice); empty = Use game setting
+    ' (desktop) or the same as desktop (VR).
     Public Property GraphicsQuality As New Dictionary(Of String, String)
+    Public Property VrGraphicsQuality As New Dictionary(Of String, String)
 
     Public Shared Function Capture(value As LauncherSettings) As ProfileValues
         value.Validate()
@@ -26,7 +28,8 @@ Public Class ProfileValues
             .VrRenderScale = value.VrRenderScale, .DesktopWidth = value.DesktopWidth, .DesktopHeight = value.DesktopHeight,
             .DesktopDisplayMode = value.DesktopDisplayMode, .DesktopVSync = value.DesktopVSync, .SkipStartupMovies = value.SkipStartupMovies,
             .RecenterKey = value.RecenterKey, .RecenterModifiers = value.RecenterModifiers,
-            .GraphicsQuality = New Dictionary(Of String, String)(value.GraphicsQuality)}
+            .GraphicsQuality = New Dictionary(Of String, String)(value.GraphicsQuality),
+            .VrGraphicsQuality = New Dictionary(Of String, String)(value.VrGraphicsQuality)}
     End Function
 
     Public Function ApplyTo(local As LauncherSettings) As LauncherSettings
@@ -38,7 +41,8 @@ Public Class ProfileValues
             .VrRenderScale = VrRenderScale, .DesktopWidth = DesktopWidth, .DesktopHeight = DesktopHeight,
             .DesktopDisplayMode = DesktopDisplayMode, .DesktopVSync = DesktopVSync, .SkipStartupMovies = SkipStartupMovies,
             .RecenterKey = RecenterKey, .RecenterModifiers = RecenterModifiers,
-            .GraphicsQuality = New Dictionary(Of String, String)(If(GraphicsQuality, New Dictionary(Of String, String)))}
+            .GraphicsQuality = New Dictionary(Of String, String)(If(GraphicsQuality, New Dictionary(Of String, String))),
+            .VrGraphicsQuality = New Dictionary(Of String, String)(If(VrGraphicsQuality, New Dictionary(Of String, String)))}
         result.Validate()
         Return result
     End Function
@@ -58,7 +62,7 @@ Public Class SettingsProfile
         If Settings Is Nothing Then Throw New IOException("The profile has no settings.")
         If Schema = 1 AndAlso Settings.SkipStartupMovies Then Throw New IOException("Startup choices require settings profile schema 2.")
         If Schema < 3 AndAlso (Settings.RecenterKey <> RecenterShortcut.DefaultKey OrElse Settings.RecenterModifiers <> 0) Then Throw New IOException("Recenter keys require settings profile schema 3.")
-        If Schema < 4 AndAlso Settings.GraphicsQuality IsNot Nothing AndAlso Settings.GraphicsQuality.Count > 0 Then Throw New IOException("Graphics quality choices require settings profile schema 4.")
+        If Schema < 4 AndAlso ((Settings.GraphicsQuality IsNot Nothing AndAlso Settings.GraphicsQuality.Count > 0) OrElse (Settings.VrGraphicsQuality IsNot Nothing AndAlso Settings.VrGraphicsQuality.Count > 0)) Then Throw New IOException("Graphics quality choices require settings profile schema 4.")
         Settings.ApplyTo(New LauncherSettings())
     End Sub
 End Class
