@@ -3,6 +3,10 @@
 #include "game_vr.h"
 #include "scene_resolution.h"
 #include "hud_hooks.h"
+#include "background_play.h"
+#if defined(DIRT3VR_RESEARCH_PATCHES)
+#include "research_patch.h"
+#endif
 #include <intrin.h>
 #include <MinHook.h>
 #include <bcrypt.h>
@@ -206,9 +210,12 @@ HRESULT STDMETHODCALLTYPE Present(IDXGISwapChain* chain, UINT interval, UINT fla
                 elapsed = 1000.0 * (now.QuadPart - state.lastPresent.QuadPart) / state.frequency.QuadPart;
             state.lastPresent = now; state.presentThread = thread;
         }
-        if(count == 1 || count % 120 == 0 || FAILED(result))
-            Log("Present count=%u chain=%p thread=%lu interval=%u flags=0x%x result=0x%08lx interval_ms=%.3f",
-                count, chain, GetCurrentThreadId(), interval, flags, result, elapsed);
+        if(count == 1 || count % 120 == 0 || FAILED(result)) {
+            DWORD foregroundProcess{};
+            GetWindowThreadProcessId(GetForegroundWindow(), &foregroundProcess);
+            Log("Present count=%u chain=%p thread=%lu interval=%u flags=0x%x result=0x%08lx interval_ms=%.3f foreground=%u",
+                count, chain, GetCurrentThreadId(), interval, flags, result, elapsed, foregroundProcess == GetCurrentProcessId());
+        }
     } catch(...) { }
     return result;
 }
@@ -274,6 +281,10 @@ void ObserveCreation(HRESULT result, ID3D11Device* device, IDXGISwapChain* chain
     try {
         Initialize();
         auto& state = GetState();
+        if(state.supported && backgroundplay::Requested()) backgroundplay::Install(Log);
+#if defined(DIRT3VR_RESEARCH_PATCHES)
+        if(state.supported && state.enabled) research::Apply(Log);
+#endif
         if(!state.enabled || (!state.supported && !state.fixture)) return;
         Log("D3D11 creation result=0x%08lx device=%p swapchain=%p", result, device, chain);
         if(FAILED(result)) return;

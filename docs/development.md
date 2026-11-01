@@ -66,6 +66,12 @@ For a release to be offered:
 
 ## Bounded desktop diagnostic
 
+`--background-play` keeps the game running when it loses focus and starts it without
+activating its window, so a run doesn't need the desk. `--research-patch
+RVA:ORIGINAL:REPLACEMENT[,…]` with `--proxy build/native/bin/research/d3d11.dll` applies
+an in-memory code change in the research-only renderer (never packaged) after its original
+bytes match; the report records whether it was applied.
+
 `python tools/run_benchmark.py` is read-only preflight. With `--run`, it stages
 an owned proxy and unique benchmark XML in the game directory, and a unique
 hardware XML under the actual Documents `My Games/DiRT3/hardwaresettings` folder.
