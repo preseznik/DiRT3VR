@@ -515,6 +515,7 @@ Module Program
         RecenterTiltTests.RunUi(root, AddressOf Check)
         GraphicsQualityTests.RunUi(root, AddressOf Check)
         DirectPracticeTests.RunUi(root, AddressOf Check)
+        SimpleViewTests.RunUi(root, AddressOf Check)
         WheelGuardTests.Run(root, AddressOf Check)
         InstallerTests.RunUi(AddressOf Check)
         SectionCollapseTests.Run(root, AddressOf Check)

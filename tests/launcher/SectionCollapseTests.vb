@@ -70,7 +70,15 @@ Module SectionCollapseTests
             Dim plainHeadings = Descendants(tabs).OfType(Of VerticalStack)().Where(Function(s) s.Controls.Count > 0).Select(Function(s) s.Controls(0)).OfType(Of Label)().
                 Where(Function(l) l.Font.Bold AndAlso l.Font.SizeInPoints >= 11).Select(Function(l) l.Text).ToArray()
             check(plainHeadings.Length = 0, "launcher sections use collapsible headings: " & String.Join(", ", plainHeadings))
-            check(Descendants(tabs).OfType(Of SectionHeader)().Count() = form.SectionHeaders.Count, "every launcher heading remembers its collapsed state")
+            ' Quick start (Simple view) has headings of its own, outside the tabs while Advanced shows.
+            Dim registered = form.SectionHeaders.ToHashSet()
+            Dim advancedHeadings = Descendants(tabs).OfType(Of SectionHeader)().ToArray()
+            DirectCast(form.Controls.Find("SimpleView", True).Single(), RadioButton).Checked = True : Application.DoEvents()
+            Dim simpleHeadings = Descendants(tabs).OfType(Of SectionHeader)().ToArray()
+            form.ConfirmAdvancedView = Function() True
+            DirectCast(form.Controls.Find("AdvancedView", True).Single(), RadioButton).Checked = True : Application.DoEvents()
+            check(simpleHeadings.Length > 0 AndAlso advancedHeadings.Concat(simpleHeadings).All(Function(h) registered.Contains(h)) AndAlso advancedHeadings.Union(simpleHeadings).Count() = registered.Count,
+                  "every launcher heading, in both views, remembers its collapsed state")
             form.Close()
         End Using
         check(WindowPreferences.Load(ctx).CollapsedSections = "Startup", "collapsed sections are saved with the window size on close")

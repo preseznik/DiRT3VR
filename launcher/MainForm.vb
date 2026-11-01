@@ -115,7 +115,7 @@ Public Class MainForm
         AddHandler help.Click, Sub() ShowHelp()
         AddHandler updateNotice.Click, Sub() ShowHelp()
         Dim headerActions As New FlowLayoutPanel With {.AutoSize = True, .WrapContents = False, .Margin = New Padding(0), .Anchor = AnchorStyles.Top Or AnchorStyles.Right}
-        headerActions.Controls.AddRange({updateNotice, help})
+        headerActions.Controls.AddRange({updateNotice, viewPicker, help})
         header.Controls.Add(headerActions, 1, 0)
         layout.Controls.Add(header, 0, 0)
         state.Margin = New Padding(0, 0, 0, 12)
@@ -123,6 +123,7 @@ Public Class MainForm
         layout.Controls.Add(tabs, 0, 2)
         BuildLauncher() : BuildGraphics() : BuildControls() : BuildSettings() : BuildAdvanced()
         headers.AddRange(FindHeaders(tabs))
+        InitializeViews()
         For Each heading In headers
             AddHandler heading.CollapsedChanged, Sub() collapsedSectionTitles = WindowPreferences.JoinSections(headers.Where(Function(h) h.Collapsed).Select(Function(h) h.Title))
         Next
@@ -747,6 +748,8 @@ Public Class MainForm
         Dim running = InstallContext.GameRunning()
         Dim pending = New OwnedFileTransaction(context).Pending
         Dim reason = RuntimeCapabilities.ExperimentalReason(context, CurrentSettings())
+        ' In Simple view the opt-in sits on Quick start.
+        If SimpleViewShown AndAlso Not experimental.Checked Then reason = "Enable experimental VR under VR headset to use Launch VR."
         state.Text = If(busy, "Working…", If(interactive IsNot Nothing, InteractiveSession.OutputStatus(interactive.ReadNativeTail()), If(launchProgress IsNot Nothing, "Starting DiRT 3…", If(pending, "Recovery pending — close DiRT 3, then restore original files.", If(running, "DiRT 3 is running.", If(reason = "", "Ready · experimental VDXR enabled", reason))))))
         If Not busy AndAlso desktopStartup IsNot Nothing Then state.Text = "DiRT 3 desktop session · DiRT3VR's temporary files will be removed after exit."
         If Not busy AndAlso interactive IsNot Nothing AndAlso interactive.VrStopped Then state.Text = "VR stopped · DiRT 3 runs on the monitor · original files will be restored after exit."
@@ -759,6 +762,7 @@ Public Class MainForm
         stopVrButton.Enabled = Not busy AndAlso interactive IsNot Nothing AndAlso Not interactive.VrStopped
         save.Enabled = Not busy : recover.Enabled = Not busy AndAlso Not running
         tabs.Enabled = Not busy AndAlso interactive Is Nothing AndAlso desktopStartup Is Nothing
+        viewPicker.Enabled = tabs.Enabled
         ' Hovering a disabled button says why (disabled buttons show no ordinary tooltip).
         Dim wait = If(busy, "Wait until the current task finishes.", "")
         Dim pendingReason = "Files from an earlier session still need restoring. Use Restore original files first."
@@ -837,6 +841,7 @@ Public Class MainForm
         Dim normal = If(WindowState = FormWindowState.Normal, Size, RestoreBounds.Size)
         Dim preferences = WindowPreferences.Capture(normal, DeviceDpi, lastWindowState = FormWindowState.Maximized)
         preferences.CollapsedSections = collapsedSectionTitles
+        preferences.SimpleView = Not viewPicker.Advanced
         preferences.Save(context)
     End Sub
 
@@ -996,7 +1001,8 @@ Public Class MainForm
                 "Launch starts DiRT 3 Complete Edition on your monitor with the desktop choices under Graphics. Choose your career, event, car and track in the game's own menus. Steam must be running with access to the game. Driving controls and saves stay managed by DiRT 3." & vbCrLf & vbCrLf &
                 "Launch VR starts an experimental VR session (see " & HelpVr & "). While DiRT 3 runs, Launch becomes Show game, which brings the game window to the front." & vbCrLf & vbCrLf &
                 "Save settings keeps the current controls as the launcher's settings for next time, as Launch does. It never changes the game or a settings profile." & vbCrLf & vbCrLf &
-                "The ? button opens this window: updates at the top, these topics below. The Instructions link on each tab opens that tab's topic."),
+                "The ? button opens this window: updates at the top, these topics below. The Instructions link on each tab opens that tab's topic. The Simple | Advanced switch beside it shows the essentials on one page or every option (see " & HelpViews & ")."),
+            ViewsTopic(),
             New HelpTopic(HelpDirect,
                 "Launcher → Launch mode → Direct practice starts DiRT 3 straight on a route with your car, without its menus, through the game's own benchmark start; DiRT3VR's renderer keeps the car under your control." & vbCrLf & vbCrLf &
                 "Choose the discipline (rally, rallycross, trailblazer or Land Rush), the location and route, and the car. Cars are those of the route's discipline; Show cars from other disciplines lists the rest, which are untested. Search finds cars by name, code or class, and Class narrows the list." & vbCrLf & vbCrLf &
