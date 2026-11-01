@@ -40,7 +40,25 @@ inline bool Keep(uint8_t* image,uintptr_t loadedBase) {
     return true;
 }
 
+// Laps: the race setup (0x608fbe) takes the lap count from the benchmark config's count
+// (+0xef4, 0xf9dd64 at the preferred base) as max(1, count); the benchmark XML has no
+// attribute for it and the parser leaves it 0. Writing it before the race loads gives the
+// player that many laps (count 3 made the AI race 3 laps: ~213 s against ~93 s for 1).
+inline constexpr uintptr_t lapsRva=0xb9dd64;
+inline constexpr unsigned maxLaps=20;
+// One Present's worth: writes laps into the count while the benchmark flag is set.
+// Returns true when it changed the value.
+inline bool KeepLaps(uint8_t benchmarkActive,uint32_t& count,unsigned laps) {
+    if(benchmarkActive!=1 || laps<1 || laps>maxLaps || count==laps) return false;
+    count=laps;
+    return true;
+}
+
 bool Requested();
+// DIRT3VR_DIRECT_LAPS=N (1-20); 0 when unset or invalid.
+unsigned RequestedLaps();
+// Called on every Present: keeps the requested lap count once direct practice is installed.
+void Tick(void (*log)(const char*,...));
 // Applies the change to the running supported game once; false leaves the code unchanged.
 bool Install(void (*log)(const char*,...));
 }

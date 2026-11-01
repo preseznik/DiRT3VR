@@ -19,9 +19,10 @@ import subprocess
 import time
 import uuid
 import xml.etree.ElementTree as ET
+import zlib
 
 from diagnostic_files import (DiagnosticFiles, RESTRICTIONS_NAME, SPECTATOR_NAME, preflight_replacement, no_links,
-                              preflight_serial_render, restore_xml_formatting, save_json, sha256)
+                              preflight_serial_render, replace_verified, restore_xml_formatting, save_json, sha256)
 
 EXPECTED_EXE = "c502b495bb34a097440756769c80dcb36a79b618943f739e20d591d54171ff98"
 ROOT = Path(__file__).resolve().parents[1]
@@ -191,7 +192,7 @@ def diagnostic_environment(directory: Path, *, scene_observer: bool = False, rep
                            xr_runtime: Path | None = None, background_play: bool = False) -> dict:
     env = dict(os.environ, DIRT3VR_DIAGNOSTICS="1", DIRT3VR_LOG_DIR=str(directory), SteamAppId="321040")
     for flag in ("DIRT3VR_ENABLE_VR", "DIRT3VR_SCENE_DIAGNOSTICS", "DIRT3VR_REPLAY_DIAGNOSTICS",
-                 "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH", "DIRT3VR_RESEARCH_FILE_TRACE", "DIRT3VR_DIRECT_PRACTICE"):
+                 "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH", "DIRT3VR_RESEARCH_FILE_TRACE", "DIRT3VR_DIRECT_PRACTICE", "DIRT3VR_DIRECT_LAPS", "DIRT3VR_RESEARCH_LAPS", "DIRT3VR_SCREENSHOT_SECONDS"):
         env.pop(flag, None)
     if background_play:
         env["DIRT3VR_BACKGROUND_PLAY"] = "1"
@@ -262,7 +263,8 @@ def benchmark_completed(report: dict) -> bool:
     summary = report.get("benchmarkSummary", {})
     return bool(report.get("supportedProxyLoaded") and report.get("lastLoggedPresentCount", 0) > 0
                 and report.get("exitCode") == 0 and not report.get("forcedTermination")
-                and report.get("benchmarkConfirmed") and summary.get("requestedConfigurationVerified")
+                and report.get("benchmarkConfirmed")
+                and (report.get("playerHardwareSettings") or summary.get("requestedConfigurationVerified"))
                 and (not report.get("serialRender") or summary.get("serialRenderVerified"))
                 and (not report.get("replayPair") or report.get("replaySummary", {}).get("evidenceVerified"))
                 and (not report.get("xrRuntime") or (report.get("xrSummary", {}).get("evidenceVerified")
@@ -305,6 +307,50 @@ def documents_dir() -> Path:
     return Path(buffer.value)
 
 
+def bmp_to_png(source: Path) -> Path:
+    """Convert the renderer's 32-bit top-down BMP screenshot to an RGB PNG next to it."""
+    data = source.read_bytes()
+    if len(data) < 54 or data[:2] != b"BM":
+        raise ValueError(f"Not a screenshot BMP: {source.name}")
+    offset, width, height, bits = (struct.unpack_from("<I", data, 10)[0], struct.unpack_from("<i", data, 18)[0],
+                                   struct.unpack_from("<i", data, 22)[0], struct.unpack_from("<H", data, 28)[0])
+    if bits != 32 or width <= 0 or height >= 0 or len(data) != offset + width * -height * 4:
+        raise ValueError(f"Unexpected screenshot layout: {source.name}")
+    height = -height
+    pixels = data[offset:]
+    rgb = bytearray(width * height * 3)
+    rgb[0::3], rgb[1::3], rgb[2::3] = pixels[2::4], pixels[1::4], pixels[0::4]
+    stride = width * 3
+    raw = b"".join(b"\x00" + rgb[y * stride:(y + 1) * stride] for y in range(height))
+
+    def chunk(kind: bytes, body: bytes) -> bytes:
+        return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body) & 0xFFFFFFFF)
+
+    target = source.with_suffix(".png")
+    target.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+                       + chunk(b"IDAT", zlib.compress(raw, 6)) + chunk(b"IEND", b""))
+    return target
+
+
+def restore_player_hardware(target: Path, backup: Path, original_hash: str, retained: Path) -> bool:
+    """Put the player's settings file back byte-exact after the game rewrote it, keeping the game's copy."""
+    for path in (target, backup, retained):
+        no_links(path)
+    original = backup.read_bytes()
+    if hashlib.sha256(original).hexdigest() != original_hash:
+        raise ValueError("Backup of the player's hardware settings changed; current file preserved")
+    if not target.is_file():
+        raise FileNotFoundError("The player's hardware settings file disappeared; backup retained")
+    current = target.read_bytes()
+    current_hash = hashlib.sha256(current).hexdigest()
+    if current_hash == original_hash:
+        return False
+    with retained.open("xb") as stream:
+        stream.write(current)
+    replace_verified(target, original, current_hash)
+    return True
+
+
 def protected_state(game: Path) -> dict[str, str]:
     paths = [game / "dirt3_game.exe", game / "steam_api.dll",
              game / RESTRICTIONS_NAME, game / SPECTATOR_NAME,
@@ -342,6 +388,17 @@ def main() -> int:
                         help="Research: temporarily add the normal race's 'Controller / Switch type=human' event to cutscene/spectator_startsequence.xml (journaled and restored)")
     parser.add_argument("--research-patch", metavar="RVA:ORIGINAL:REPLACEMENT",
                         help="Research only: in-memory code change applied by the research proxy (build/native/bin/research/d3d11.dll, pass it with --proxy) after its original bytes match")
+    parser.add_argument("--screenshots", metavar="SECONDS",
+                        help="Comma-separated, ascending seconds after the first frame (e.g. 40,100,160): the renderer saves the "
+                             "game's frame at each, converted to screenshot-<n>-<s>s.png in the run directory")
+    parser.add_argument("--direct-laps", type=int, choices=range(1, 21), metavar="N",
+                        help="With --direct-practice: the renderer sets the race to N laps (DIRT3VR_DIRECT_LAPS)")
+    parser.add_argument("--research-laps", type=int, choices=range(1, 21), metavar="N",
+                        help="Research only: the research proxy sets the benchmark's lap count to N")
+    parser.add_argument("--player-hardware-settings", action="store_true",
+                        help="Point the benchmark at the player's own hardware_settings_config.xml (as direct launch will) instead of a "
+                             "temporary windowed copy; the game runs at the player's settings and the file is put back byte-exact "
+                             "afterwards, keeping the game-written copy")
     parser.add_argument("--file-trace", action="store_true",
                         help="Research only: the research proxy logs every file the game opens after device creation")
     parser.add_argument("--recover", type=Path, metavar="JOURNAL")
@@ -350,6 +407,16 @@ def main() -> int:
         parser.error("--replay-pair requires both --serial-render and --scene-observer")
     if args.xr_runtime and (not (args.serial_render and args.scene_observer) or args.replay_pair):
         parser.error("--xr-runtime requires --serial-render and --scene-observer and cannot be combined with --replay-pair")
+    if args.screenshots is not None:
+        times = args.screenshots.split(",")
+        if (not all(t.isdigit() for t in times) or len(times) > 16
+                or any(not 1 <= int(t) <= 3600 for t in times)
+                or any(int(a) >= int(b) for a, b in zip(times, times[1:]))):
+            parser.error("--screenshots needs up to 16 ascending whole seconds between 1 and 3600, e.g. 40,100,160")
+    if args.direct_laps and not args.direct_practice:
+        parser.error("--direct-laps requires --direct-practice")
+    if args.player_hardware_settings and args.serial_render:
+        parser.error("--player-hardware-settings cannot be combined with --serial-render, which needs a modified copy")
     if args.xr_runtime and not 120 <= args.seconds <= 300:
         parser.error("--xr-runtime requires --seconds between 120 and 300 for a bounded session and shutdown")
     game = args.game.absolute()
@@ -387,6 +454,7 @@ def main() -> int:
                  "serialRender": args.serial_render, "replayPair": args.replay_pair,
                  "xrRuntime": xr_runtime, "backgroundPlay": args.background_play, "researchPatch": args.research_patch,
                  "spectatorHumanSwitch": args.spectator_human_switch, "directPractice": args.direct_practice,
+                 "playerHardwareSettings": args.player_hardware_settings, "directLaps": args.direct_laps,
                  "durationSeconds": args.seconds}
     if restrictions:
         preflight["restrictionsOriginalSha256"] = hashlib.sha256(restrictions[0]).hexdigest()
@@ -408,6 +476,8 @@ def main() -> int:
         (backups / name).write_bytes(Path(path).read_bytes())
         originals[path] = {"sha256": digest, "backup": name}
     save_json(run / "protected-state.json", originals)
+    if args.player_hardware_settings and str(hardware_source) not in originals:
+        raise RuntimeError("The player's hardware settings file was not backed up; nothing deployed")
     transaction = DiagnosticFiles(game, run / "deployment.json", run_id, hardware_dir)
     process = None
     hardware_path = None
@@ -421,9 +491,13 @@ def main() -> int:
             transaction.apply_serial_render(restrictions[0])
         if spectator:
             transaction.apply_replacement(SPECTATOR_NAME, spectator[0])
-        hardware_name = f"dirt3vr-hardware-{run_id}.xml"
-        hardware_input.write_bytes(hardware_bytes)
-        hardware_path = transaction.add(hardware_name, hardware_input.read_bytes())
+        if args.player_hardware_settings:
+            # The game reads and rewrites this file; its original is in protected-originals.
+            hardware_name = hardware_source.name
+        else:
+            hardware_name = f"dirt3vr-hardware-{run_id}.xml"
+            hardware_input.write_bytes(hardware_bytes)
+            hardware_path = transaction.add(hardware_name, hardware_input.read_bytes())
         benchmark = ET.Element("config", {"skipreplays": "true", "outputfilename": f"DiRT3VR_{run_id}",
                                            "hardwaresettings": hardware_name})
         track = ET.SubElement(benchmark, "track", {"country": "usa", "name": "aspen", "route": "route_0"})
@@ -438,6 +512,12 @@ def main() -> int:
             env["DIRT3VR_RESEARCH_FILE_TRACE"] = "1"
         if args.direct_practice:
             env["DIRT3VR_DIRECT_PRACTICE"] = "1"
+        if args.direct_laps:
+            env["DIRT3VR_DIRECT_LAPS"] = str(args.direct_laps)
+        if args.screenshots:
+            env["DIRT3VR_SCREENSHOT_SECONDS"] = args.screenshots
+        if args.research_laps:
+            env["DIRT3VR_RESEARCH_LAPS"] = str(args.research_laps)
         startup = None
         if args.background_play:
             # Ask Windows not to activate the game window; DiRT 3 may still bring itself forward.
@@ -482,6 +562,18 @@ def main() -> int:
             report["directPracticeInstalled"] = "Direct practice: benchmark start keeps the player's car under player control" in logs
             if not report["directPracticeInstalled"]:
                 report["errors"].append("Direct practice was requested but the proxy did not install it")
+        if args.screenshots:
+            report["screenshots"] = []
+            for bmp in sorted(run.glob("screenshot-*.bmp")):
+                try:
+                    report["screenshots"].append(bmp_to_png(bmp).name)
+                    bmp.unlink()
+                except (OSError, ValueError) as error:
+                    report["errors"].append("Screenshot conversion failed: " + str(error))
+        if args.direct_laps:
+            report["directLapsWritten"] = f"Direct practice laps: benchmark count 0 -> {args.direct_laps}" in logs
+            if not report["directLapsWritten"]:
+                report["errors"].append("Direct practice laps were requested but the renderer did not set them")
         if args.research_patch:
             report["researchPatchesApplied"] = len(re.findall(r"Research patch applied", logs))
             report["researchPatchRefused"] = "Research patch refused" in logs
@@ -509,7 +601,8 @@ def main() -> int:
                 report["benchmarkSummary"] = summary
                 report["benchmarkConfirmed"] = summary["sceneConfirmed"]
                 report["serialRenderVerified"] = summary["serialRenderVerified"]
-                if not summary["requestedConfigurationVerified"]:
+                # With the player's own file the game runs at the player's settings, not the diagnostic copy.
+                if not summary["requestedConfigurationVerified"] and not args.player_hardware_settings:
                     report["errors"].append("The benchmark did not retain the requested scheduling/graphics configuration")
         if not report["benchmarkConfirmed"]:
             report["errors"].append("No completed benchmark result confirmed the requested scene")
@@ -537,6 +630,10 @@ def main() -> int:
                 conflicts = DiagnosticFiles.recover(run / "deployment.json", game, hardware_dir)
                 report["recoveryConflicts"] = conflicts
                 report["restored"] = not conflicts
+                if args.player_hardware_settings:
+                    report["playerHardwareRewritten"] = restore_player_hardware(
+                        hardware_source, backups / originals[str(hardware_source)]["backup"],
+                        originals[str(hardware_source)]["sha256"], run / "player-hardware-settings-game-written.xml")
             except Exception as error:
                 report["restored"] = False
                 report["errors"].append("Diagnostic recovery did not finish; originals retained: " + str(error))

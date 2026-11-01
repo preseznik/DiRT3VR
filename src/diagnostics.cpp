@@ -5,6 +5,7 @@
 #include "hud_hooks.h"
 #include "background_play.h"
 #include "direct_practice.h"
+#include "screenshot.h"
 #if defined(DIRT3VR_RESEARCH_PATCHES)
 #include "research_patch.h"
 #endif
@@ -196,11 +197,16 @@ bool Observed(IDXGISwapChain* chain) {
 }
 HRESULT STDMETHODCALLTYPE Present(IDXGISwapChain* chain, UINT interval, UINT flags) {
     try { if(Observed(chain) && !(flags & DXGI_PRESENT_TEST)) VrBeforePresent(chain); } catch(...) { }
+    try { if(Observed(chain) && !(flags & DXGI_PRESENT_TEST)) screenshot::BeforePresent(chain, Log); } catch(...) { }
     const HRESULT result = realPresent(chain, interval, flags);
     try {
         if(!Observed(chain)) return result;
         auto& state = GetState();
         const auto count = ++state.presents;
+        directpractice::Tick(Log);
+#if defined(DIRT3VR_RESEARCH_PATCHES)
+        research::Tick(Log);
+#endif
         if(FAILED(result)) ++state.failedPresents;
         LARGE_INTEGER now{}; QueryPerformanceCounter(&now);
         double elapsed{};
