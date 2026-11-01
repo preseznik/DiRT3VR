@@ -150,6 +150,13 @@ class XrRuntimeTests(unittest.TestCase):
             self.assertEqual(env["DIRT3VR_XR_STOP_FILE"], str(self.directory / "xr-stop.request"))
             self.assertNotIn("DIRT3VR_ENABLE_VR", env)
 
+    def test_background_play_is_explicit_and_never_inherited(self):
+        with patch.dict(os.environ, {"DIRT3VR_BACKGROUND_PLAY": "1"}):
+            self.assertNotIn("DIRT3VR_BACKGROUND_PLAY", runner.diagnostic_environment(self.directory))
+            env = runner.diagnostic_environment(self.directory, background_play=True)
+            self.assertEqual(env["DIRT3VR_BACKGROUND_PLAY"], "1")
+            self.assertNotIn("DIRT3VR_XR_PROTOTYPE", env)
+
     def test_stop_file_precedes_acknowledgement_and_exit_is_not_success(self):
         process = Mock()
         process.poll.return_value = None

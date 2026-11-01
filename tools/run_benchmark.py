@@ -188,11 +188,13 @@ def request_xr_shutdown(process, directory: Path, timeout: float = 3.0, *, alrea
 
 
 def diagnostic_environment(directory: Path, *, scene_observer: bool = False, replay_pair: bool = False,
-                           xr_runtime: Path | None = None) -> dict:
+                           xr_runtime: Path | None = None, background_play: bool = False) -> dict:
     env = dict(os.environ, DIRT3VR_DIAGNOSTICS="1", DIRT3VR_LOG_DIR=str(directory), SteamAppId="321040")
     for flag in ("DIRT3VR_ENABLE_VR", "DIRT3VR_SCENE_DIAGNOSTICS", "DIRT3VR_REPLAY_DIAGNOSTICS",
-                 "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON"):
+                 "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH"):
         env.pop(flag, None)
+    if background_play:
+        env["DIRT3VR_BACKGROUND_PLAY"] = "1"
     if scene_observer:
         env["DIRT3VR_SCENE_DIAGNOSTICS"] = "1"
     if replay_pair:
@@ -332,6 +334,10 @@ def main() -> int:
                         help="Run the bounded desktop eye replay; requires --serial-render and --scene-observer; does not enable VR")
     parser.add_argument("--xr-runtime", type=Path, metavar="ABS_MANIFEST",
                         help="Opt into the headset prototype with an explicit x86 runtime manifest; requires --serial-render and --scene-observer; incompatible with --replay-pair")
+    parser.add_argument("--background-play", action="store_true",
+                        help="Keep the game running when it loses focus (suppresses its focus-loss pause in memory) and start its window without activating it")
+    parser.add_argument("--research-patch", metavar="RVA:ORIGINAL:REPLACEMENT",
+                        help="Research only: in-memory code change applied by the research proxy (build/native/bin/research/d3d11.dll, pass it with --proxy) after its original bytes match")
     parser.add_argument("--recover", type=Path, metavar="JOURNAL")
     args = parser.parse_args()
     if args.replay_pair and not (args.serial_render and args.scene_observer):
@@ -372,7 +378,7 @@ def main() -> int:
                  "mode": "headset-prototype" if xr_runtime else "desktop-eye-replay" if args.replay_pair else "desktop-observation",
                  "stereo": False, "sceneObserver": args.scene_observer,
                  "serialRender": args.serial_render, "replayPair": args.replay_pair,
-                 "xrRuntime": xr_runtime,
+                 "xrRuntime": xr_runtime, "backgroundPlay": args.background_play, "researchPatch": args.research_patch,
                  "durationSeconds": args.seconds}
     if restrictions:
         preflight["restrictionsOriginalSha256"] = hashlib.sha256(restrictions[0]).hexdigest()
@@ -415,9 +421,15 @@ def main() -> int:
         benchmark_path = transaction.add(f"dirt3vr-benchmark-{run_id}.xml", ET.tostring(benchmark, encoding="utf-8", xml_declaration=True))
         transaction.add("d3d11.dll", proxy_bytes)
         env = diagnostic_environment(run, scene_observer=args.scene_observer, replay_pair=args.replay_pair,
-                                     xr_runtime=args.xr_runtime)
+                                     xr_runtime=args.xr_runtime, background_play=args.background_play)
+        if args.research_patch:
+            env["DIRT3VR_RESEARCH_PATCH"] = args.research_patch
+        startup = None
+        if args.background_play:
+            # Ask Windows not to activate the game window; DiRT 3 may still bring itself forward.
+            startup = subprocess.STARTUPINFO(dwFlags=subprocess.STARTF_USESHOWWINDOW, wShowWindow=4)  # SW_SHOWNOACTIVATE
         started = time.monotonic()
-        process = subprocess.Popen([str(exe), "-benchmark", benchmark_path.name], cwd=game, env=env)
+        process = subprocess.Popen([str(exe), "-benchmark", benchmark_path.name], cwd=game, env=env, startupinfo=startup)
         report["pid"] = process.pid
         save_json(run / "run.json", report)
         print(f"Diagnostic running: pid={process.pid}; log directory={run}", flush=True)
@@ -452,6 +464,15 @@ def main() -> int:
         report["elapsedSeconds"] = round(time.monotonic() - started, 2)
         logs = native_logs(run)
         report["supportedProxyLoaded"] = "supported_host=1" in logs
+        if args.research_patch:
+            report["researchPatchesApplied"] = len(re.findall(r"Research patch applied", logs))
+            report["researchPatchRefused"] = "Research patch refused" in logs
+        if args.background_play:
+            report["backgroundPlayInstalled"] = "Background play: focus-loss pause request and replay pause suppressed" in logs
+            report["presentLogsInBackground"] = len(re.findall(r"Present count=\d+ .* foreground=0", logs))
+            report["presentLogsInForeground"] = len(re.findall(r"Present count=\d+ .* foreground=1", logs))
+            if not report["backgroundPlayInstalled"]:
+                report["errors"].append("Background play was requested but the proxy did not install it")
         counts = [int(x) for x in re.findall(r"Present count=(\d+)", logs)]
         report["lastLoggedPresentCount"] = max(counts, default=0)
         report["requestedSwapchainObserved"] = bool(re.search(r"Swapchain.*size=1280x720\b", logs))
