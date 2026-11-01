@@ -20,7 +20,8 @@ Public Module ExperimentalFiles
         End Try
     End Function
 
-    Public Function Graphics(data As Byte(), Optional width As Integer = 1280, Optional height As Integer = 720) As Byte()
+    ' vrQuality: VR-only graphics quality choices (GraphicsCatalog), part of this temporary transform.
+    Public Function Graphics(data As Byte(), Optional width As Integer = 1280, Optional height As Integer = 720, Optional vrQuality As IDictionary(Of String, String) = Nothing) As Byte()
         HeadsetResolution.ValidateSceneSize(width, height)
         Dim document = ReadXml(data), root = document.Root
         If root Is Nothing OrElse root.Name <> "hardware_settings_config" Then Throw New IOException("Unexpected graphics XML root.")
@@ -41,6 +42,7 @@ Public Module ExperimentalFiles
                 found(0).SetAttributeValue(value.Key, value.Value)
             Next
         Next
+        If vrQuality IsNot Nothing Then GraphicsCatalog.Current.Apply(root, vrQuality)
         Return Encoding.UTF8.GetBytes(document.ToString(SaveOptions.DisableFormatting))
     End Function
 
@@ -133,9 +135,19 @@ Public Module ExperimentalFiles
 
     ' Keeps what changed in DiRT 3 during the session but puts back the original's values for
     ' everything the session owns. Nothing when the current file isn't DiRT 3's settings XML.
-    Public Function RestoreSessionValues(current As Byte(), original As Byte()) As Byte()
+    ' vrQuality: the session's VR-only quality choices; their attributes go back to the original too.
+    Public Function RestoreSessionValues(current As Byte(), original As Byte(), Optional vrQuality As IDictionary(Of String, String) = Nothing) As Byte()
         Dim target = SettingsDocument(current), source = SettingsDocument(original)
         If target Is Nothing OrElse source Is Nothing Then Return Nothing
+        For Each pair In GraphicsCatalog.Current.Normalize(vrQuality)
+            For Each key In GraphicsCatalog.Current.Categories.First(Function(category) category.Field = pair.Key).Find(pair.Value).Attributes.Keys
+                Dim parts = key.Split("@"c)
+                Dim originalElement = source.Root.Elements(parts(0)).Take(2).ToArray(), currentElement = target.Root.Elements(parts(0)).Take(2).ToArray()
+                If originalElement.Length <> 1 OrElse currentElement.Length <> 1 Then Return Nothing
+                Dim value = originalElement(0).Attribute(parts(1))
+                If value Is Nothing Then currentElement(0).Attribute(parts(1))?.Remove() Else currentElement(0).SetAttributeValue(parts(1), value.Value)
+            Next
+        Next
         For Each pair In SessionValues
             Dim originalElement = FindOne(source.Root, pair.Key), currentElement = FindOne(target.Root, pair.Key)
             For Each name In pair.Value
@@ -163,14 +175,14 @@ Public Module ExperimentalFiles
         Return New Drawing.Size(width, height)
     End Function
 
-    Public Function Changes(context As InstallContext, Optional width As Integer = 1280, Optional height As Integer = 720, Optional skipStartupMovies As Boolean = False) As IReadOnlyDictionary(Of String, Byte())
+    Public Function Changes(context As InstallContext, Optional width As Integer = 1280, Optional height As Integer = 720, Optional skipStartupMovies As Boolean = False, Optional vrQuality As IDictionary(Of String, String) = Nothing) As IReadOnlyDictionary(Of String, Byte())
         Dim payload = Path.Combine(context.PackageRoot, "payload", "d3d11.dll")
         For Each target In {context.GraphicsPath, Path.Combine(context.GameRoot, "system", "hardware_settings_restrictions.xml"), payload}
             SafeFiles.NoLinks(target)
             If Not File.Exists(target) Then Throw New IOException("Required experimental VR file is missing: " & target)
         Next
         Dim preparedFiles As New Dictionary(Of String, Byte()) From {
-            {"proxy", File.ReadAllBytes(payload)}, {"graphics", Graphics(File.ReadAllBytes(context.GraphicsPath), width, height)},
+            {"proxy", File.ReadAllBytes(payload)}, {"graphics", Graphics(File.ReadAllBytes(context.GraphicsPath), width, height, vrQuality)},
             {"restrictions", Restrictions(File.ReadAllBytes(Path.Combine(context.GameRoot, "system", "hardware_settings_restrictions.xml")))}}
         If skipStartupMovies Then preparedFiles.Add("startup", StartupMovies.ReadPatch(context))
         Return preparedFiles

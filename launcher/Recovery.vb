@@ -14,6 +14,10 @@ Public Class RecoveryJournal
     Public Property InstallId As String = ""
     Public Property GraphicsPath As String = ""
     Public Property Entries As New List(Of RecoveryEntry)
+    ' VR-only graphics quality the session's graphics file was prepared with (approved transform). Only
+    ' written when set, so other journals stay readable by older launchers; those refuse one that has it.
+    <System.Text.Json.Serialization.JsonIgnore(Condition:=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)>
+    Public Property GraphicsQuality As Dictionary(Of String, String)
 End Class
 
 ' What to do with a graphics file that changed during the session beyond DiRT3VR's own values.
@@ -67,12 +71,14 @@ Public Class OwnedFileTransaction
         End Select
     End Function
 
-    Public Sub Prepare(changes As IReadOnlyDictionary(Of String, Byte()), Optional experimental As Boolean = False, Optional apply As Boolean = True)
+    Public Sub Prepare(changes As IReadOnlyDictionary(Of String, Byte()), Optional experimental As Boolean = False, Optional apply As Boolean = True, Optional vrQuality As IDictionary(Of String, String) = Nothing)
         context.RequireClosed()
         If Pending Then Throw New IOException("File recovery is pending. Restore original files first.")
         If changes.Count = 0 Then Return
         Dim hasStartup = changes.ContainsKey("startup")
-        Dim journal As New RecoveryJournal With {.Schema = If(hasStartup, 3, If(experimental, 2, 1)), .InstallId = context.Id, .GraphicsPath = context.GraphicsPath}
+        Dim quality = GraphicsCatalog.Current.Normalize(vrQuality)
+        If quality.Count > 0 AndAlso Not (experimental AndAlso changes.ContainsKey("graphics")) Then Throw New IOException("VR graphics quality belongs to a VR session.")
+        Dim journal As New RecoveryJournal With {.Schema = If(hasStartup, 3, If(experimental, 2, 1)), .InstallId = context.Id, .GraphicsPath = context.GraphicsPath, .GraphicsQuality = If(quality.Count > 0, quality, Nothing)}
         Dim prepared = journal.Schema >= 2
         If experimental Then
             Dim required = If(hasStartup, {"graphics", "proxy", "restrictions", "startup"}, {"graphics", "proxy", "restrictions"})
@@ -87,7 +93,7 @@ Public Class OwnedFileTransaction
             If pair.Key = "restrictions" AndAlso Not experimental Then Throw New IOException("Restrictions require an experimental session journal.")
             If pair.Key = "proxy" AndAlso File.Exists(target) Then Throw New IOException("An existing d3d11.dll was preserved. Another graphics mod must be removed using its own instructions.")
             If prepared AndAlso pair.Key <> "proxy" AndAlso Not File.Exists(target) Then Throw New IOException("The original settings file is missing: " & target)
-            If prepared Then ValidateApplied(pair.Key, If(File.Exists(target), File.ReadAllBytes(target), Array.Empty(Of Byte)()), pair.Value)
+            If prepared Then ValidateApplied(pair.Key, If(File.Exists(target), File.ReadAllBytes(target), Array.Empty(Of Byte)()), pair.Value, journal.GraphicsQuality)
         Next
         For Each pair In changes
             Dim target = TargetPath(pair.Key)
@@ -132,12 +138,12 @@ Public Class OwnedFileTransaction
         If SafeFiles.Hash(path) <> SafeFiles.HashBytes(bytes) Then Throw New IOException("Deployed file verification failed: " & path)
     End Sub
 
-    Private Sub ValidateApplied(target As String, original As Byte(), applied As Byte())
+    Private Sub ValidateApplied(target As String, original As Byte(), applied As Byte(), vrQuality As IDictionary(Of String, String))
         Dim expected As Byte()
         Select Case target
             Case "graphics"
                 Dim size = ExperimentalFiles.AppliedGraphicsSize(applied)
-                expected = ExperimentalFiles.Graphics(original, size.Width, size.Height)
+                expected = ExperimentalFiles.Graphics(original, size.Width, size.Height, vrQuality)
             Case "restrictions" : expected = ExperimentalFiles.Restrictions(original)
             Case "startup" : expected = StartupMovies.Patch(original)
             Case "proxy"
@@ -178,7 +184,7 @@ Public Class OwnedFileTransaction
         Dim applied = File.ReadAllBytes(path)
         If SafeFiles.HashBytes(applied) <> entry.AppliedHash Then Throw New IOException("Applied backup changed during inspection.")
         ' Recovery remains possible after the package was moved or updated.
-        If deployment OrElse entry.Target <> "proxy" Then ValidateApplied(entry.Target, If(entry.OriginalExists, File.ReadAllBytes(IO.Path.Combine(Folder, entry.Backup)), Array.Empty(Of Byte)()), applied)
+        If deployment OrElse entry.Target <> "proxy" Then ValidateApplied(entry.Target, If(entry.OriginalExists, File.ReadAllBytes(IO.Path.Combine(Folder, entry.Backup)), Array.Empty(Of Byte)()), applied, journal.GraphicsQuality)
         Return applied
     End Function
 
@@ -242,7 +248,7 @@ Public Class OwnedFileTransaction
                         If graphicsChoice = GraphicsRecoveryChoice.RestoreOriginal Then
                             replacement = OriginalBytes(entry)
                         ElseIf graphicsChoice = GraphicsRecoveryChoice.KeepGameChanges Then
-                            replacement = ExperimentalFiles.RestoreSessionValues(File.ReadAllBytes(target), OriginalBytes(entry))
+                            replacement = ExperimentalFiles.RestoreSessionValues(File.ReadAllBytes(target), OriginalBytes(entry), journal.GraphicsQuality)
                             mergeRefused = replacement Is Nothing
                         End If
                     End If
@@ -271,7 +277,7 @@ Public Class OwnedFileTransaction
             Dim conflicts = Inspect(journal, True).Where(Function(pair) pair.Value.State = EntryState.Conflict).Select(Function(pair) pair.Key).ToArray()
             If Not conflicts.SequenceEqual({"graphics"}) OrElse Not File.Exists(context.GraphicsPath) Then Return GraphicsConflictKind.None
             Dim entry = journal.Entries.Single(Function(item) item.Target = "graphics")
-            Return If(ExperimentalFiles.RestoreSessionValues(File.ReadAllBytes(context.GraphicsPath), OriginalBytes(entry)) Is Nothing, GraphicsConflictKind.NotMergeable, GraphicsConflictKind.Mergeable)
+            Return If(ExperimentalFiles.RestoreSessionValues(File.ReadAllBytes(context.GraphicsPath), OriginalBytes(entry), journal.GraphicsQuality) Is Nothing, GraphicsConflictKind.NotMergeable, GraphicsConflictKind.Mergeable)
         Catch ex As Exception When TypeOf ex Is IOException OrElse TypeOf ex Is UnauthorizedAccessException
             Return GraphicsConflictKind.None
         End Try

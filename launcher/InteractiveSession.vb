@@ -84,11 +84,12 @@ Public Class InteractiveSession
             ' Quality choices are shared with desktop play and kept in the game file (with a backup), so the
             ' VR transaction below records the quality-applied file as the original to restore.
             DesktopGraphics.Apply(context, DesktopGraphics.QualityOnly(settings), Drawing.Size.Empty)
-            Dim changes = ExperimentalFiles.Changes(context, scene.Width, scene.Height, settings.SkipStartupMovies)
+            ' VR-only quality goes into the session's temporary graphics changes and is undone when VR ends.
+            Dim changes = ExperimentalFiles.Changes(context, scene.Width, scene.Height, settings.SkipStartupMovies, settings.VrGraphicsQuality)
             directory = Path.Combine(context.UserRoot, "logs", "session-" & Guid.NewGuid().ToString("N"))
             SafeFiles.NoLinks(directory) : IO.Directory.CreateDirectory(directory)
             settings.Save(context)
-            transaction.Prepare(changes, experimental:=True, apply:=False)
+            transaction.Prepare(changes, experimental:=True, apply:=False, vrQuality:=settings.VrGraphicsQuality)
             staged = True
             Await RecoveryWorker.ApplyAsync(context)
             context.RequireClosed()

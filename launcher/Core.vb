@@ -165,6 +165,8 @@ Public Class LauncherSettings
     Public Property RecenterKeepLevel As Boolean = True
     ' Graphics quality per catalog field (GraphicsCatalog), applied at every launch; absent = Use game setting.
     Public Property GraphicsQuality As New Dictionary(Of String, String)
+    ' VR-only quality per field, applied inside the VR session's temporary changes; absent = same as desktop.
+    Public Property VrGraphicsQuality As New Dictionary(Of String, String)
     ' Optional controller/wheel button; machine-specific, so never part of settings profiles.
     Public Property RecenterDevice As RecenterDeviceBinding
 
@@ -179,6 +181,7 @@ Public Class LauncherSettings
         RecenterDevice?.Validate()
         DesktopGraphics.Validate(Me)
         GraphicsQuality = GraphicsCatalog.Current.Normalize(GraphicsQuality)
+        VrGraphicsQuality = GraphicsCatalog.Current.Normalize(VrGraphicsQuality)
     End Sub
 
     Public Shared Function Load(context As InstallContext) As LauncherSettings

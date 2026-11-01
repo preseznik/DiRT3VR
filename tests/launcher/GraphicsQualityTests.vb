@@ -78,6 +78,37 @@ Module GraphicsQualityTests
         Dim changes = ExperimentalFiles.Changes(ctx, 1800, 1950)
         check(Attr(changes("graphics"), "shadows", "size") = "768", "the VR session's temporary file starts from the quality-applied file, so recovery returns to it")
 
+        ' VR-only quality: part of the VR session's temporary transform, recorded in its journal.
+        Dim vr = Context(root, "vr-quality")
+        File.WriteAllBytes(vr.GraphicsPath, real)
+        Dim vrLow As New Dictionary(Of String, String) From {{"Shadows", "low"}, {"Crowd", "off"}}
+        Dim vrChanges = ExperimentalFiles.Changes(vr, 1800, 1950, vrQuality:=vrLow)
+        check(Attr(vrChanges("graphics"), "shadows", "size") = "768" AndAlso Attr(vrChanges("graphics"), "crowd", "enabled") = "false" AndAlso Attr(vrChanges("graphics"), "mirrors", "width") = Attr(real, "mirrors", "width"),
+              "VR quality is part of the session's temporary graphics file; other options keep the file's values")
+        Dim vrTransaction As New OwnedFileTransaction(vr)
+        check(Refused(Sub() vrTransaction.Prepare(vrChanges, experimental:=True, apply:=False)) AndAlso Not vrTransaction.Pending, "a VR file with quality changes that the journal doesn't record is refused (not an approved transform)")
+        vrTransaction.Prepare(vrChanges, experimental:=True, apply:=False, vrQuality:=vrLow)
+        Dim journalText = File.ReadAllText(vrTransaction.JournalPath)
+        check(journalText.Contains("""GraphicsQuality""") AndAlso journalText.Contains("""Shadows"": ""low"""), "the recovery journal records the VR quality")
+        File.WriteAllBytes(vr.GraphicsPath, vrChanges("graphics")) : File.WriteAllBytes(Path.Combine(vr.GameRoot, "d3d11.dll"), vrChanges("proxy")) : File.WriteAllBytes(Path.Combine(vr.GameRoot, "system", "hardware_settings_restrictions.xml"), vrChanges("restrictions"))
+        check(vrTransaction.Recover() AndAlso File.ReadAllBytes(vr.GraphicsPath).SequenceEqual(real), "after VR the graphics file is exactly the desktop one again")
+        ' DiRT 3 rewrote resolution/refresh and the player changed mirrors in-game: keep the change, undo VR's.
+        vrTransaction.Prepare(vrChanges, experimental:=True, apply:=False, vrQuality:=vrLow)
+        Dim rewritten = XDocument.Parse(Encoding.UTF8.GetString(vrChanges("graphics")))
+        rewritten.Root.Element("graphics_card").Element("resolution").SetAttributeValue("width", "1280")
+        rewritten.Root.Element("mirrors").SetAttributeValue("width", "768")
+        File.WriteAllBytes(vr.GraphicsPath, Encoding.UTF8.GetBytes(rewritten.ToString(SaveOptions.DisableFormatting)))
+        File.WriteAllBytes(Path.Combine(vr.GameRoot, "d3d11.dll"), vrChanges("proxy")) : File.WriteAllBytes(Path.Combine(vr.GameRoot, "system", "hardware_settings_restrictions.xml"), vrChanges("restrictions"))
+        check(vrTransaction.GraphicsConflict() = GraphicsConflictKind.Mergeable AndAlso vrTransaction.Recover(GraphicsRecoveryChoice.KeepGameChanges), "a VR session with quality can still be recovered keeping the game's changes")
+        Dim kept = File.ReadAllBytes(vr.GraphicsPath)
+        check(Attr(kept, "mirrors", "width") = "768" AndAlso Attr(kept, "shadows", "size") = Attr(real, "shadows", "size") AndAlso Attr(kept, "crowd", "enabled") = Attr(real, "crowd", "enabled"),
+              "keeping the game's changes keeps the in-game mirror change but undoes the VR-only quality")
+        File.WriteAllBytes(vr.GraphicsPath, real)
+        Dim plain = Context(root, "vr-no-quality")
+        File.WriteAllBytes(plain.GraphicsPath, real)
+        Call New OwnedFileTransaction(plain).Prepare(ExperimentalFiles.Changes(plain, 1800, 1950), experimental:=True, apply:=False)
+        check(Not File.ReadAllText(New OwnedFileTransaction(plain).JournalPath).Contains("GraphicsQuality"), "journals without VR quality are unchanged, so older launchers can still read them")
+
         ' Launcher settings and settings profiles (schema 4).
         Dim saved = Context(root, "settings")
         Call New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = "", .GraphicsQuality = New Dictionary(Of String, String) From {{"Water", "high"}, {"Trees", "ultra"}}}.Save(saved)
@@ -89,7 +120,12 @@ Module GraphicsQualityTests
         check(profile.GraphicsQuality("Trees") = "ultra" AndAlso profile.ApplyTo(New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = ""}).GraphicsQuality("Water") = "high", "settings profiles carry the quality choices")
         check(Refused(Sub() Call New SettingsProfile With {.Kind = "DiRT3VR.SettingsProfile", .Schema = 3, .Name = "Old", .Settings = profile}.Validate()), "a schema 3 profile can't carry quality choices")
         Call New SettingsProfile With {.Kind = "DiRT3VR.SettingsProfile", .Schema = SettingsProfile.CurrentSchema, .Name = "New", .Settings = profile}.Validate()
-        check(LauncherDefaults.Graphics(loaded).GraphicsQuality.Count = 0 AndAlso LauncherDefaults.All(loaded).GraphicsQuality.Count = 0, "both restore-defaults buttons set every quality option to Use game setting")
+        loaded.VrGraphicsQuality = New Dictionary(Of String, String) From {{"Shadows", "low"}}
+        Dim withVr = ProfileValues.Capture(loaded)
+        check(withVr.VrGraphicsQuality("Shadows") = "low" AndAlso withVr.ApplyTo(New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = ""}).VrGraphicsQuality("Shadows") = "low", "settings profiles carry the VR quality too")
+        check(Refused(Sub() Call New SettingsProfile With {.Kind = "DiRT3VR.SettingsProfile", .Schema = 3, .Name = "Old VR", .Settings = New ProfileValues With {.VrGraphicsQuality = New Dictionary(Of String, String) From {{"Water", "low"}}}}.Validate()), "a schema 3 profile can't carry VR quality")
+        check(LauncherDefaults.Graphics(loaded).GraphicsQuality.Count = 0 AndAlso LauncherDefaults.Graphics(loaded).VrGraphicsQuality.Count = 0 AndAlso LauncherDefaults.All(loaded).VrGraphicsQuality.Count = 0,
+              "both restore-defaults buttons reset desktop and VR quality")
     End Sub
 
     Public Sub RunUi(root As String, check As Action(Of Boolean, String))
@@ -111,11 +147,16 @@ Module GraphicsQualityTests
             check(preset.SelectedIndex = catalog.Presets.Count + 1 AndAlso form.CurrentSettings().GraphicsQuality("Shadows") = "ultra", "changing one option shows Custom")
             box("Shadows").SelectedIndex = catalog.Categories.Single(Function(category) category.Field = "Shadows").Choices.FindIndex(Function(choice) choice.Id = "high") + 1
             check(preset.SelectedIndex = 4, "putting it back shows High again")
+            Dim vrPreset = DirectCast(form.Controls.Find("VrQualityPreset", True).Single(), ComboBox)
+            Dim vrShadows = DirectCast(form.Controls.Find("VrQualityShadows", True).Single(), ComboBox)
+            check(vrPreset.SelectedIndex = 0 AndAlso vrPreset.Text = "Same as desktop" AndAlso vrShadows.Text = "Same as desktop" AndAlso form.CurrentSettings().VrGraphicsQuality.Count = 0, "VR quality starts on Same as desktop")
+            vrPreset.SelectedIndex = 2 ' Low
+            check(form.CurrentSettings().VrGraphicsQuality.Count = 15 AndAlso form.CurrentSettings().VrGraphicsQuality("Shadows") = "low" AndAlso form.CurrentSettings().GraphicsQuality("Shadows") = "high", "choosing a VR preset leaves the desktop choices alone")
             DirectCast(form.Controls.Find("SaveSettings", True).Single(), Button).PerformClick()
-            check(LauncherSettings.Load(ctx).GraphicsQuality.Count = 15, "Save settings keeps the quality choices")
+            check(LauncherSettings.Load(ctx).GraphicsQuality.Count = 15 AndAlso LauncherSettings.Load(ctx).VrGraphicsQuality("Water") = "low", "Save settings keeps desktop and VR quality")
             form.ConfirmPrompt = Function(caption, body) True
             form.RestoreDefaults(graphicsOnly:=True)
-            check(preset.SelectedIndex = 0 AndAlso form.CurrentSettings().GraphicsQuality.Count = 0, "Restore graphics defaults puts every option back on Use game setting")
+            check(preset.SelectedIndex = 0 AndAlso vrPreset.SelectedIndex = 0 AndAlso form.CurrentSettings().GraphicsQuality.Count = 0 AndAlso form.CurrentSettings().VrGraphicsQuality.Count = 0, "Restore graphics defaults resets desktop and VR quality")
             form.Close()
         End Using
     End Sub

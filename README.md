@@ -81,10 +81,12 @@ report is investigated.
    height per eye. Output stays at that recommendation while the slider changes
    scene detail. The launcher rechecks the headset before every VR launch.
    Unsupported sizes are refused; the displayed maximum depends on the headset.
-   **Quality (desktop and VR)** offers DiRT 3's own presets (Ultra Low to Ultra)
-   and each quality option. Everything starts on **Use game setting**; chosen
-   options are written into the game's graphics file (backed up first) at every
-   launch, desktop and VR, replacing changes made in the game's own menu.
+   **Quality** offers DiRT 3's own presets (Ultra Low to Ultra) and each
+   quality option, separately for **Desktop** and **VR**. Desktop options start
+   on **Use game setting**; chosen ones are written into the game's graphics
+   file (backed up first) at every launch, replacing changes made in the game's
+   own menu. VR options start on **Same as desktop**; chosen ones apply only
+   while a VR session runs and are undone with the other temporary VR changes.
    Changes apply on the next VR launch. Below it, **Last VR session** shows the
    headset refresh rate (when the runtime reports it) and whether DiRT 3
    rendered the requested scene size.

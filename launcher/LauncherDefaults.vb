@@ -12,6 +12,7 @@ Public NotInheritable Class LauncherDefaults
         result.DesktopDisplayMode = defaults.DesktopDisplayMode : result.DesktopVSync = defaults.DesktopVSync
         result.VrRenderScale = defaults.VrRenderScale
         result.GraphicsQuality = New Dictionary(Of String, String)
+        result.VrGraphicsQuality = New Dictionary(Of String, String)
         Return result
     End Function
 
