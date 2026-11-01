@@ -16,6 +16,12 @@ Public NotInheritable Class DirectPractice
     Private Sub New()
     End Sub
 
+    ' Laps the renderer sets for the benchmark start (DIRT3VR_DIRECT_LAPS); 0 for point-to-point stages.
+    Public Shared Function Laps(settings As LauncherSettings) As Integer
+        Dim route = EventCatalog.Current.FindRoute(settings.DirectRoute)
+        Return If(route IsNot Nothing AndAlso route.TrackType = "circuit", Math.Clamp(settings.DirectLaps, 1, 5), 0)
+    End Function
+
     Public Shared Function ConfigPath(context As InstallContext) As String
         Return Path.Combine(context.GameRoot, FileName)
     End Function

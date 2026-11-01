@@ -77,6 +77,12 @@ Module DirectPracticeTests
         Dim directStart = InteractiveSession.StartInfo(ctx, runtime, logs, settings, headset)
         Dim normalStart = InteractiveSession.StartInfo(ctx, runtime, logs, New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = ""}, headset)
         check(directStart.ArgumentList.SequenceEqual({"-benchmark", "dirt3vr-direct.xml"}) AndAlso directStart.Environment("DIRT3VR_DIRECT_PRACTICE") = "1", "Launch VR in direct practice starts the benchmark with the player-control switch")
+        check(directStart.Environment("DIRT3VR_DIRECT_LAPS") = "1", "a circuit gets its lap count (1 by default)")
+        settings.DirectLaps = 3
+        check(InteractiveSession.StartInfo(ctx, runtime, logs, settings, headset).Environment("DIRT3VR_DIRECT_LAPS") = "3", "the chosen lap count reaches the renderer")
+        Dim stage As New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = "", .LaunchMode = "direct", .DirectRoute = catalog.RoutesFor("rally").First().Id, .DirectCar = "frx", .DirectLaps = 3}
+        check(Not InteractiveSession.StartInfo(ctx, runtime, logs, stage, headset).Environment.ContainsKey("DIRT3VR_DIRECT_LAPS") AndAlso DirectPractice.Laps(stage) = 0, "point-to-point stages get no lap count")
+        check(Refused(Sub() Call New LauncherSettings With {.DirectLaps = 6}.Validate()) AndAlso Refused(Sub() Call New LauncherSettings With {.DirectLaps = 0}.Validate()), "laps are 1 to 5")
         check(normalStart.ArgumentList.Count = 0 AndAlso Not normalStart.Environment.ContainsKey("DIRT3VR_DIRECT_PRACTICE"), "a normal launch is unchanged")
 
         ' DiRT 3's result file for the session is removed; other benchmark results stay.
@@ -90,9 +96,9 @@ Module DirectPracticeTests
         ' Settings and profiles (schema 4).
         settings.Save(ctx)
         Dim loaded = LauncherSettings.Load(ctx)
-        check(loaded.LaunchMode = "direct" AndAlso loaded.DirectRoute = Aspen().Id AndAlso loaded.DirectCar = "frx", "the direct practice choice is saved with the launcher settings")
+        check(loaded.LaunchMode = "direct" AndAlso loaded.DirectRoute = Aspen().Id AndAlso loaded.DirectCar = "frx" AndAlso loaded.DirectLaps = 3, "the direct practice choice is saved with the launcher settings")
         Dim profile = ProfileValues.Capture(loaded)
-        check(profile.ApplyTo(New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = ""}).DirectCar = "frx", "settings profiles carry the direct practice choice")
+        check(profile.ApplyTo(New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = ""}).DirectCar = "frx" AndAlso profile.DirectLaps = 3, "settings profiles carry the direct practice choice")
         check(Refused(Sub() Call New SettingsProfile With {.Kind = "DiRT3VR.SettingsProfile", .Schema = 3, .Name = "Old", .Settings = profile}.Validate()), "a schema 3 profile can't carry direct practice")
         check(LauncherDefaults.All(loaded).LaunchMode = "normal", "Restore launcher defaults goes back to Normal launch")
     End Sub
@@ -124,11 +130,19 @@ Module DirectPracticeTests
             route.SelectedItem = route.Items.Cast(Of EventCatalog.EventRoute)().Single(Function(item) item.Track = "aspen" AndAlso item.Route = "route_0")
             car.SelectedItem = car.Items.Cast(Of EventCatalog.EventCar)().First()
             Dim chosenCar = DirectCast(car.SelectedItem, EventCatalog.EventCar).Code
+            Dim lapSlider = DirectCast(find("DirectLaps"), ValueSlider)
+            check(lapSlider.Enabled, "laps can be set for a circuit")
+            lapSlider.Value = 3 : Application.DoEvents()
             Dim summary = find("DirectSummary").Text
-            check(summary.StartsWith("Direct practice: RALLYCROSS · ASPEN – LAKESIDE", StringComparison.Ordinal), "the summary names the discipline, route and car (" & summary & ")")
+            check(summary.StartsWith("Direct practice: RALLYCROSS · ASPEN – LAKESIDE · 3 laps", StringComparison.Ordinal), "the summary names the discipline, route, laps and car (" & summary & ")")
             DirectCast(find("SaveSettings"), Button).PerformClick()
             Dim saved = LauncherSettings.Load(ctx)
-            check(saved.LaunchMode = "direct" AndAlso saved.DirectRoute = Aspen().Id AndAlso saved.DirectCar = chosenCar, "Save settings keeps the direct practice choice")
+            check(saved.LaunchMode = "direct" AndAlso saved.DirectRoute = Aspen().Id AndAlso saved.DirectCar = chosenCar AndAlso saved.DirectLaps = 3, "Save settings keeps the direct practice choice")
+            discipline.SelectedItem = EventCatalog.Current.FindDiscipline("rally") : Application.DoEvents()
+            check(Not lapSlider.Enabled AndAlso Not find("DirectSummary").Text.Contains(" laps"), "point-to-point stages have no laps")
+            discipline.SelectedItem = EventCatalog.Current.FindDiscipline("rallycross") : Application.DoEvents()
+            route.SelectedItem = route.Items.Cast(Of EventCatalog.EventRoute)().Single(Function(item) item.Track = "aspen" AndAlso item.Route = "route_0")
+            car.SelectedItem = car.Items.Cast(Of EventCatalog.EventCar)().Single(Function(item) item.Code = chosenCar)
             form.Close()
         End Using
         Using form As New MainForm(ctx)
