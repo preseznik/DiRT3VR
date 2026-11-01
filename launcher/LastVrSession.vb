@@ -55,6 +55,7 @@ Public NotInheritable Class LastVrSession
             Dim sessions = Directory.EnumerateDirectories(logs, "session-*").Take(5000).
                 OrderByDescending(Function(folder) Directory.GetLastWriteTimeUtc(folder))
             For Each folder In sessions
+                If Not VrFolder(folder) Then Continue For
                 Dim native = Directory.EnumerateFiles(folder, "native-*.log").OrderByDescending(Function(file) IO.File.GetLastWriteTimeUtc(file)).FirstOrDefault()
                 If native Is Nothing Then Continue For
                 SafeFiles.NoLinks(native)
@@ -69,6 +70,22 @@ Public NotInheritable Class LastVrSession
             ' Diagnostics only: an unreadable log simply shows nothing.
         End Try
         Return Nothing
+    End Function
+
+    Private Class SessionMode
+        Public Property Mode As String
+    End Class
+
+    ' Desktop direct practice also logs into a session folder; its session.json names its mode. Folders
+    ' without a session.json are VR sessions of older builds.
+    Private Shared Function VrFolder(folder As String) As Boolean
+        Dim info = Path.Combine(folder, "session.json")
+        If Not File.Exists(info) Then Return True
+        Try
+            Return SafeFiles.ReadJson(Of SessionMode)(info)?.Mode <> DesktopStartupSession.DirectMode
+        Catch ex As Exception When TypeOf ex Is System.Text.Json.JsonException OrElse TypeOf ex Is IOException OrElse TypeOf ex Is UnauthorizedAccessException
+            Return True
+        End Try
     End Function
 
     Public Function Describe() As String
