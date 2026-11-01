@@ -38,6 +38,14 @@ Module LastVrSessionTests
         Directory.CreateDirectory(Path.Combine(ctx.UserRoot, "logs", "session-" & Guid.NewGuid().ToString("N"))) ' Newest, but no native log.
         Dim loaded = LastVrSession.Load(ctx)
         check(loaded IsNot Nothing AndAlso loaded.RefreshHz.GetValueOrDefault() = 120.0, "the newest session with a native log is shown")
+        ' A later desktop direct practice session (renderer log without VR) doesn't hide the last VR session.
+        Dim desktopFolder = Path.Combine(ctx.UserRoot, "logs", "session-" & Guid.NewGuid().ToString("N"))
+        Directory.CreateDirectory(desktopFolder)
+        File.WriteAllText(Path.Combine(desktopFolder, "native-77.log"), "DiRT3VR native diagnostics" & vbLf)
+        File.WriteAllText(Path.Combine(desktopFolder, "session.json"), "{""schema"":1,""mode"":""" & DesktopStartupSession.DirectMode & """}")
+        Directory.SetLastWriteTimeUtc(desktopFolder, DateTime.UtcNow + TimeSpan.FromMinutes(1))
+        loaded = LastVrSession.Load(ctx)
+        check(loaded IsNot Nothing AndAlso loaded.RefreshHz.GetValueOrDefault() = 120.0, "a newer desktop direct practice session is skipped")
     End Sub
 
     Public Sub RunUi(root As String, check As Action(Of Boolean, String))

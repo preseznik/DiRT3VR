@@ -10,6 +10,9 @@ Public NotInheritable Class DesktopStartupSession
         context = install : Game = child : lease = sessionLease
     End Sub
 
+    ' session.json mode of a desktop direct practice log folder.
+    Public Const DirectMode As String = "desktop-direct-practice"
+
     Public Shared Function NeedsSession(settings As LauncherSettings) As Boolean
         Return settings.SkipStartupMovies OrElse settings.LaunchMode = "direct"
     End Function
@@ -58,7 +61,11 @@ Public NotInheritable Class DesktopStartupSession
             End If
             Dim changes = DesktopStartupSession.Changes(context, settings)
             Dim logs = Path.Combine(context.UserRoot, "logs", "session-" & Guid.NewGuid().ToString("N"))
-            If settings.LaunchMode = "direct" Then SafeFiles.NoLinks(logs) : Directory.CreateDirectory(logs)
+            If settings.LaunchMode = "direct" Then
+                SafeFiles.NoLinks(logs) : Directory.CreateDirectory(logs)
+                ' Marks the folder as a desktop session, so Last VR session skips it.
+                SafeFiles.SaveJson(Path.Combine(logs, "session.json"), New With {.schema = 1, .mode = DirectMode, .startedUtc = DateTime.UtcNow, .launchMode = settings.LaunchMode, .directRoute = settings.DirectRoute, .directCar = settings.DirectCar, .directLaps = DirectPractice.Laps(settings)})
+            End If
             settings.Save(context)
             DesktopGraphics.Apply(context, settings, monitor)
             preparing = True
