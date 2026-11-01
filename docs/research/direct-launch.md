@@ -158,6 +158,10 @@ led through the Aspen event intro to the Single Race pre-race screen (RACE / ENT
 DIFFICULTY AND ASSISTS / VEHICLE SETUP); RACE started a new race with the player in
 control.
 
+Restart (run 26) asks "RESTART RACE? Really restart the race? Your progress in this race
+will be lost. RESTART / CANCEL"; confirmed, the car is back on the start line with the
+timer at 0:00, no intro, and the player keeps control.
+
 Checks that need keyboard input use `run_benchmark.py --focus-keys`, only with the
 user's permission: it brings DiRT 3 to the front and presses real keys, refusing to send
 anything unless the game is the foreground window. Keys sent in the first ~40 s skip the
@@ -168,10 +172,28 @@ running. That doesn't settle whether the benchmark can pause: DiRT 3 reads the k
 directly, so window messages likely never reach it. The pause menu still has to be checked
 with real input.
 
+## Opponents and disciplines
+
+`<car name number>`: `number` is how many copies of that car race (the game's own
+`example_benchmark.xml`: "up to 10 tracks, 8 cars per track", `<car name="aqb"
+number="8"/>`). **The first `<car>` is the player's car**; every other car is AI.
+Copies past 8 in total are cut. Runs 24–28 (Aspen): 4 entries with `number="1"` give a
+4-car field; with direct practice the player waits at the start while the AI cars race
+(run 28: `mex` first → the player in the Mitsubishi). `<car frx number="4"/>` alone gives
+the player's `frx` plus 3 AI copies (run 34). `run_benchmark.py --route`, `--car`,
+`--opponents N` and `--player-copies K` build such files from the catalog.
+
+All four catalog disciplines start and race (AI driving): rallycross (Aspen), rally
+(Finland route 0, run 29), trailblazer (Finland trail route 0, run 30) and Land Rush
+(Aspen route 6, run 31). Stages take opponents too (runs 32–33), but run with staggered
+starts, so the player races the clock. On a stage, a car that never leaves the start is
+ended after about 45 s of race time, with a result written, with or without opponents
+(run 35); on circuits a waiting car is left alone (runs 10, 17).
+
 ## Still open
 
-- Confirm what the pause menu's Restart does, and that the main menu works after a
-  return (starting another event, Exit).
+- Confirm that the main menu works after a return (starting another event, Exit).
+- AI difficulty for opponents.
 - Opponents (more `<car>` entries, as DiRT2VR's race grid), and which disciplines and
   routes start correctly. The event catalog is #5b02d01b.
 - Not yet tried in VR.
