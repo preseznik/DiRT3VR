@@ -82,6 +82,11 @@ report is investigated.
    scene detail. The launcher rechecks the headset before every VR launch.
    Unsupported sizes are refused; the displayed maximum depends on the headset.
    Changes apply on the next VR launch.
+   **Graphics → Restore graphics defaults…** sets the desktop choices to
+   **Use game setting** and VR render scale to 100%. **Settings → Restore
+   launcher defaults…** resets every launcher choice except the VR runtime
+   locations and the experimental VR opt-in. Both ask first and, like loading
+   a profile, change only the controls until **Save settings** or Launch.
 6. Use **Save settings**, **Restore original files**, and **Open logs** from
    the persistent footer when needed.
 7. **?** opens About, updates and instructions. Installed versions check GitHub
