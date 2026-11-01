@@ -13,6 +13,7 @@ Public NotInheritable Class DirectPracticePicker
     Private ReadOnly carClass As New ComboBox With {.Name = "DirectCarClass", .DropDownStyle = ComboBoxStyle.DropDownList}
     Private ReadOnly allCars As New CheckBox With {.Name = "DirectAllCars", .Text = "Show cars from other disciplines (untested)", .AutoSize = True}
     Private ReadOnly car As New ComboBox With {.Name = "DirectCar", .DropDownStyle = ComboBoxStyle.DropDownList}
+    Private ReadOnly laps As New ValueSlider("DirectLaps", 1, 5, 1, " laps")
     Private ReadOnly summary As New Label With {.Name = "DirectSummary", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 6, 0, 10)}
     Private ReadOnly pickerControls As Control()
     Private updating As Boolean
@@ -33,6 +34,7 @@ Public NotInheritable Class DirectPracticePicker
         Field(parent, "Class", carClass)
         parent.Controls.Add(allCars)
         Field(parent, "Car", car)
+        Field(parent, "Laps (circuits)", laps)
         parent.Controls.Add(summary)
         pickerControls = {discipline, route, search, carClass, allCars, car}
         AddHandler normal.CheckedChanged, Sub() ModeChanged()
@@ -41,12 +43,16 @@ Public NotInheritable Class DirectPracticePicker
                                                        If updating Then Return
                                                        FillRoutes(0) : FillCars("") : Edited()
                                                    End Sub
-        AddHandler route.SelectedIndexChanged, Sub() If Not updating Then Edited()
+        AddHandler route.SelectedIndexChanged, Sub()
+                                                   UpdateLaps()
+                                                   If Not updating Then Edited()
+                                               End Sub
+        AddHandler laps.ValueChanged, Sub() If Not updating Then Edited()
         AddHandler search.TextChanged, Sub() If Not updating Then FillCars(SelectedCarCode()) : Edited()
         AddHandler carClass.SelectedIndexChanged, Sub() If Not updating Then FillCars(SelectedCarCode(), keepClass:=True) : Edited()
         AddHandler allCars.CheckedChanged, Sub() If Not updating Then FillCars(SelectedCarCode()) : Edited()
         AddHandler car.SelectedIndexChanged, Sub() If Not updating Then Edited()
-        Apply("normal", 0, "")
+        Apply("normal", 0, "", 1)
     End Sub
 
     Public ReadOnly Property Mode As String
@@ -67,6 +73,12 @@ Public NotInheritable Class DirectPracticePicker
         End Get
     End Property
 
+    Public ReadOnly Property LapCount As Integer
+        Get
+            Return laps.Value
+        End Get
+    End Property
+
     Public ReadOnly Property SummaryText As String
         Get
             Return summary.Text
@@ -74,7 +86,7 @@ Public NotInheritable Class DirectPracticePicker
     End Property
 
     ' Shows saved choices; an unknown or missing route starts on the first rally stage.
-    Public Sub Apply(launchMode As String, routeId As Integer, carCode As String)
+    Public Sub Apply(launchMode As String, routeId As Integer, carCode As String, lapCount As Integer)
         Dim catalog = EventCatalog.Current
         updating = True
         Try
@@ -86,6 +98,7 @@ Public NotInheritable Class DirectPracticePicker
             Dim chosenCar = catalog.FindCar(carCode)
             allCars.Checked = chosenCar IsNot Nothing AndAlso chosenCar.Discipline <> CurrentDiscipline()
             FillCars(carCode)
+            laps.Value = Math.Clamp(lapCount, 1, 5)
         Finally
             updating = False
         End Try
@@ -146,7 +159,13 @@ Public NotInheritable Class DirectPracticePicker
         For Each item In pickerControls
             item.Enabled = direct.Checked
         Next
+        UpdateLaps()
         Edited()
+    End Sub
+
+    ' Laps apply to circuits; point-to-point stages are one run.
+    Private Sub UpdateLaps()
+        laps.Enabled = direct.Checked AndAlso TryCast(route.SelectedItem, EventCatalog.EventRoute)?.TrackType = "circuit"
     End Sub
 
     Private Sub Edited()
@@ -160,7 +179,7 @@ Public NotInheritable Class DirectPracticePicker
         Dim chosenCar = TryCast(car.SelectedItem, EventCatalog.EventCar)
         summary.Text = If(Not direct.Checked, "Launch and Launch VR open DiRT 3's own menus.",
                           If(chosenRoute Is Nothing OrElse chosenCar Is Nothing, "Choose a route and a car (adjust the search if no car is listed).",
-                             "Direct practice: " & CurrentDisciplineName() & " · " & chosenRoute.ToString() & " · " & chosenCar.Name & ". No opponents; laps and the end of the session follow DiRT 3's benchmark start for now."))
+                             "Direct practice: " & CurrentDisciplineName() & " · " & chosenRoute.ToString() & If(chosenRoute.TrackType = "circuit", " · " & laps.Value & If(laps.Value = 1, " lap", " laps"), "") & " · " & chosenCar.Name & ". No opponents; the end of the session follows DiRT 3's benchmark start for now."))
     End Sub
 
     Private Function CurrentDisciplineName() As String

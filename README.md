@@ -143,8 +143,9 @@ Use **Launch VR** and select any camera through DiRT 3's native controls.
 chosen route with your car, without the menus (discipline, route, and a car
 list with search, class filter and an option for other disciplines' cars). It
 uses DiRT 3's own benchmark start with DiRT3VR's renderer keeping you in
-control; for now it starts with Launch VR, without opponents, and laps and the
-end of the session follow the benchmark start. Normal launch stays the default.
+control. Circuits (rallycross, Land Rush) take 1 to 5 laps. For now it starts
+with Launch VR, without opponents, and the end of the session follows the
+benchmark start. Normal launch stays the default.
 **Stop VR** turns the headset off and keeps DiRT 3 running on the monitor; it
 keeps the temporary VR graphics settings until it closes. **End session**
 closes DiRT 3. Either way the original files are restored once DiRT 3 closes.

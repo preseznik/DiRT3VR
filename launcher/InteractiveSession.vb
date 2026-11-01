@@ -53,6 +53,8 @@ Public Class InteractiveSession
         If settings.LaunchMode = "direct" Then
             ' The renderer keeps the benchmark's car under the player's control (#a1d31909).
             start.Environment("DIRT3VR_DIRECT_PRACTICE") = "1"
+            Dim laps = DirectPractice.Laps(settings)
+            If laps > 0 Then start.Environment("DIRT3VR_DIRECT_LAPS") = laps.ToString(Globalization.CultureInfo.InvariantCulture)
             start.ArgumentList.Add("-benchmark") : start.ArgumentList.Add(DirectPractice.FileName)
         End If
         Return start
@@ -103,7 +105,7 @@ Public Class InteractiveSession
             game = Process.Start(StartInfo(context, runtime, directory, settings, headset, preflight.Bypasses))
             If game Is Nothing Then Throw New IOException("DiRT 3 could not start.")
             Dim result As New InteractiveSession(context, game, directory, lease)
-            SafeFiles.SaveJson(Path.Combine(directory, "session.json"), New With {.schema = 1, .mode = "experimental-interactive", .processId = game.Id, .startedUtc = result.StartedUtc, .runtime = runtime.Mode, .vrRenderScale = settings.VrRenderScale, .headsetWidth = headset.Width, .headsetHeight = headset.Height, .sceneWidth = scene.Width, .sceneHeight = scene.Height, .stereoVerified = False, .launchMode = settings.LaunchMode, .directRoute = If(settings.LaunchMode = "direct", settings.DirectRoute, 0), .directCar = If(settings.LaunchMode = "direct", settings.DirectCar, ""), .disabledApiLayers = preflight.Bypasses.Select(Function(layer) layer.LayerName).ToArray(), .layerWarning = preflight.Warning})
+            SafeFiles.SaveJson(Path.Combine(directory, "session.json"), New With {.schema = 1, .mode = "experimental-interactive", .processId = game.Id, .startedUtc = result.StartedUtc, .runtime = runtime.Mode, .vrRenderScale = settings.VrRenderScale, .headsetWidth = headset.Width, .headsetHeight = headset.Height, .sceneWidth = scene.Width, .sceneHeight = scene.Height, .stereoVerified = False, .launchMode = settings.LaunchMode, .directRoute = If(settings.LaunchMode = "direct", settings.DirectRoute, 0), .directCar = If(settings.LaunchMode = "direct", settings.DirectCar, ""), .directLaps = If(settings.LaunchMode = "direct", DirectPractice.Laps(settings), 0), .disabledApiLayers = preflight.Bypasses.Select(Function(layer) layer.LayerName).ToArray(), .layerWarning = preflight.Warning})
             Session.WriteLaunchStatus(context, "starting", "Waiting for the game window and native headset output.", game.Id, result.StartedUtc, mode:="experimental-interactive")
             Return result
         Catch ex As Exception

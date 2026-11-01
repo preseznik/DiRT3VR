@@ -315,7 +315,7 @@ Public Class MainForm
         content.Controls.Add(columns)
         Dim launch = Section(columns.First, "Launch mode")
         directPicker = New DirectPracticePicker(launch)
-        launch.Controls.Add(Info("Direct practice starts DiRT 3 straight on the chosen route with your car, through DiRT 3's own benchmark start: no menus, no opponents. For now it starts with Launch VR, and laps and the end of the session follow the benchmark start. Normal launch keeps DiRT 3's menus for careers, events and multiplayer."))
+        launch.Controls.Add(Info("Direct practice starts DiRT 3 straight on the chosen route with your car, through DiRT 3's own benchmark start: no menus, no opponents. For now it starts with Launch VR; laps apply to circuits, and the end of the session follows the benchmark start. Normal launch keeps DiRT 3's menus for careers, events and multiplayer."))
         launch.Controls.Add(TopicLink(HelpDirect))
         AddHandler directPicker.Changed, Sub() RefreshState()
         Dim startup = Section(columns.First, "Startup")
@@ -664,7 +664,7 @@ Public Class MainForm
         renderScale.Value = settings.VrRenderScale
         applyingPreset = True
         desktopQuality.Values = settings.GraphicsQuality : vrQuality.Values = settings.VrGraphicsQuality
-        directPicker.Apply(settings.LaunchMode, settings.DirectRoute, settings.DirectCar)
+        directPicker.Apply(settings.LaunchMode, settings.DirectRoute, settings.DirectCar, settings.DirectLaps)
         applyingPreset = False
         ClearPresetUndo()
         desktopMode.SelectedIndex = Array.IndexOf({"game", "windowed", "fullscreen", "borderless"}, settings.DesktopDisplayMode)
@@ -687,7 +687,7 @@ Public Class MainForm
             .DesktopDisplayMode = {"game", "windowed", "fullscreen", "borderless"}(Math.Max(0, desktopMode.SelectedIndex)), .DesktopVSync = {"game", "off", "on"}(Math.Max(0, desktopVSync.SelectedIndex)), .SkipStartupMovies = skipStartupMovies.Checked,
             .RecenterKey = recenterKey, .RecenterModifiers = recenterModifiers, .RecenterDevice = recenterDevice, .RecenterKeepLevel = recenterKeepLevel.Checked,
             .GraphicsQuality = desktopQuality.Values, .VrGraphicsQuality = vrQuality.Values,
-            .LaunchMode = directPicker.Mode, .DirectRoute = directPicker.RouteId, .DirectCar = directPicker.CarCode}
+            .LaunchMode = directPicker.Mode, .DirectRoute = directPicker.RouteId, .DirectCar = directPicker.CarCode, .DirectLaps = directPicker.LapCount}
     End Function
 
     Private Sub RememberSavedSettings()
@@ -999,7 +999,7 @@ Public Class MainForm
             New HelpTopic(HelpDirect,
                 "Launcher → Launch mode → Direct practice starts DiRT 3 straight on a route with your car, without its menus, through the game's own benchmark start; DiRT3VR's renderer keeps the car under your control." & vbCrLf & vbCrLf &
                 "Choose the discipline (rally, rallycross, trailblazer or Land Rush), the location and route, and the car. Cars are those of the route's discipline; Show cars from other disciplines lists the rest, which are untested. Search finds cars by name, code or class, and Class narrows the list." & vbCrLf & vbCrLf &
-                "For now direct practice starts with Launch VR, there are no opponents, and laps and the end of the session follow the benchmark start (quit from the game when you are done). The short config file it writes into the game folder, dirt3vr-direct.xml, is removed with DiRT3VR's other temporary changes, and DiRT 3's benchmark result file is deleted afterwards." & vbCrLf & vbCrLf &
+                "Laps (1 to 5) apply to circuits (rallycross and Land Rush); point-to-point stages are one run. For now direct practice starts with Launch VR, there are no opponents, and the end of the session follows the benchmark start (quit from the game when you are done). The short config file it writes into the game folder, dirt3vr-direct.xml, is removed with DiRT3VR's other temporary changes, and DiRT 3's benchmark result file is deleted afterwards." & vbCrLf & vbCrLf &
                 "Normal launch keeps DiRT 3's menus for careers, events and multiplayer."),
             New HelpTopic(HelpStartup,
                 "Launcher → Skip startup logo movies temporarily replaces the AMD and DiRT 3 logo movie states for desktop and VR launches. Copyright, Press Start and other movies remain." & vbCrLf & vbCrLf &
