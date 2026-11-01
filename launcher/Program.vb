@@ -22,7 +22,7 @@ Public Module Program
                 If arguments.Contains("--apply-worker") Then
                     Call (New OwnedFileTransaction(context)).ApplyPrepared()
                 Else
-                    Call (New OwnedFileTransaction(context)).Recover()
+                    Call (New OwnedFileTransaction(context)).Recover(RecoveryWorker.ParseChoice(Argument(arguments, "--graphics-choice", "ask")))
                 End If
                 Return 0
             End If

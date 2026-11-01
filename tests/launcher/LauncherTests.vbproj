@@ -10,6 +10,7 @@
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../../launcher/DiRT3VR.vbproj" /></ItemGroup>
   <ItemGroup><None Update="fixtures/hardware_settings_restrictions.xml" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
+  <ItemGroup><None Update="fixtures/rewrite-2026-10-31/*.xml" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
   <ItemGroup>
     <!-- Built by tools/build.ps1 before the tests run; the live-input tests also cover its absence. -->
     <None Include="../../build/driving-input/driving_input.dll" Link="driving_input.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('../../build/driving-input/driving_input.dll')" />

@@ -187,7 +187,13 @@ Public Class InteractiveSession
         Try
             Await Game.WaitForExitAsync()
             Dim exitCode = Game.ExitCode
-            Dim restored = Await RecoveryWorker.RecoverAsync(context)
+            Dim restored As Boolean
+            Try
+                restored = Await RecoveryWorker.RecoverAsync(context)
+            Catch ex As Exception
+                Session.WriteLaunchStatus(context, "recovery-pending", "DiRT 3 closed; recovery is pending: " & ex.Message, Game.Id, StartedUtc, exitCode, mode:="experimental-interactive")
+                Throw
+            End Try
             Dim message = If(restored, "DiRT 3 closed; original session files restored.", "DiRT 3 closed; no file recovery was pending.")
             If exitCode <> 0 Then message &= $" Exit code 0x{exitCode:X8}. Open logs for details."
             Session.WriteLaunchStatus(context, "closed", message, Game.Id, StartedUtc, exitCode, mode:="experimental-interactive")

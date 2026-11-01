@@ -191,8 +191,7 @@ Public Class MainForm
         AddHandler stopVrButton.Click, Sub() StopVrKeepPlaying()
         AddHandler recover.Click, Async Sub() Await ActionAsync(Async Function()
                                                                    Using lease = InteractiveSession.AcquireLease(context)
-                                                                   Dim restored = Await RecoveryWorker.RecoverAsync(context)
-                                                                   notice.Text = If(restored, "Owned session files were restored.", "No launcher file recovery is pending. No game files were changed.")
+                                                                       notice.Text = Await RestoreOriginalFilesAsync()
                                                                    End Using
                                                                End Function)
         AddHandler logs.Click, Sub() SafeAction(Sub()
@@ -701,6 +700,47 @@ Public Class MainForm
         End If
     End Sub
 
+    ' Asks what to keep when DiRT 3's graphics settings changed during the session beyond the VR
+    ' values (public so the launcher tests can answer it).
+    <System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)>
+    Public Property GraphicsChoicePrompt As Func(Of GraphicsConflictKind, GraphicsRecoveryChoice) = AddressOf AskGraphicsChoice
+
+    ' Restore original files: restores what it can, then lets the user decide about changed graphics settings.
+    Private Async Function RestoreOriginalFilesAsync() As Task(Of String)
+        Dim failure As IOException
+        Try
+            Return If(Await RecoveryWorker.RecoverAsync(context), "Owned session files were restored.", "No launcher file recovery is pending. No game files were changed.")
+        Catch ex As IOException
+            failure = ex
+        End Try
+        Dim kind = New OwnedFileTransaction(context).GraphicsConflict()
+        If kind = GraphicsConflictKind.None Then Throw failure
+        Dim choice = GraphicsChoicePrompt(kind)
+        If choice = GraphicsRecoveryChoice.Ask Then Return failure.Message
+        Await RecoveryWorker.RecoverAsync(context, choice)
+        Return If(choice = GraphicsRecoveryChoice.KeepGameChanges,
+                  "Original files restored. DiRT 3's graphics settings keep the changes made during the session, with the display values from before VR.",
+                  "Original files restored, including DiRT 3's graphics settings from before the session. The changed version was kept in the recovery folder.")
+    End Function
+
+    Private Function AskGraphicsChoice(kind As GraphicsConflictKind) As GraphicsRecoveryChoice
+        If background.Active Then background.Leave()
+        Dim keep As New TaskDialogCommandLinkButton("Keep the changes made in DiRT 3", "Puts back the resolution, window mode, refresh rate, VSync, anti-aliasing and DirectX settings from before VR. Other graphics settings changed during the session stay.") With {.Enabled = kind = GraphicsConflictKind.Mergeable}
+        Dim restore As New TaskDialogCommandLinkButton("Restore all graphics settings from before the session", "DiRT 3's current file is kept as a copy in the recovery folder.")
+        Dim later As New TaskDialogCommandLinkButton("Decide later", "The graphics settings stay as they are for now. The other game files are already restored.")
+        Dim page As New TaskDialogPage With {
+            .Caption = "DiRT3VR", .Icon = TaskDialogIcon.Warning,
+            .Heading = "DiRT 3's graphics settings changed during the session",
+            .Text = If(kind = GraphicsConflictKind.Mergeable,
+                       "Besides the temporary VR display values, other graphics settings changed while DiRT 3 ran (for example in its options menu).",
+                       "The graphics settings file is no longer valid settings XML, so only the settings from before the session can be restored."),
+            .Buttons = New TaskDialogButtonCollection From {keep, restore, later}}
+        Dim result = TaskDialog.ShowDialog(Me, page)
+        If result Is keep Then Return GraphicsRecoveryChoice.KeepGameChanges
+        If result Is restore Then Return GraphicsRecoveryChoice.RestoreOriginal
+        Return GraphicsRecoveryChoice.Ask
+    End Function
+
     ' Stop VR: the headset turns off and DiRT 3 keeps running on the monitor until it is closed.
     Private Sub StopVrKeepPlaying()
         If interactive Is Nothing OrElse busy Then Return
@@ -785,7 +825,7 @@ Public Class MainForm
             "Launcher → Skip startup logo movies temporarily replaces the two startup movie states for desktop or VR. Copyright and Press Start remain. The original startup file is restored when the game exits. Leave skipping off for multiplayer until checked." & vbCrLf & vbCrLf &
             "During a session, Stop VR turns the headset off and keeps DiRT 3 running on the monitor; End session closes DiRT 3. Closing this window keeps DiRT3VR in the notification area (next to the clock) until DiRT 3 closes and the original files are restored; it then quits by itself. Right-click its icon to open the window, stop VR or end the session. Starting DiRT3VR again opens the running window." & vbCrLf & vbCrLf &
             ExperimentalFiles.ProfileDescription & vbCrLf & vbCrLf &
-            "Restore original files only handles this launcher's recorded changes. Foreign mods and real settings changes are preserved. If Windows shuts down during a session, use it on the next start." & vbCrLf & vbCrLf &
+            "Restore original files only handles this launcher's recorded changes. Foreign mods and real settings changes are preserved, and the other files are still restored. If DiRT 3's graphics settings changed during the session beyond the VR values, it asks whether to keep those changes or restore the settings from before the session. If Windows shuts down during a session, use it on the next start." & vbCrLf & vbCrLf &
             "Preferences and diagnostics: " & context.UserRoot & vbCrLf & vbCrLf &
             "The native WinForms layout and appearance are adapted from DiRT2VR, with yellow DiRT3VR accents. Modern / Classic follows Windows light, dark and high-contrast preferences."
     End Function
