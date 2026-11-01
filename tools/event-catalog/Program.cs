@@ -17,6 +17,16 @@ if (args.Length == 3 && args[0] == "xml")
     Console.WriteLine($"wrote {args[2]}");
     return 0;
 }
+// lng <game> <regex>: English strings whose key or text matches, for research.
+if (args.Length == 3 && args[0] == "lng")
+{
+    using var stream = File.OpenRead(Path.Combine(args[1], "language", "language_eng.lng"));
+    var lng = new EgoEngineLibrary.Language.LngFile(stream);
+    var pattern = new System.Text.RegularExpressions.Regex(args[2], System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    foreach (var entry in lng.hsht.Entries.Where(e => pattern.IsMatch(e.Key) || pattern.IsMatch(e.Value)).OrderBy(e => e.Key, StringComparer.Ordinal))
+        Console.WriteLine($"{entry.Key} = {entry.Value}");
+    return 0;
+}
 if (args.Length < 4 || (args[0] != "dump" && args[0] != "catalog"))
 {
     Console.Error.WriteLine("usage: EventCatalog dump|catalog <DiRT 3 folder> <schemaDirt3.xml> <output.json> [table ...]");

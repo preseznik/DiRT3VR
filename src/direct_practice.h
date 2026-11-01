@@ -113,8 +113,31 @@ inline bool EndBenchmark(uint8_t& active,uint8_t& commandLine,uint32_t requested
     return true;
 }
 
+// AI difficulty: the race setup (0x69ca05) asks 0x5ba5c0 for the profile's "difficulty"
+// setting (star level 0-5, -1 when absent) and turns it into the opponents' pace
+// (difficulty.ai_ratio, 0x5c9560). During a benchmark start the hook answers with the
+// requested level instead; outside one the player's own setting is returned unchanged.
+inline constexpr uintptr_t difficultyRva=0x1ba5c0;
+inline constexpr int maxDifficulty=5;
+inline constexpr uint8_t difficultyEntry[]{0x8b,0x41,0x08,0x8b,0x90,0xf0,0x1c,0x00,0x00,0x83,0xba,0x84,0x0a,0x00,0x00,0x07};
+inline constexpr uint8_t difficultyBranch[]{0x74,0x05};                          // at +0x15
+inline constexpr uint8_t difficultyTail[]{0x50,0xe8,0x4e,0xff,0xff,0xff,0xc3};   // at +0x1c: push; call 0x5ba530; ret
+inline bool DifficultySiteMatches(const uint8_t* image) {
+    const uint8_t* entry=image+difficultyRva;
+    return std::memcmp(entry,difficultyEntry,sizeof(difficultyEntry))==0 &&
+           std::memcmp(entry+0x15,difficultyBranch,sizeof(difficultyBranch))==0 &&
+           std::memcmp(entry+0x1c,difficultyTail,sizeof(difficultyTail))==0;
+}
+inline int DifficultyAnswer(uint8_t benchmarkActive,int requested,int original) {
+    return benchmarkActive==1 && requested>=0 && requested<=maxDifficulty ? requested : original;
+}
+
 bool Requested();
 bool ReturnRequested();
+// DIRT3VR_DIRECT_DIFFICULTY=N (0-5); -1 when unset or invalid.
+int RequestedDifficulty();
+// Hooks the difficulty lookup once; false leaves the game's own setting in charge.
+bool InstallDifficulty(void (*log)(const char*,...));
 // Applies the return-to-menus change once; false leaves the code unchanged.
 bool InstallReturn(void (*log)(const char*,...));
 // DIRT3VR_DIRECT_LAPS=N (1-20); 0 when unset or invalid.
