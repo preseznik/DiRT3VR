@@ -41,7 +41,12 @@ Public NotInheritable Class AboutForm
                 "Return to stable", MessageBoxButtons.OKCancel, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) = DialogResult.OK))
 
         Text = "DiRT3VR — About, updates and instructions"
-        StartPosition = FormStartPosition.CenterParent : Size = New Size(820, 700) : MinimumSize = New Size(520, 440) : Padding = New Padding(20)
+        StartPosition = FormStartPosition.CenterParent
+        ' Logical sizes scaled for the display (this window doesn't autoscale), so the topic list fits at 150% too.
+        Dim work = Screen.PrimaryScreen.WorkingArea
+        MinimumSize = New Size(Px(Me, 520), Px(Me, 440))
+        Size = New Size(Math.Max(MinimumSize.Width, Math.Min(Px(Me, 820), work.Width)), Math.Max(MinimumSize.Height, Math.Min(Px(Me, 700), work.Height)))
+        Padding = New Padding(Px(Me, 20))
         ' The Updates stack sizes itself to its rows; the instruction topics fill the rest of the window.
         Dim updates As New VerticalStack With {.Name = "Updates", .Dock = DockStyle.Top, .Padding = New Padding(0, 0, 0, 12)}
         updates.Controls.Add(New Label With {.Text = "Updates", .AutoSize = True, .Font = New Font("Segoe UI", 11, FontStyle.Bold), .Margin = New Padding(0, 0, 0, 6)})
