@@ -68,7 +68,7 @@ Module StartupTests
             End Using
             check(child.WaitForExit(5000), "disposing startup progress preserves the lifetime owner's process handle")
             Dim result = System.Threading.Tasks.Task.Run(Function() session.WaitAndRestoreAsync()).GetAwaiter().GetResult()
-            check(result.Contains("restored") AndAlso Not transaction.Pending AndAlso SafeFiles.Hash(target) = StartupMovies.OriginalHash, "desktop process exit restores original startup definitions")
+            check(result.Contains("temporary files were removed") AndAlso Not transaction.Pending AndAlso SafeFiles.Hash(target) = StartupMovies.OriginalHash, "desktop process exit restores original startup definitions")
             Using nextLease = InteractiveSession.AcquireLease(ctx)
                 check(True, "desktop exit recovery releases session ownership")
             End Using
