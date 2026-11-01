@@ -68,6 +68,29 @@ Useful facts from those runs: the start-sequence `Controller` event (parser `0x5
 apply `0x5fc070`) writes the player's control mode to `[component(0xff67d8)+0x16c]`
 (0 ai, 1 human); a normal race's `startsequence.xml` switches to human at the lights.
 
+## Event catalog (#5b02d01b)
+
+`tools/data/event-catalog.json` lists what the picker can offer, extracted read-only from
+the installed game by `tools/event-catalog` (EgoEngineLibrary with Ego-Engine-Modding's
+`schemaDirt3.xml`, both MIT; run
+`dotnet run --project tools/event-catalog -- catalog <game> <schemaDirt3.xml> <out.json>`):
+
+- `disciplines`: the four the game marks `valid_for_benchmark` (rally, rallycross,
+  trailblazer, landrush), with display name, `trackType` (`circuit` /
+  `point_to_point`), `staggeredStart` and the Single Race lap choices (1–5 for circuits,
+  1 for point to point). Gymkhana, head-to-head and joyride are not benchmark-valid.
+- `routes` (80): database id, discipline, `country`/`track`/`route` (exactly the benchmark
+  XML's `<track country name route>`), route, track and location names, type and length
+  in metres (0 for circuits). Only routes whose folder is installed and not marked
+  `not_single_race`.
+- `cars` (55): `code` (the benchmark XML's `<car name>`), full name, discipline, class id
+  and class name. Only installed cars, no easter eggs or dummy swaps.
+
+Names are English (`language_eng.lng`, `db_<name_string_id>`). The catalog records the
+database and language hashes. `tests/test_event_catalog.py` checks consistency and, when
+DiRT 3 is installed, that every route and car exists. Only Aspen route 0 with `frx` has
+been driven so far; cross-discipline car choices are untested.
+
 ## Still open
 
 - How a direct session ends: the benchmark counts finished tracks (`+0xefc` against
