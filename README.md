@@ -93,6 +93,9 @@ report is investigated.
    copied (Ctrl+A, Ctrl+C or right-click) to paste into a report.
    **Settings → Diagnostics → Diagnostic logging** adds a presentation trace
    to the next VR session's log; leave it off unless asked for diagnostics.
+   Old VR session logs (with their F8 captures) and records of finished
+   recoveries are removed automatically after 30 days, keeping the newest 10;
+   nothing is removed while recovery is pending or DiRT 3 is running.
 7. **?** opens About, updates and instructions. The instructions are split into
    topics (a list beside the text, or a dropdown in a narrow window), and the
    **Instructions** link on each tab opens that tab's topic. Installed versions check GitHub
