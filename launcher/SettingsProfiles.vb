@@ -23,6 +23,8 @@ Public Class ProfileValues
     Public Property DirectRoute As Integer
     Public Property DirectCar As String = ""
     Public Property DirectLaps As Integer = 1
+    Public Property DirectOpponents As Integer
+    Public Property DirectOpponentCars As String = "class"
 
     Public Shared Function Capture(value As LauncherSettings) As ProfileValues
         value.Validate()
@@ -34,7 +36,8 @@ Public Class ProfileValues
             .RecenterKey = value.RecenterKey, .RecenterModifiers = value.RecenterModifiers,
             .GraphicsQuality = New Dictionary(Of String, String)(value.GraphicsQuality),
             .VrGraphicsQuality = New Dictionary(Of String, String)(value.VrGraphicsQuality),
-            .LaunchMode = value.LaunchMode, .DirectRoute = value.DirectRoute, .DirectCar = value.DirectCar, .DirectLaps = value.DirectLaps}
+            .LaunchMode = value.LaunchMode, .DirectRoute = value.DirectRoute, .DirectCar = value.DirectCar, .DirectLaps = value.DirectLaps,
+            .DirectOpponents = value.DirectOpponents, .DirectOpponentCars = value.DirectOpponentCars}
     End Function
 
     Public Function ApplyTo(local As LauncherSettings) As LauncherSettings
@@ -48,7 +51,8 @@ Public Class ProfileValues
             .RecenterKey = RecenterKey, .RecenterModifiers = RecenterModifiers,
             .GraphicsQuality = New Dictionary(Of String, String)(If(GraphicsQuality, New Dictionary(Of String, String))),
             .VrGraphicsQuality = New Dictionary(Of String, String)(If(VrGraphicsQuality, New Dictionary(Of String, String))),
-            .LaunchMode = If(LaunchMode, "normal"), .DirectRoute = DirectRoute, .DirectCar = If(DirectCar, ""), .DirectLaps = DirectLaps}
+            .LaunchMode = If(LaunchMode, "normal"), .DirectRoute = DirectRoute, .DirectCar = If(DirectCar, ""), .DirectLaps = DirectLaps,
+            .DirectOpponents = DirectOpponents, .DirectOpponentCars = If(DirectOpponentCars, "class")}
         result.Validate()
         Return result
     End Function
@@ -69,7 +73,7 @@ Public Class SettingsProfile
         If Schema = 1 AndAlso Settings.SkipStartupMovies Then Throw New IOException("Startup choices require settings profile schema 2.")
         If Schema < 3 AndAlso (Settings.RecenterKey <> RecenterShortcut.DefaultKey OrElse Settings.RecenterModifiers <> 0) Then Throw New IOException("Recenter keys require settings profile schema 3.")
         If Schema < 4 AndAlso ((Settings.GraphicsQuality IsNot Nothing AndAlso Settings.GraphicsQuality.Count > 0) OrElse (Settings.VrGraphicsQuality IsNot Nothing AndAlso Settings.VrGraphicsQuality.Count > 0)) Then Throw New IOException("Graphics quality choices require settings profile schema 4.")
-        If Schema < 4 AndAlso (If(Settings.LaunchMode, "normal") <> "normal" OrElse Settings.DirectRoute <> 0 OrElse If(Settings.DirectCar, "") <> "" OrElse Settings.DirectLaps <> 1) Then Throw New IOException("Direct practice requires settings profile schema 4.")
+        If Schema < 4 AndAlso (If(Settings.LaunchMode, "normal") <> "normal" OrElse Settings.DirectRoute <> 0 OrElse If(Settings.DirectCar, "") <> "" OrElse Settings.DirectLaps <> 1 OrElse Settings.DirectOpponents <> 0) Then Throw New IOException("Direct practice requires settings profile schema 4.")
         Settings.ApplyTo(New LauncherSettings())
     End Sub
 End Class

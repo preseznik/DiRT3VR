@@ -151,8 +151,8 @@ chosen route with your car, without the menus (discipline, route, and a car
 list with search, class filter and an option for other disciplines' cars). It
 uses DiRT 3's own benchmark start with DiRT3VR's renderer keeping you in
 control. Circuits (rallycross, Land Rush) take 1 to 5 laps. It works with
-**Launch** (on the monitor) and **Launch VR**, for now without opponents, and
-DiRT 3 closes by itself a few seconds after the finish (launch again for
+**Launch** (on the monitor) and **Launch VR**. Circuits can add up to 7 AI
+opponents (same class, mixed, or your car's model); DiRT 3 closes by itself a few seconds after the finish (launch again for
 another run). During the run, Esc opens DiRT 3's pause menu: Restart goes back
 to the start line, Retire ends the run. Normal launch stays the default.
 **Stop VR** turns the headset off and keeps DiRT 3 running on the monitor; it

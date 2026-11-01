@@ -173,6 +173,9 @@ Public Class LauncherSettings
     Public Property DirectCar As String = ""
     ' Laps for circuit routes (rallycross, Land Rush); point-to-point stages are one run.
     Public Property DirectLaps As Integer = 1
+    ' AI opponents on circuits (0 = practice alone) and their cars: "class", "mixed" or "same" (DirectPractice).
+    Public Property DirectOpponents As Integer
+    Public Property DirectOpponentCars As String = "class"
     ' Optional controller/wheel button; machine-specific, so never part of settings profiles.
     Public Property RecenterDevice As RecenterDeviceBinding
 
@@ -193,6 +196,8 @@ Public Class LauncherSettings
         If DirectCar Is Nothing OrElse (DirectCar <> "" AndAlso EventCatalog.Current.FindCar(DirectCar) Is Nothing) Then Throw New IOException("Choose a listed car for direct practice.")
         If LaunchMode = "direct" AndAlso (DirectRoute = 0 OrElse DirectCar = "") Then Throw New IOException("Choose a route and a car for direct practice.")
         If DirectLaps < 1 OrElse DirectLaps > 5 Then Throw New IOException("Choose 1 to 5 laps for direct practice.")
+        If DirectOpponents < 0 OrElse DirectOpponents > DirectPractice.MaxOpponents Then Throw New IOException("Choose 0 to " & DirectPractice.MaxOpponents & " opponents for direct practice.")
+        If Not DirectPractice.OpponentCarChoices.Contains(DirectOpponentCars) Then Throw New IOException("Choose which cars the opponents drive.")
     End Sub
 
     Public Shared Function Load(context As InstallContext) As LauncherSettings
