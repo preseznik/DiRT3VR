@@ -178,6 +178,8 @@ Public Class LauncherSettings
     Public Property DirectOpponentCars As String = "class"
     ' AI difficulty with opponents: -1 = the player's own DiRT 3 setting, 0 (easiest) to 5 (hardest).
     Public Property DirectDifficulty As Integer = -1
+    ' After the finish: "quit" (DiRT 3 closes, as its benchmark start does) or "menus" (DiRT 3's main menu).
+    Public Property DirectAfterFinish As String = "quit"
     ' Optional controller/wheel button; machine-specific, so never part of settings profiles.
     Public Property RecenterDevice As RecenterDeviceBinding
 
@@ -201,6 +203,7 @@ Public Class LauncherSettings
         If DirectOpponents < 0 OrElse DirectOpponents > DirectPractice.MaxOpponents Then Throw New IOException("Choose 0 to " & DirectPractice.MaxOpponents & " opponents for direct practice.")
         If Not DirectPractice.OpponentCarChoices.Contains(DirectOpponentCars) Then Throw New IOException("Choose which cars the opponents drive.")
         If DirectDifficulty < -1 OrElse DirectDifficulty > DirectPractice.MaxDifficulty Then Throw New IOException("Choose the AI difficulty for direct practice.")
+        If Not DirectPractice.AfterFinishChoices.Contains(DirectAfterFinish) Then Throw New IOException("Choose what happens after the finish.")
     End Sub
 
     Public Shared Function Load(context As InstallContext) As LauncherSettings

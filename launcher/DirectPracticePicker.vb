@@ -17,6 +17,7 @@ Public NotInheritable Class DirectPracticePicker
     Private ReadOnly opponents As New ValueSlider("DirectOpponents", 0, DirectPractice.MaxOpponents, 0, valueLabels:=Counted(0, DirectPractice.MaxOpponents, "opponent", "opponents"))
     Private ReadOnly rivalCars As New ComboBox With {.Name = "DirectOpponentCars", .DropDownStyle = ComboBoxStyle.DropDownList}
     Private ReadOnly aiLevel As New ComboBox With {.Name = "DirectDifficulty", .DropDownStyle = ComboBoxStyle.DropDownList}
+    Private ReadOnly finish As New ComboBox With {.Name = "DirectAfterFinish", .DropDownStyle = ComboBoxStyle.DropDownList}
     Private ReadOnly summary As New Label With {.Name = "DirectSummary", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 6, 0, 10)}
     Private ReadOnly pickerControls As Control()
     Private updating As Boolean
@@ -30,7 +31,8 @@ Public NotInheritable Class DirectPracticePicker
         Next
         rivalCars.Items.AddRange({"Same class as my car", "Mixed: any car of this discipline", "My car's model"})
         aiLevel.Items.AddRange({"My DiRT 3 setting", "Level 0 (easiest)", "Level 1", "Level 2", "Level 3", "Level 4", "Level 5 (hardest)"})
-        For Each box In {discipline, route, carClass, car, rivalCars, aiLevel}
+        finish.Items.AddRange({"Quit to desktop", "Return to DiRT 3's menus"})
+        For Each box In {discipline, route, carClass, car, rivalCars, aiLevel, finish}
             StyleChoice(box, parent)
         Next
         Field(parent, "Discipline", discipline)
@@ -43,8 +45,9 @@ Public NotInheritable Class DirectPracticePicker
         Field(parent, "Opponents (circuits)", opponents)
         Field(parent, "Opponent cars", rivalCars)
         Field(parent, "Difficulty", aiLevel)
+        Field(parent, "After the finish", finish)
         parent.Controls.Add(summary)
-        pickerControls = {discipline, route, search, carClass, allCars, car}
+        pickerControls = {discipline, route, search, carClass, allCars, car, finish}
         AddHandler normal.CheckedChanged, Sub() ModeChanged()
         AddHandler direct.CheckedChanged, Sub() ModeChanged()
         AddHandler discipline.SelectedIndexChanged, Sub()
@@ -62,11 +65,12 @@ Public NotInheritable Class DirectPracticePicker
                                            End Sub
         AddHandler rivalCars.SelectedIndexChanged, Sub() If Not updating Then Edited()
         AddHandler aiLevel.SelectedIndexChanged, Sub() If Not updating Then Edited()
+        AddHandler finish.SelectedIndexChanged, Sub() If Not updating Then Edited()
         AddHandler search.TextChanged, Sub() If Not updating Then FillCars(SelectedCarCode()) : Edited()
         AddHandler carClass.SelectedIndexChanged, Sub() If Not updating Then FillCars(SelectedCarCode(), keepClass:=True) : Edited()
         AddHandler allCars.CheckedChanged, Sub() If Not updating Then FillCars(SelectedCarCode()) : Edited()
         AddHandler car.SelectedIndexChanged, Sub() If Not updating Then Edited()
-        Apply("normal", 0, "", 1, 0, "class", -1)
+        Apply("normal", 0, "", 1, 0, "class", -1, "quit")
     End Sub
 
     ' "None", "1 lap", "2 laps"… for the sliders.
@@ -117,6 +121,12 @@ Public NotInheritable Class DirectPracticePicker
         End Get
     End Property
 
+    Public ReadOnly Property AfterFinish As String
+        Get
+            Return DirectPractice.AfterFinishChoices(Math.Max(0, finish.SelectedIndex))
+        End Get
+    End Property
+
     Public ReadOnly Property SummaryText As String
         Get
             Return summary.Text
@@ -124,7 +134,7 @@ Public NotInheritable Class DirectPracticePicker
     End Property
 
     ' Shows saved choices; an unknown or missing route starts on the first rally stage.
-    Public Sub Apply(launchMode As String, routeId As Integer, carCode As String, lapCount As Integer, opponentCount As Integer, opponentChoice As String, level As Integer)
+    Public Sub Apply(launchMode As String, routeId As Integer, carCode As String, lapCount As Integer, opponentCount As Integer, opponentChoice As String, level As Integer, afterFinishChoice As String)
         Dim catalog = EventCatalog.Current
         updating = True
         Try
@@ -140,6 +150,7 @@ Public NotInheritable Class DirectPracticePicker
             opponents.Value = Math.Clamp(opponentCount, 0, DirectPractice.MaxOpponents)
             rivalCars.SelectedIndex = Math.Max(0, Array.IndexOf(DirectPractice.OpponentCarChoices, opponentChoice))
             aiLevel.SelectedIndex = Math.Clamp(level, -1, DirectPractice.MaxDifficulty) + 1
+            finish.SelectedIndex = Math.Max(0, Array.IndexOf(DirectPractice.AfterFinishChoices, afterFinishChoice))
         Finally
             updating = False
         End Try
@@ -227,7 +238,7 @@ Public NotInheritable Class DirectPracticePicker
                           If(chosenRoute Is Nothing OrElse chosenCar Is Nothing, "Choose a route and a car (adjust the search if no car is listed).",
                              "Direct practice: " & CurrentDisciplineName() & " · " & chosenRoute.ToString() & If(circuit, " · " & laps.Value & If(laps.Value = 1, " lap", " laps"), "") &
                              If(rivals > 0, " · " & rivals & If(rivals = 1, " opponent", " opponents") & " (" & {"same class", "mixed cars", "your car's model"}(Math.Max(0, rivalCars.SelectedIndex)) & If(DifficultyLevel >= 0, ", AI level " & DifficultyLevel, "") & ")", "") &
-                             " · " & chosenCar.Name & ". " & If(rivals > 0, "", "No opponents; ") & "DiRT 3 closes by itself after the finish."))
+                             " · " & chosenCar.Name & ". " & If(rivals > 0, "", "No opponents. ") & If(AfterFinish = "menus", "After the finish DiRT 3 returns to its menus.", "DiRT 3 closes by itself after the finish.")))
     End Sub
 
     Private Function CurrentDisciplineName() As String

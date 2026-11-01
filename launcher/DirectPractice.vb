@@ -20,6 +20,9 @@ Public NotInheritable Class DirectPractice
     Public Shared ReadOnly OpponentCarChoices As String() = {"class", "mixed", "same"}
     ' DiRT 3's six AI levels (shown as stars in the game); the renderer answers the game's lookup.
     Public Const MaxDifficulty As Integer = 5
+    ' After the finish DiRT 3 quits (its benchmark start) or, with the renderer's DIRT3VR_DIRECT_RETURN,
+    ' goes to its main menu as a normal session (Wrench's 05e63da).
+    Public Shared ReadOnly AfterFinishChoices As String() = {"quit", "menus"}
 
     Private Sub New()
     End Sub
@@ -66,6 +69,7 @@ Public NotInheritable Class DirectPractice
         Dim lapCount = Laps(settings), level = Difficulty(settings)
         If lapCount > 0 Then start.Environment("DIRT3VR_DIRECT_LAPS") = Number(lapCount)
         If level >= 0 Then start.Environment("DIRT3VR_DIRECT_DIFFICULTY") = Number(level)
+        If settings.DirectAfterFinish = "menus" Then start.Environment("DIRT3VR_DIRECT_RETURN") = "1"
         start.ArgumentList.Add("-benchmark") : start.ArgumentList.Add(FileName)
     End Sub
 
