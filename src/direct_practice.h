@@ -40,6 +40,27 @@ inline bool Keep(uint8_t* image,uintptr_t loadedBase) {
     return true;
 }
 
+// Pause: the race's next-state check (0x51f3f0) returns "pause" when a pause was requested,
+// but drops it while the benchmark flag is set. Making that je unconditional gives a direct
+// session DiRT 3's normal Single Race pause menu (Continue, Restart, Options, Retire...).
+inline constexpr uintptr_t pauseCheckRva=0x11f44f;  // cmp byte [benchmark flag],0; je +0xf; push 0; lea ecx,[ebp+8]
+inline constexpr uintptr_t pauseBranchRva=0x11f456;
+inline void PauseCheck(uintptr_t loadedBase,uint8_t (&bytes)[13]) {
+    const uint32_t flag=static_cast<uint32_t>(loadedBase+benchmarkFlagRva);
+    const uint8_t pattern[13]{0x80,0x3d,uint8_t(flag),uint8_t(flag>>8),uint8_t(flag>>16),uint8_t(flag>>24),0x00,
+                              0x74,0x0f,0x6a,0x00,0x8d,0x4d};
+    std::memcpy(bytes,pattern,sizeof(pattern));
+}
+inline bool PauseSiteMatches(const uint8_t* image,uintptr_t loadedBase) {
+    uint8_t expected[13]; PauseCheck(loadedBase,expected);
+    return std::memcmp(image+pauseCheckRva,expected,sizeof(expected))==0;
+}
+inline bool AllowPause(uint8_t* image,uintptr_t loadedBase) {
+    if(!PauseSiteMatches(image,loadedBase)) return false;
+    image[pauseBranchRva]=0xeb;
+    return true;
+}
+
 // Laps: the race setup (0x608fbe) takes the lap count from the benchmark config's count
 // (+0xef4, 0xf9dd64 at the preferred base) as max(1, count); the benchmark XML has no
 // attribute for it and the parser leaves it 0. Writing it before the race loads gives the

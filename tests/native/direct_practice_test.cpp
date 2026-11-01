@@ -33,7 +33,11 @@ bool InstalledGameMatches(const char* path) {
     std::vector<uint8_t> exit(dp::exitCheckRva+26);
     file.seekg(static_cast<std::streamoff>(dp::exitCheckRva-0x1000+0x400));
     file.read(reinterpret_cast<char*>(exit.data()+dp::exitCheckRva),26);
-    return file && dp::ExitSiteMatches(exit.data(),0x400000);
+    if(!file || !dp::ExitSiteMatches(exit.data(),0x400000)) return false;
+    std::vector<uint8_t> pause(dp::pauseCheckRva+13);
+    file.seekg(static_cast<std::streamoff>(dp::pauseCheckRva-0x1000+0x400));
+    file.read(reinterpret_cast<char*>(pause.data()+dp::pauseCheckRva),13);
+    return file && dp::PauseSiteMatches(pause.data(),0x400000);
 }
 
 std::vector<uint8_t> ExitImage(uintptr_t loadedBase) {
@@ -95,6 +99,18 @@ int main(int argc,char** argv) {
             Require(dp::exitBranchRva+5+rel==0x2a8757,"Jump target differs from the je's target");
             Require(!dp::SkipExit(exit.data(),base),"Already-changed exit code was accepted again");
         }
+        for(const uintptr_t base:{uintptr_t{0x400000},uintptr_t{0x280000}}) {
+            std::vector<uint8_t> pause(dp::pauseCheckRva+32,0xcc);
+            uint8_t check[13]; dp::PauseCheck(base,check);
+            std::copy(std::begin(check),std::end(check),pause.begin()+dp::pauseCheckRva);
+            const auto before=pause;
+            Require(dp::PauseSiteMatches(pause.data(),base) && !dp::PauseSiteMatches(pause.data(),base+0x10000),"Pause site not recognised for its own base only");
+            Require(dp::AllowPause(pause.data(),base),"Pause branch not made unconditional");
+            for(size_t i=0;i<pause.size();++i) Require(i==dp::pauseBranchRva ? pause[i]==0xeb : pause[i]==before[i],"Bytes other than the pause branch changed");
+            Require(!dp::AllowPause(pause.data(),base),"Already-changed pause code was accepted again");
+        }
+        Require(dp::pauseBranchRva==dp::pauseCheckRva+7,"Pause branch is not the je after the flag compare");
+
         uint8_t active=1,commandLine=1;
         Require(!dp::EndBenchmark(active,commandLine,1,0) && active==1,"Benchmark ended before the track was complete");
         Require(!dp::EndBenchmark(active,commandLine,0,0) && active==1,"Benchmark ended with no requested tracks");

@@ -361,8 +361,19 @@ def press_in_focused_game(pid: int, key: str) -> str:
     if not windows:
         return "no-window"
     if not foreground_is_game():
-        user32.ShowWindow(windows[0], 9)  # SW_RESTORE
-        user32.SetForegroundWindow(windows[0])
+        # Windows only lets the foreground owner hand over focus; borrow its input queue briefly.
+        kernel32 = ctypes.WinDLL("kernel32")
+        foreground_thread = user32.GetWindowThreadProcessId(user32.GetForegroundWindow(), None)
+        own_thread = kernel32.GetCurrentThreadId()
+        attached = bool(foreground_thread) and foreground_thread != own_thread and \
+            bool(user32.AttachThreadInput(own_thread, foreground_thread, True))
+        try:
+            user32.ShowWindow(windows[0], 9)  # SW_RESTORE
+            user32.BringWindowToTop(windows[0])
+            user32.SetForegroundWindow(windows[0])
+        finally:
+            if attached:
+                user32.AttachThreadInput(own_thread, foreground_thread, False)
         time.sleep(0.3)
     if not foreground_is_game():
         return "not-foreground"  # never type into another program
