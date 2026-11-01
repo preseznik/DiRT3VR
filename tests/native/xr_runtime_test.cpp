@@ -413,6 +413,20 @@ int main() {
             events.push_back(XR_SESSION_STATE_STOPPING); auto stopped=runtime.BeginFrame(6); Require(!stopped && !runtime.Running(),"Stopping session rendered");
             runtime.Shutdown(); Require(runtime.ReferenceRevision()==0,"Reference revision survived runtime shutdown");
         }
+        Reset(); {
+            // Including tilt levels the current view; the default keeps the head's roll, and a later
+            // ordinary recenter must not keep including tilt.
+            XrRuntime runtime; Require(runtime.Initialize(device.Get()),"Init failed");
+            auto first=runtime.BeginFrame(1); Require(bool(first),"Initial tilt-test frame failed"); first.Abort();
+            const float s15=std::sin(.1309f),c15=std::cos(.1309f);
+            headOrientation={0,0,s15,c15};
+            runtime.RequestRecenter(); auto level=runtime.BeginFrame(2);
+            Require(bool(level) && std::abs(std::abs(level.RelativeEyePose(0).orientation.z)-s15)<.001f,"Yaw-only recenter removed the head's roll"); level.Abort();
+            runtime.RequestRecenter(true); auto tilted=runtime.BeginFrame(3);
+            Require(bool(tilted) && std::abs(tilted.RelativeEyePose(0).orientation.w-1)<.001f && std::abs(tilted.RelativeEyePose(0).orientation.z)<.001f,"Recenter including tilt did not level the view"); tilted.Abort();
+            runtime.RequestRecenter(); auto again=runtime.BeginFrame(4);
+            Require(bool(again) && std::abs(std::abs(again.RelativeEyePose(0).orientation.z)-s15)<.001f,"A later ordinary recenter still included tilt"); again.Abort();
+        }
         Reset(); badPose=true; {
             XrRuntime runtime; Require(runtime.Initialize(device.Get()),"Init failed"); auto bad=runtime.BeginFrame(1); Require(!bad && layers==0,"NaN view rendered");
             badPose=false; auto recovered=runtime.BeginFrame(2); Require(bool(recovered),"Tracking recovery permanently blocked");

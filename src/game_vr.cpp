@@ -334,8 +334,14 @@ bool DeviceRecenterRequested() {
     const auto& path=RecenterRequestPath();
     return !path.empty() && DeleteFileW(path.c_str())!=FALSE;
 }
+// DIRT3VR_RECENTER_TILT=1: the player chose to include pitch and roll when recentering.
+bool ConfiguredRecenterTilt() {
+    wchar_t value[4]{};
+    return GetEnvironmentVariableW(L"DIRT3VR_RECENTER_TILT",value,4)==1 && value[0]==L'1';
+}
 void RecenterKey(PrototypeState& state) {
     static const RecenterShortcut binding=ConfiguredRecenter();
+    static const bool tilt=ConfiguredRecenterTilt();
     DWORD process{};
     GetWindowThreadProcessId(GetForegroundWindow(),&process);
     const unsigned modifiers=(GetAsyncKeyState(VK_CONTROL)<0?1u:0u)|(GetAsyncKeyState(VK_MENU)<0?2u:0u)|(GetAsyncKeyState(VK_SHIFT)<0?4u:0u);
@@ -344,8 +350,8 @@ void RecenterKey(PrototypeState& state) {
     const bool keyPressed=state.recenter.Update(binding,keyDown,modifiers,process==GetCurrentProcessId());
     const bool devicePressed=DeviceRecenterRequested();
     if(keyPressed || devicePressed) {
-        state.xr.RequestRecenter();
-        RuntimeLog((keyPressed ? "XR recenter requested key="+binding.Describe() : std::string("XR recenter requested by controller/wheel button")).c_str());
+        state.xr.RequestRecenter(tilt);
+        RuntimeLog(((keyPressed ? "XR recenter requested key="+binding.Describe() : std::string("XR recenter requested by controller/wheel button")) + (tilt ? " tilt=1" : "")).c_str());
     }
 }
 }

@@ -27,6 +27,14 @@ int main() {
         Require(Near(local.position.x,1) && Near(local.position.z,0),"Pose relative transform does not invert local offset");
         const auto up=RecenterPose({{half,0,0,half},{3,2,1}},turn);
         Require(Near(up.orientation.y,half) && Near(up.orientation.w,half),"Vertical recenter lost the last valid heading");
+        // Including tilt: the tilted view becomes straight ahead and level; yaw-only keeps the tilt.
+        const float s15=std::sin(.1309f),c15=std::cos(.1309f); // 15 degrees of roll, about the view axis
+        const XrPosef tilted{{0,0,s15,c15},{0,1.4f,0}};
+        const auto withTilt=RecenterPoseWithTilt(tilted);
+        const auto level=RelativePose(withTilt,tilted);
+        Require(Near(level.orientation.w,1) && Near(level.orientation.z,0) && Near(level.position.y,0),"Recentering with tilt did not level the current view");
+        const auto keepLevel=RelativePose(RecenterPose(tilted,origin),tilted);
+        Require(Near(std::abs(keepLevel.orientation.z),s15),"Yaw-only recentering removed the head's roll");
         bool rejected=false;
         try { Normalize({0,0,0,0}); } catch(const std::invalid_argument&) { rejected=true; }
         Require(rejected,"Zero quaternion accepted");

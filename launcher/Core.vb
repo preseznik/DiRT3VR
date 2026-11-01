@@ -160,6 +160,9 @@ Public Class LauncherSettings
     Public Property SkipStartupMovies As Boolean = False
     Public Property RecenterKey As Integer = RecenterShortcut.DefaultKey
     Public Property RecenterModifiers As Integer = 0
+    ' True: recentering turns to face forward and keeps the horizon level (default, as in GRID2VR).
+    ' False: a manual recenter also resets pitch and roll.
+    Public Property RecenterKeepLevel As Boolean = True
     ' Optional controller/wheel button; machine-specific, so never part of settings profiles.
     Public Property RecenterDevice As RecenterDeviceBinding
 

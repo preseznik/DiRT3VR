@@ -25,6 +25,7 @@ Public Class MainForm
     Private capturingRecenter As Boolean
     Private ReadOnly recenterDeviceButton As New Button With {.Name = "RecenterDevice", .AutoSize = True}
     Private ReadOnly clearRecenterDevice As New Button With {.Name = "ClearRecenterDevice", .Text = "Clear", .AutoSize = True}
+    Private ReadOnly recenterKeepLevel As New CheckBox With {.Name = "RecenterKeepLevel", .Text = "Keep the horizon level when recentering", .AutoSize = True, .Checked = True}
     Private recenterDevice As RecenterDeviceBinding
     Private recenterWatcher As RecenterDeviceWatcher
     Private ReadOnly experimental As New CheckBox With {.Name = "ExperimentalVR", .Text = "Enable experimental VR (VDXR)", .AutoSize = True}
@@ -403,6 +404,8 @@ Public Class MainForm
         deviceRow.Controls.AddRange({recenterDeviceButton, clearRecenterDevice})
         Field(vrControls, "Controller / wheel button", deviceRow)
         vrControls.Controls.Add(Info("Optional: a controller, wheel or button-box button (or D-pad / hat direction) that also recenters while DiRT 3 is in front. The launcher reads the device without taking it over and sends nothing to the game."))
+        vrControls.Controls.Add(recenterKeepLevel)
+        vrControls.Controls.Add(Info("On (recommended): recentering turns the view to face forward and keeps the horizon level, however your head is tilted. Off: the key or button also resets pitch and roll, so the way you hold your head when you press it becomes level; useful if your headset sits tilted. The automatic centering at the start of VR always keeps the horizon level."))
         AddHandler recenterDeviceButton.Click, Sub()
                                                    Using dialog As New RecenterDeviceForm(DrivingInput.LibraryPath(context))
                                                        If dialog.ShowDialog(Me) = DialogResult.OK AndAlso dialog.Binding IsNot Nothing Then SetRecenterDevice(dialog.Binding)
@@ -574,6 +577,7 @@ Public Class MainForm
         skipStartupMovies.Checked = settings.SkipStartupMovies
         recenterKey = settings.RecenterKey : recenterModifiers = settings.RecenterModifiers : capturingRecenter = False : UpdateRecenterLabel()
         recenterDevice = settings.RecenterDevice : UpdateRecenterDeviceLabel()
+        recenterKeepLevel.Checked = settings.RecenterKeepLevel
         renderScale.Value = settings.VrRenderScale
         desktopMode.SelectedIndex = Array.IndexOf({"game", "windowed", "fullscreen", "borderless"}, settings.DesktopDisplayMode)
         desktopVSync.SelectedIndex = Array.IndexOf({"game", "off", "on"}, settings.DesktopVSync)
@@ -593,7 +597,7 @@ Public Class MainForm
         Return New LauncherSettings With {.ModernInterface = modern.Checked, .RuntimeMode = If(runtime.SelectedIndex = 1, "steamvr", "vdxr"), .SteamRuntimeManifest = manifest.Text, .VdxrRuntimeManifest = vdxrManifest.Text, .DiagnosticLogging = logging.Checked, .ExperimentalVrEnabled = experimental.Checked, .VrRenderScale = renderScale.Value,
             .DesktopWidth = If(resolution Is Nothing, 0, resolution.Size.Width), .DesktopHeight = If(resolution Is Nothing, 0, resolution.Size.Height),
             .DesktopDisplayMode = {"game", "windowed", "fullscreen", "borderless"}(Math.Max(0, desktopMode.SelectedIndex)), .DesktopVSync = {"game", "off", "on"}(Math.Max(0, desktopVSync.SelectedIndex)), .SkipStartupMovies = skipStartupMovies.Checked,
-            .RecenterKey = recenterKey, .RecenterModifiers = recenterModifiers, .RecenterDevice = recenterDevice}
+            .RecenterKey = recenterKey, .RecenterModifiers = recenterModifiers, .RecenterDevice = recenterDevice, .RecenterKeepLevel = recenterKeepLevel.Checked}
     End Function
 
     Private Sub RememberSavedSettings()
@@ -925,7 +929,8 @@ Public Class MainForm
                 "Use your existing keyboard, controller or wheel bindings in DiRT 3." & vbCrLf & vbCrLf &
                 "Live input and force feedback shows your wheel, pedals, shifter and controllers as Windows reports them and tests rumble or force feedback on each one. It reads devices without taking them over and changes no game or Windows setting. Close DiRT 3 before testing force feedback." & vbCrLf & vbCrLf &
                 recenter & " recenters the headset view while DiRT 3 is in front. To change it, click the key under VR and seat controls and press another key, optionally with Ctrl, Alt or Shift; Esc cancels. DiRT 3 still receives the key, so pick one the game doesn't use. Alt+Tab, Alt+F4 and Ctrl+Alt+Delete are reserved." & vbCrLf & vbCrLf &
-                "Bind a button… adds a controller, wheel or button-box button, or a D-pad / hat direction, as another way to recenter. During VR the launcher watches it only while DiRT 3 is in front, without taking the device over. Clear removes it."),
+                "Bind a button… adds a controller, wheel or button-box button, or a D-pad / hat direction, as another way to recenter. During VR the launcher watches it only while DiRT 3 is in front, without taking the device over. Clear removes it." & vbCrLf & vbCrLf &
+                "Keep the horizon level when recentering is on by default: recentering turns the view to face forward but leaves pitch and roll alone. Turn it off if your headset sits tilted; the key or button then also makes the way you hold your head level. The automatic centering at the start of VR always keeps the horizon level."),
             New HelpTopic(HelpRuntime,
                 "Settings → Check runtime and headset runs a small 32-bit OpenXR check without starting the game. A successful check does not mean VR driving is ready." & vbCrLf & vbCrLf &
                 "Choose VDXR or SteamVR explicitly. The selected runtime is used only by DiRT3VR's own processes; your system OpenXR default stays unchanged. VDXR and SteamVR need separate checks. Browse to the selected runtime file if it is installed elsewhere." & vbCrLf & vbCrLf &
