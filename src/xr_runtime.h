@@ -111,6 +111,7 @@ private:
     bool EyeCurrent(uint64_t,unsigned) const noexcept;
     bool Check(XrResult,const char*) noexcept;
     void Report(const char*,...) noexcept;
+    void ReportRefreshRate(bool enabled) noexcept;
     void ReportOrientation(const char* reason) noexcept;
     Logger logger_{};
     DWORD ownerThread_{};
