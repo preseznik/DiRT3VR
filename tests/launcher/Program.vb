@@ -29,6 +29,7 @@ Module Program
             BackgroundTests.Run(root, AddressOf Check)
             RecoveryConflictTests.Run(root, AddressOf Check)
             DefaultsTests.Run(root, AddressOf Check)
+            LogCleanupTests.Run(root, AddressOf Check)
             StartupTests.Run(root, AddressOf Check)
             InstallerTests.Run(root, AddressOf Check)
             TestHeadsetResolution(root)

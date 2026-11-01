@@ -230,6 +230,8 @@ Public Class MainForm
                            End Sub
         AddHandler Shown, Sub() FitInitialWindow()
         AddHandler Shown, Async Sub() Await StartupUpdateCheckAsync()
+        ' Old session logs, F8 captures and finished recovery records go after 30 days (newest 10 kept).
+        AddHandler Shown, Async Sub() Await LogCleanup.RunAsync(context)
         tips.SetToolTip(graphicsDefaultsButton, "Set desktop display mode, resolution and VSync to Use game setting and VR render scale to 100%. Nothing is saved until Save settings or Launch.")
         tips.SetToolTip(launcherDefaultsButton, "Reset every launcher choice except VR runtime locations and the experimental VR opt-in. Nothing is saved until Save settings or Launch.")
         tips.SetToolTip(probe, "Check OpenXR and headset access without starting DiRT 3. This does not validate stereoscopic game rendering.")
@@ -934,6 +936,7 @@ Public Class MainForm
             New HelpTopic(HelpFiles,
                 "Preferences and diagnostics: " & context.UserRoot & vbCrLf & vbCrLf &
                 "Open logs opens that folder. It holds the launcher settings, settings profiles, desktop-backups, the recovery folder and the logs, including one session-… folder per VR session. Startup results and failures are always recorded there. Advanced → Latest diagnostic report shows the most recent report." & vbCrLf & vbCrLf &
+                "Old data is removed automatically, at most once a day: VR session folders (with their F8 captures) and the records and backups of recoveries that finished, once they are older than 30 days. The newest 10 of each are always kept, and nothing is removed while recovery is pending or DiRT 3 is running. logs\cleanup.json says what was removed." & vbCrLf & vbCrLf &
                 "Settings → Diagnostics → Diagnostic logging adds a presentation trace to the next VR session's log (metadata only, at most 180 seconds or 512 records). Leave it off unless you are asked for diagnostics." & vbCrLf & vbCrLf &
                 "The status line and messages above the buttons can be selected and copied (Ctrl+A, Ctrl+C or right-click) to paste into a report."),
             New HelpTopic(HelpAbout,
