@@ -6,7 +6,8 @@ Imports System.Runtime.InteropServices
 Public Class ValueSlider
     Inherits UserControl
     Private ReadOnly track As MarkerTrackBar
-    Private ReadOnly valueText As New SliderValueLabel With {.AutoSize = True, .Anchor = AnchorStyles.Right, .TextAlign = ContentAlignment.MiddleRight, .Margin = New Padding(8, 0, 0, 0)}
+    ' Sized for the widest value, so the track doesn't shift and launcher label wrapping can't clip it.
+    Private ReadOnly valueText As New SliderValueLabel With {.AutoSize = False, .Anchor = AnchorStyles.Right, .TextAlign = ContentAlignment.MiddleRight, .Margin = New Padding(8, 0, 0, 0)}
     Private ReadOnly suffix As String
     Private ReadOnly divisor As Decimal
     Private ReadOnly labels As String()
@@ -38,7 +39,19 @@ Public Class ValueSlider
                                            RefreshValue()
                                            RaiseEvent ValueChanged(Me, EventArgs.Empty)
                                        End Sub
+        AddHandler valueText.FontChanged, Sub() FitValueWidth()
         RefreshValue()
+        FitValueWidth()
+    End Sub
+
+    Private Function Display(value As Integer) As String
+        Return If(labels Is Nothing, (value / divisor).ToString(If(divisor = 1D, "0", "0.0")) & suffix, labels(value - track.Minimum))
+    End Function
+
+    Private Sub FitValueWidth()
+        Dim widest = Enumerable.Range(track.Minimum, track.Maximum - track.Minimum + 1).
+            Max(Function(value) TextRenderer.MeasureText(Display(value), valueText.Font, Size.Empty, TextFormatFlags.NoPrefix).Width)
+        valueText.Size = New Size(widest + 4, Math.Max(valueText.Font.Height + 4, 20))
     End Sub
     <System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)>
     Public Property Value As Integer
@@ -57,11 +70,11 @@ Public Class ValueSlider
         Set(value As Integer)
             If labels IsNot Nothing OrElse value < track.Minimum Then Throw New ArgumentOutOfRangeException(NameOf(value))
             track.Maximum = value
-            RefreshValue()
+            RefreshValue() : FitValueWidth()
         End Set
     End Property
     Private Sub RefreshValue()
-        valueText.Text = If(labels Is Nothing, (track.Value / divisor).ToString(If(divisor = 1D, "0", "0.0")) & suffix, labels(track.Value - track.Minimum))
+        valueText.Text = Display(track.Value)
         AccessibleDescription = valueText.Text
     End Sub
     Protected Overrides Sub OnBackColorChanged(e As EventArgs)

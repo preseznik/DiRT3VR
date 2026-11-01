@@ -122,6 +122,48 @@ Module DirectPracticeTests
         check(plainStart.ArgumentList.Count = 0 AndAlso Not plainStart.Environment.Keys.Any(Function(key) key.StartsWith("DIRT3VR_", StringComparison.OrdinalIgnoreCase)), "a startup-skip desktop session starts DiRT 3 as before")
         check(Refused(Sub() DesktopStartupSession.StartInfo(desktopCtx, settings, "logs")), "the desktop session log path must be absolute")
 
+        ' Opponents on circuits: the player's car first, then the field (Wrench's runs 24-28).
+        Dim race As New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = "", .LaunchMode = "direct", .DirectRoute = Aspen().Id, .DirectCar = "frx", .DirectOpponents = 3}
+        race.Validate()
+        Dim rallycross = catalog.CarsFor("rallycross", False, "", "").ToDictionary(Function(item) item.Code)
+        Dim field = DirectPractice.OpponentField(race)
+        check(race.DirectOpponentCars = "class" AndAlso field.Count = 3 AndAlso field.Sum(Function(entry) entry.Count) = 3 AndAlso
+              field.All(Function(entry) entry.Code <> "frx" AndAlso rallycross.ContainsKey(entry.Code) AndAlso rallycross(entry.Code).VehicleClass = rallycross("frx").VehicleClass),
+              "three opponents of the player's class (the default): three different cars, never the player's model")
+        Dim raceConfig = Encoding.UTF8.GetString(DirectPractice.Config(race))
+        Dim opponentCars = String.Concat(field.Select(Function(entry) "<car name=""" & entry.Code & """ number=""" & entry.Count & """ />"))
+        check(raceConfig.Contains("<track country=""usa"" name=""aspen"" route=""route_0""><car name=""frx"" number=""1"" />" & opponentCars & "</track>"), "the player's car comes first, each opponent model after it (" & raceConfig & ")")
+        DirectPractice.Validate(DirectPractice.Config(race))
+        race.DirectOpponents = 7 : race.DirectOpponentCars = "mixed"
+        check(DirectPractice.OpponentField(race).Count = 7 AndAlso DirectPractice.OpponentField(race).All(Function(entry) entry.Code <> "frx" AndAlso entry.Count = 1), "seven mixed opponents are seven other cars of the discipline")
+        DirectPractice.Validate(DirectPractice.Config(race))
+        race.DirectOpponentCars = "same"
+        check(Encoding.UTF8.GetString(DirectPractice.Config(race)).Contains("<car name=""frx"" number=""8"" /></track>"), "My car's model shares the player's entry: number 8 is the player and 7 opponents")
+        DirectPractice.Validate(DirectPractice.Config(race))
+        Dim landRush = catalog.RoutesFor("landrush").First()
+        Dim trucks = catalog.CarsFor("landrush", False, "", "").ToArray()
+        Dim rush As New LauncherSettings With {.LaunchMode = "direct", .DirectRoute = landRush.Id, .DirectCar = trucks(0).Code, .DirectOpponents = 5, .DirectOpponentCars = "mixed"}
+        check(trucks.Length = 2 AndAlso DirectPractice.OpponentField(rush).Single().Code = trucks(1).Code AndAlso DirectPractice.OpponentField(rush).Single().Count = 5, "Land Rush's mixed field repeats the other vehicle")
+        rush.DirectOpponentCars = "class"
+        check(DirectPractice.OpponentField(rush).Single().Code = trucks(0).Code, "with no other car in the class, opponents drive the player's model")
+        Dim solo = New LauncherSettings With {.LaunchMode = "direct", .DirectRoute = stage.DirectRoute, .DirectCar = "frx", .DirectOpponents = 4}
+        check(DirectPractice.Opponents(solo) = 0 AndAlso DirectPractice.OpponentField(solo).Count = 0 AndAlso Encoding.UTF8.GetString(DirectPractice.Config(solo)).Split("<car ").Length = 2, "stages stay solo whatever the opponents setting")
+        Dim soloConfig = Encoding.UTF8.GetString(DirectPractice.Config(solo))
+        Dim refusedConfig = Function(text As String) Refused(Sub() DirectPractice.Validate(Encoding.UTF8.GetBytes(text)))
+        Dim otherCar = rallycross.Keys.First(Function(code) code <> "frx")
+        check(refusedConfig(config.Replace("number=""1""", "number=""9""")) AndAlso refusedConfig(config.Replace("number=""1""", "number=""0""")) AndAlso refusedConfig(config.Replace("number=""1""", "number=""01""")) AndAlso
+              refusedConfig(config.Replace("</track>", "<car name=""zzz"" number=""1"" /></track>")) AndAlso refusedConfig(config.Replace("</track>", "<car name=""frx"" number=""2"" /></track>")) AndAlso
+              refusedConfig(soloConfig.Replace("</track>", "<car name=""" & otherCar & """ number=""1"" /></track>")) AndAlso refusedConfig(soloConfig.Replace("number=""1""", "number=""2""")) AndAlso
+              refusedConfig(raceConfig.Replace(opponentCars, opponentCars & "<car name=""" & otherCar & """ number=""5"" />")),
+              "the journal check refuses more than 8 cars, counts that aren't plain numbers, unknown cars, the player's model listed twice and opponents on a stage")
+        check(Refused(Sub() Call New LauncherSettings With {.DirectOpponents = 8}.Validate()) AndAlso Refused(Sub() Call New LauncherSettings With {.DirectOpponents = -1}.Validate()) AndAlso
+              Refused(Sub() Call New LauncherSettings With {.DirectOpponentCars = "ai"}.Validate()), "opponents are 0 to 7 with a known car choice")
+        Dim opponentsCtx = Context(root, "opponents")
+        Dim opponentsTransaction As New OwnedFileTransaction(opponentsCtx)
+        race.DirectOpponentCars = "class" : race.DirectOpponents = 3
+        opponentsTransaction.Prepare(DesktopStartupSession.Changes(opponentsCtx, race), apply:=False)
+        check(opponentsTransaction.Pending AndAlso opponentsTransaction.Recover() AndAlso Not opponentsTransaction.Pending, "a config with opponents passes the recovery journal's check")
+
         ' DiRT 3's result file for the session is removed; other benchmark results stay.
         Dim results = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(ctx.GraphicsPath)), "benchmarks")
         Directory.CreateDirectory(results)
@@ -137,6 +179,10 @@ Module DirectPracticeTests
         Dim profile = ProfileValues.Capture(loaded)
         check(profile.ApplyTo(New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = ""}).DirectCar = "frx" AndAlso profile.DirectLaps = 3, "settings profiles carry the direct practice choice")
         check(Refused(Sub() Call New SettingsProfile With {.Kind = "DiRT3VR.SettingsProfile", .Schema = 3, .Name = "Old", .Settings = profile}.Validate()), "a schema 3 profile can't carry direct practice")
+        loaded.DirectOpponents = 4 : loaded.DirectOpponentCars = "mixed"
+        Dim raceProfile = ProfileValues.Capture(loaded).ApplyTo(New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = ""})
+        check(raceProfile.DirectOpponents = 4 AndAlso raceProfile.DirectOpponentCars = "mixed", "settings profiles carry the opponents")
+        check(Refused(Sub() Call New SettingsProfile With {.Kind = "DiRT3VR.SettingsProfile", .Schema = 3, .Name = "Old", .Settings = New ProfileValues With {.DirectOpponents = 2}}.Validate()), "a schema 3 profile can't carry opponents")
         check(LauncherDefaults.All(loaded).LaunchMode = "normal", "Restore launcher defaults goes back to Normal launch")
     End Sub
 
@@ -170,13 +216,19 @@ Module DirectPracticeTests
             Dim lapSlider = DirectCast(find("DirectLaps"), ValueSlider)
             check(lapSlider.Enabled, "laps can be set for a circuit")
             lapSlider.Value = 3 : Application.DoEvents()
+            check(find("DirectLapsValue").Text = "3 laps", "the laps slider reads 3 laps")
+            Dim rivals = DirectCast(find("DirectOpponents"), ValueSlider), rivalCars = DirectCast(find("DirectOpponentCars"), ComboBox)
+            check(rivals.Enabled AndAlso rivals.Value = 0 AndAlso find("DirectOpponentsValue").Text = "None" AndAlso Not rivalCars.Enabled, "a circuit can take opponents; their cars are chosen once there are some")
+            rivals.Value = 3 : rivalCars.SelectedIndex = 1 : Application.DoEvents()
+            check(rivalCars.Enabled AndAlso find("DirectSummary").Text.Contains("· 3 opponents (mixed cars) ·") AndAlso form.CurrentSettings().DirectOpponents = 3 AndAlso form.CurrentSettings().DirectOpponentCars = "mixed",
+                  "opponents show in the summary and the settings (" & find("DirectSummary").Text & ")")
             Dim summary = find("DirectSummary").Text
             check(summary.StartsWith("Direct practice: RALLYCROSS · ASPEN – LAKESIDE · 3 laps", StringComparison.Ordinal), "the summary names the discipline, route, laps and car (" & summary & ")")
             DirectCast(find("SaveSettings"), Button).PerformClick()
             Dim saved = LauncherSettings.Load(ctx)
-            check(saved.LaunchMode = "direct" AndAlso saved.DirectRoute = Aspen().Id AndAlso saved.DirectCar = chosenCar AndAlso saved.DirectLaps = 3, "Save settings keeps the direct practice choice")
+            check(saved.LaunchMode = "direct" AndAlso saved.DirectRoute = Aspen().Id AndAlso saved.DirectCar = chosenCar AndAlso saved.DirectLaps = 3 AndAlso saved.DirectOpponents = 3 AndAlso saved.DirectOpponentCars = "mixed", "Save settings keeps the direct practice choice")
             discipline.SelectedItem = EventCatalog.Current.FindDiscipline("rally") : Application.DoEvents()
-            check(Not lapSlider.Enabled AndAlso Not find("DirectSummary").Text.Contains(" laps"), "point-to-point stages have no laps")
+            check(Not lapSlider.Enabled AndAlso Not rivals.Enabled AndAlso Not rivalCars.Enabled AndAlso Not find("DirectSummary").Text.Contains(" laps") AndAlso Not find("DirectSummary").Text.Contains("opponents ("), "point-to-point stages have no laps and no opponents")
             discipline.SelectedItem = EventCatalog.Current.FindDiscipline("rallycross") : Application.DoEvents()
             route.SelectedItem = route.Items.Cast(Of EventCatalog.EventRoute)().Single(Function(item) item.Track = "aspen" AndAlso item.Route = "route_0")
             car.SelectedItem = car.Items.Cast(Of EventCatalog.EventCar)().Single(Function(item) item.Code = chosenCar)

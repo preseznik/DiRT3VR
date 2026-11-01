@@ -318,7 +318,7 @@ Public Class MainForm
         content.Controls.Add(columns)
         Dim launch = Section(columns.First, "Launch mode")
         directPicker = New DirectPracticePicker(launch)
-        launch.Controls.Add(Info("Direct practice starts DiRT 3 straight on the chosen route with your car, through DiRT 3's own benchmark start: no menus, no opponents. It works with Launch (on the monitor) and Launch VR; laps apply to circuits, and DiRT 3 closes by itself a few seconds after the finish. Normal launch keeps DiRT 3's menus for careers, events and multiplayer."))
+        launch.Controls.Add(Info("Direct practice starts DiRT 3 straight on the chosen route with your car, through DiRT 3's own benchmark start, without the menus. It works with Launch (on the monitor) and Launch VR; laps and up to 7 AI opponents apply to circuits, and DiRT 3 closes by itself a few seconds after the finish. Normal launch keeps DiRT 3's menus for careers, events and multiplayer."))
         launch.Controls.Add(TopicLink(HelpDirect))
         AddHandler directPicker.Changed, Sub() RefreshState()
         Dim startup = Section(columns.First, "Startup")
@@ -667,7 +667,7 @@ Public Class MainForm
         renderScale.Value = settings.VrRenderScale
         applyingPreset = True
         desktopQuality.Values = settings.GraphicsQuality : vrQuality.Values = settings.VrGraphicsQuality
-        directPicker.Apply(settings.LaunchMode, settings.DirectRoute, settings.DirectCar, settings.DirectLaps)
+        directPicker.Apply(settings.LaunchMode, settings.DirectRoute, settings.DirectCar, settings.DirectLaps, settings.DirectOpponents, settings.DirectOpponentCars)
         applyingPreset = False
         ClearPresetUndo()
         desktopMode.SelectedIndex = Array.IndexOf({"game", "windowed", "fullscreen", "borderless"}, settings.DesktopDisplayMode)
@@ -690,7 +690,8 @@ Public Class MainForm
             .DesktopDisplayMode = {"game", "windowed", "fullscreen", "borderless"}(Math.Max(0, desktopMode.SelectedIndex)), .DesktopVSync = {"game", "off", "on"}(Math.Max(0, desktopVSync.SelectedIndex)), .SkipStartupMovies = skipStartupMovies.Checked,
             .RecenterKey = recenterKey, .RecenterModifiers = recenterModifiers, .RecenterDevice = recenterDevice, .RecenterKeepLevel = recenterKeepLevel.Checked,
             .GraphicsQuality = desktopQuality.Values, .VrGraphicsQuality = vrQuality.Values,
-            .LaunchMode = directPicker.Mode, .DirectRoute = directPicker.RouteId, .DirectCar = directPicker.CarCode, .DirectLaps = directPicker.LapCount}
+            .LaunchMode = directPicker.Mode, .DirectRoute = directPicker.RouteId, .DirectCar = directPicker.CarCode, .DirectLaps = directPicker.LapCount,
+            .DirectOpponents = directPicker.OpponentCount, .DirectOpponentCars = directPicker.OpponentCars}
     End Function
 
     Private Sub RememberSavedSettings()
@@ -1006,7 +1007,9 @@ Public Class MainForm
             New HelpTopic(HelpDirect,
                 "Launcher → Launch mode → Direct practice starts DiRT 3 straight on a route with your car, without its menus, through the game's own benchmark start; DiRT3VR's renderer keeps the car under your control." & vbCrLf & vbCrLf &
                 "Choose the discipline (rally, rallycross, trailblazer or Land Rush), the location and route, and the car. Cars are those of the route's discipline; Show cars from other disciplines lists the rest, which are untested. Search finds cars by name, code or class, and Class narrows the list." & vbCrLf & vbCrLf &
-                "Laps (1 to 5) apply to circuits (rallycross and Land Rush); point-to-point stages are one run. Direct practice works with Launch (on the monitor) and Launch VR. There are no opponents for now. After the finish line DiRT 3 shows the finish camera and your time for a few seconds, then closes by itself; there is no results screen yet, so launch again for another run after the finish. During the run, Esc opens DiRT 3's pause menu as in any race: Restart (then confirm) puts you back on the start line, and Retire (then confirm) ends the run and DiRT 3 closes. End session (Launch VR) also stops it. The short config file it writes into the game folder, dirt3vr-direct.xml, is removed with DiRT3VR's other temporary changes, and DiRT 3's benchmark result file is deleted afterwards." & vbCrLf & vbCrLf &
+                "Laps (1 to 5) apply to circuits (rallycross and Land Rush); point-to-point stages are one run. Direct practice works with Launch (on the monitor) and Launch VR." & vbCrLf & vbCrLf &
+                "On circuits you can add up to 7 AI opponents; you start from the back of the grid. Opponent cars: Same class as my car (the default), Mixed (any car of the route's discipline) or My car's model; opponents avoid your own model unless nothing else fits (Land Rush has one truck and one buggy, so there Same class races your own model and Mixed the other vehicle). AI difficulty can't be chosen yet. Stages are driven alone." & vbCrLf & vbCrLf &
+                "After the finish line DiRT 3 shows the finish camera and your time for a few seconds, then closes by itself; there is no results screen yet, so launch again for another run after the finish. During the run, Esc opens DiRT 3's pause menu as in any race: Restart (then confirm) puts you back on the start line, and Retire (then confirm) ends the run and DiRT 3 closes. End session (Launch VR) also stops it. The short config file it writes into the game folder, dirt3vr-direct.xml, is removed with DiRT3VR's other temporary changes, and DiRT 3's benchmark result file is deleted afterwards." & vbCrLf & vbCrLf &
                 "Normal launch keeps DiRT 3's menus for careers, events and multiplayer."),
             New HelpTopic(HelpStartup,
                 "Launcher → Skip startup logo movies temporarily replaces the AMD and DiRT 3 logo movie states for desktop and VR launches. Copyright, Press Start and other movies remain." & vbCrLf & vbCrLf &
