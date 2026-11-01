@@ -193,7 +193,7 @@ def diagnostic_environment(directory: Path, *, scene_observer: bool = False, rep
                            xr_runtime: Path | None = None, background_play: bool = False) -> dict:
     env = dict(os.environ, DIRT3VR_DIAGNOSTICS="1", DIRT3VR_LOG_DIR=str(directory), SteamAppId="321040")
     for flag in ("DIRT3VR_ENABLE_VR", "DIRT3VR_SCENE_DIAGNOSTICS", "DIRT3VR_REPLAY_DIAGNOSTICS",
-                 "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH", "DIRT3VR_RESEARCH_FILE_TRACE", "DIRT3VR_DIRECT_PRACTICE", "DIRT3VR_DIRECT_LAPS", "DIRT3VR_DIRECT_RETURN", "DIRT3VR_DIRECT_DIFFICULTY", "DIRT3VR_RESEARCH_LAPS", "DIRT3VR_SCREENSHOT_SECONDS"):
+                 "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH", "DIRT3VR_RESEARCH_FILE_TRACE", "DIRT3VR_DIRECT_PRACTICE", "DIRT3VR_DIRECT_LAPS", "DIRT3VR_DIRECT_RETURN", "DIRT3VR_DIRECT_DIFFICULTY", "DIRT3VR_RESEARCH_LAPS", "DIRT3VR_SCREENSHOT_SECONDS", "DIRT3VR_RESEARCH_SETTINGS_TRACE"):
         env.pop(flag, None)
     if background_play:
         env["DIRT3VR_BACKGROUND_PLAY"] = "1"
@@ -538,6 +538,10 @@ def main() -> int:
                         help="Point the benchmark at the player's own hardware_settings_config.xml (as direct launch will) instead of a "
                              "temporary windowed copy; the game runs at the player's settings and the file is put back byte-exact "
                              "afterwards, keeping the game-written copy")
+    parser.add_argument("--normal-start", action="store_true",
+                        help="Research: start DiRT 3 normally (logos, Press Start, menus) instead of -benchmark; no result is expected")
+    parser.add_argument("--settings-trace", action="store_true",
+                        help="Research only: the research proxy logs each profile setting the game looks up (name=value)")
     parser.add_argument("--file-trace", action="store_true",
                         help="Research only: the research proxy logs every file the game opens after device creation")
     parser.add_argument("--recover", type=Path, metavar="JOURNAL")
@@ -665,6 +669,8 @@ def main() -> int:
             env["DIRT3VR_RESEARCH_PATCH"] = args.research_patch
         if args.file_trace:
             env["DIRT3VR_RESEARCH_FILE_TRACE"] = "1"
+        if args.settings_trace:
+            env["DIRT3VR_RESEARCH_SETTINGS_TRACE"] = "1"
         if args.direct_practice:
             env["DIRT3VR_DIRECT_PRACTICE"] = "1"
         if args.direct_laps:
@@ -682,7 +688,8 @@ def main() -> int:
             # Ask Windows not to activate the game window; DiRT 3 may still bring itself forward.
             startup = subprocess.STARTUPINFO(dwFlags=subprocess.STARTF_USESHOWWINDOW, wShowWindow=4)  # SW_SHOWNOACTIVATE
         started = time.monotonic()
-        process = subprocess.Popen([str(exe), "-benchmark", benchmark_path.name], cwd=game, env=env, startupinfo=startup)
+        command = [str(exe)] if args.normal_start else [str(exe), "-benchmark", benchmark_path.name]
+        process = subprocess.Popen(command, cwd=game, env=env, startupinfo=startup)
         report["pid"] = process.pid
         save_json(run / "run.json", report)
         print(f"Diagnostic running: pid={process.pid}; log directory={run}", flush=True)
