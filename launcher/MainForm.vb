@@ -300,10 +300,11 @@ Public Class MainForm
         Dim startup = Section(columns.First, "Startup")
         startup.Controls.Add(skipStartupMovies)
         startup.Controls.Add(Info("Applies to Launch and Launch VR. Copyright and Press Start remain. DiRT3VR restores the original startup file when the game closes, also when you close this window (it stays in the notification area until then). Leave this option off for multiplayer until compatibility is checked."))
+        startup.Controls.Add(TopicLink(HelpStartup))
         Dim availability = Section(columns.Second, "VR availability")
         availability.Controls.Add(Info("Experimental VR is available with VDXR when enabled in Advanced. All rendered 3D camera views use stereo and headset tracking, including cockpit, bonnet, bumper, chase and replay. Loading screens and movies use a virtual screen."))
         availability.Controls.Add(Info("Interactive play and camera transitions are still being validated. SteamVR interactive launch is unavailable pending orientation validation."))
-        content.Controls.Add(HelpLink(AddressOf ShowHelp))
+        content.Controls.Add(TopicLink(HelpStart))
     End Sub
 
     Private Sub BuildGraphics()
@@ -330,6 +331,7 @@ Public Class MainForm
         vrSettings.Controls.Add(Info("Changing game graphics during VR can leave a recovery conflict; the launcher preserves your changes and the original backup."))
         Field(content, "Game graphics file", graphicsPath)
         content.Controls.Add(graphicsDefaultsButton)
+        content.Controls.Add(TopicLink(HelpGraphics))
         AddHandler graphicsDefaultsButton.Click, Sub() RestoreDefaults(graphicsOnly:=True)
     End Sub
 
@@ -403,6 +405,7 @@ Public Class MainForm
                                              End Sub
         tips.SetToolTip(recenterButton, "Click, then press the key or key combination that recenters the headset view while DiRT 3 is in front.")
         UpdateRecenterLabel()
+        content.Controls.Add(TopicLink(HelpControls))
     End Sub
 
     ' Public for the launcher tests; the dialog sets it after a button press.
@@ -517,8 +520,11 @@ Public Class MainForm
                                      UpdateLayerSummary()
                                  End Sub
         UpdateLayerSummary()
+        runtimes.Controls.Add(TopicLink(HelpRuntime))
         Dim options = Section(content, "Diagnostics")
         options.Controls.Add(Info("Startup results and failures are always recorded in Open logs."))
+        options.Controls.Add(TopicLink(HelpFiles))
+        content.Controls.Add(TopicLink(HelpSettings))
     End Sub
 
     Private Sub BuildAdvanced()
@@ -527,12 +533,14 @@ Public Class MainForm
         capability.Controls.Add(experimental)
         capability.Controls.Add(Info("Opt in to the experimental VDXR session. Version 0.1.5 has user-confirmed interactive VR with cockpit and external views. Full camera, effects and sustained-driving validation is still in progress. A runtime check alone does not establish game support."))
         capability.Controls.Add(Info("Stop VR turns the headset off and keeps DiRT 3 running on the monitor. End session, or quitting in the game, closes DiRT 3; original files are restored after it closes. You can close this window meanwhile: DiRT3VR stays in the notification area and quits once the files are back."))
+        capability.Controls.Add(TopicLink(HelpSession))
         capability.Controls.Add(Info("Supported executable SHA-256: " & InstallContext.SupportedHash))
         Dim status = Section(content, "Latest diagnostic report")
         status.Controls.Add(diagnostics)
         Dim refresh As New Button With {.Name = "RefreshDiagnostics", .Text = "Refresh report", .AutoSize = True}
         status.Controls.Add(refresh)
         AddHandler refresh.Click, Sub() LoadDiagnostics()
+        content.Controls.Add(TopicLink(HelpVr))
     End Sub
 
     Private Sub ApplySettings()
@@ -853,24 +861,81 @@ Public Class MainForm
         Next
     End Sub
 
-    Private Function HelpText() As String
-        Return "DiRT3VR " & BuildVersion & " — Research build" & vbCrLf & vbCrLf &
-            "Launch starts DiRT 3 Complete Edition with the desktop choices under Graphics. Use game setting preserves each existing option. Desktop changes remain in the game graphics file; exact backups are kept in desktop-backups under the preferences folder below. Save settings only saves launcher preferences. Steam must be running with access to the game. Driving controls and saves remain managed by DiRT 3." & vbCrLf & vbCrLf &
-            "Advanced → Enable experimental VR enables the VDXR session when supported by this package. All rendered 3D camera views use stereo and tracking. Loading screens and movies use a virtual screen. Camera transitions remain experimental. " & RecenterShortcut.Describe(recenterKey, recenterModifiers) & " recenters while the game is foreground; change the key under Controls." & vbCrLf & vbCrLf &
-            "Settings → Check runtime and headset runs an x86 OpenXR probe without starting the game. Choose VDXR or SteamVR explicitly; the selected runtime is used for that process only, independently of the system OpenXR default. VDXR and SteamVR require separate checks. Browse to the selected runtime file if it is installed elsewhere." & vbCrLf & vbCrLf &
-            "Graphics → Restore graphics defaults sets the desktop display choices to Use game setting and VR render scale to 100%. Settings → Restore launcher defaults resets every launcher choice except VR runtime locations and the experimental VR opt-in. Both ask first and, like loading a profile, change only the controls until Save settings or Launch." & vbCrLf & vbCrLf &
-            "Settings → Settings profiles keeps named presets of desktop, VR, startup, appearance and logging choices. Save as new profile and Overwrite profile store the current controls in a profile without saving the launcher's settings. Save settings (or Launch) keeps the current controls as the launcher's settings and never changes a profile. Load copies a profile into the controls and asks before replacing unsaved edits. Import adds a profile without loading it, and Export writes the selected saved profile. Game saves and local paths are excluded." & vbCrLf & vbCrLf &
-            "Launcher → Skip startup logo movies temporarily replaces the two startup movie states for desktop or VR. Copyright and Press Start remain. The original startup file is restored when the game exits. Leave skipping off for multiplayer until checked." & vbCrLf & vbCrLf &
-            "During a session, Stop VR turns the headset off and keeps DiRT 3 running on the monitor; End session closes DiRT 3. Closing this window keeps DiRT3VR in the notification area (next to the clock) until DiRT 3 closes and the original files are restored; it then quits by itself. Right-click its icon to open the window, stop VR or end the session. Starting DiRT3VR again opens the running window." & vbCrLf & vbCrLf &
-            ExperimentalFiles.ProfileDescription & vbCrLf & vbCrLf &
-            "Restore original files only handles this launcher's recorded changes. Foreign mods and real settings changes are preserved, and the other files are still restored. If DiRT 3's graphics settings changed during the session beyond the VR values, it asks whether to keep those changes or restore the settings from before the session. If Windows shuts down during a session, use it on the next start." & vbCrLf & vbCrLf &
-            "Preferences and diagnostics: " & context.UserRoot & vbCrLf & vbCrLf &
-            "The native WinForms layout and appearance are adapted from DiRT2VR, with yellow DiRT3VR accents. Modern / Classic follows Windows light, dark and high-contrast preferences."
+    ' The instructions, one topic per subject; each tab's Instructions link opens its own topic.
+    Public Function HelpTopics() As IReadOnlyList(Of HelpTopic)
+        Dim recenter = RecenterShortcut.Describe(recenterKey, recenterModifiers)
+        Return {
+            New HelpTopic(HelpStart,
+                "DiRT3VR " & BuildVersion & " — Research build." & vbCrLf & vbCrLf &
+                "Launch starts DiRT 3 Complete Edition on your monitor with the desktop choices under Graphics. Choose your career, event, car and track in the game's own menus. Steam must be running with access to the game. Driving controls and saves stay managed by DiRT 3." & vbCrLf & vbCrLf &
+                "Launch VR starts an experimental VR session (see " & HelpVr & "). While DiRT 3 runs, Launch becomes Show game, which brings the game window to the front." & vbCrLf & vbCrLf &
+                "Save settings keeps the current controls as the launcher's settings for next time, as Launch does. It never changes the game or a settings profile." & vbCrLf & vbCrLf &
+                "The ? button opens this window: updates at the top, these topics below. The Instructions link on each tab opens that tab's topic."),
+            New HelpTopic(HelpStartup,
+                "Launcher → Skip startup logo movies temporarily replaces the AMD and DiRT 3 logo movie states for desktop and VR launches. Copyright, Press Start and other movies remain." & vbCrLf & vbCrLf &
+                "The original startup file is backed up first and restored when the game exits, also when you close this window during the session (DiRT3VR then waits in the notification area)." & vbCrLf & vbCrLf &
+                "Leave skipping off for multiplayer until compatibility is checked."),
+            New HelpTopic(HelpVr,
+                "Advanced → Enable experimental VR turns on the VDXR session when this package supports it. Connect the headset through Virtual Desktop and choose VDXR under Settings → VR runtime. Interactive SteamVR launch stays unavailable until its orientation is validated. Close other VR games first." & vbCrLf & vbCrLf &
+                "All rendered 3D camera views use stereo and headset tracking, including cockpit, bonnet, bumper, chase and replay. Loading screens, movies and frames without a 3D scene use a virtual screen, and recognized HUD and menu draws use a transparent panel 2 metres away. Camera transitions are still experimental." & vbCrLf & vbCrLf &
+                ExperimentalFiles.ProfileDescription & vbCrLf & vbCrLf &
+                "If an OpenXR add-on such as ReShade or the OBS mirror stops VR from starting, Launch VR names it and offers Disable and retry, which turns it off for DiRT 3 only. Turn it back on under Settings → VR runtime → OpenXR add-ons…." & vbCrLf & vbCrLf &
+                "If DiRT 3 starts without DiRT3VR's renderer, the launcher says why once the game window is up: its d3d11.dll was removed (usually by antivirus) or replaced by another mod, Windows' 'prefer system32 images' rule applied, or Windows used its own copy (install the Visual C++ 2015-2022 Redistributable, x86)."),
+            New HelpTopic(HelpSession,
+                "Stop VR turns the headset off and keeps DiRT 3 running on the monitor, with the temporary VR graphics settings until it closes. End session closes DiRT 3. Either way the original files are restored after DiRT 3 closes." & vbCrLf & vbCrLf &
+                "Closing this window during a session keeps DiRT3VR in the notification area next to the clock (it may be under the ^ arrow). Right-click its icon to open the window, stop VR or end the session. When DiRT 3 closes and the files are restored, DiRT3VR quits by itself; if something needs your attention, the window comes back instead." & vbCrLf & vbCrLf &
+                "Starting DiRT3VR again, for example from the Start menu, opens the running window instead of a second launcher." & vbCrLf & vbCrLf &
+                "Windows can sign out or shut down during a session. Use Restore original files on the next start."),
+            New HelpTopic(HelpGraphics,
+                "Desktop: display mode, resolution and VSync for Launch. Use game setting leaves that option unchanged. Borderless fills the main display at its current resolution. Desktop choices stay in the game's graphics file; an exact backup is saved under desktop-backups in the preferences folder before each change." & vbCrLf & vbCrLf &
+                "VR rendering: one VR render scale from 50% to 300%. At 100% the scene matches the connected headset's recommended resolution per eye; output stays at that recommendation while the slider changes scene detail. Refresh headset resolution shows the detected sizes. The launcher checks the headset again before every VR launch and refuses unsupported sizes." & vbCrLf & vbCrLf &
+                "Restore graphics defaults sets the desktop choices to Use game setting and the render scale to 100%. It asks first and changes only the controls until Save settings or Launch."),
+            New HelpTopic(HelpControls,
+                "Use your existing keyboard, controller or wheel bindings in DiRT 3." & vbCrLf & vbCrLf &
+                "Live input and force feedback shows your wheel, pedals, shifter and controllers as Windows reports them and tests rumble or force feedback on each one. It reads devices without taking them over and changes no game or Windows setting. Close DiRT 3 before testing force feedback." & vbCrLf & vbCrLf &
+                recenter & " recenters the headset view while DiRT 3 is in front. To change it, click the key under VR and seat controls and press another key, optionally with Ctrl, Alt or Shift; Esc cancels. DiRT 3 still receives the key, so pick one the game doesn't use. Alt+Tab, Alt+F4 and Ctrl+Alt+Delete are reserved." & vbCrLf & vbCrLf &
+                "Bind a button… adds a controller, wheel or button-box button, or a D-pad / hat direction, as another way to recenter. During VR the launcher watches it only while DiRT 3 is in front, without taking the device over. Clear removes it."),
+            New HelpTopic(HelpRuntime,
+                "Settings → Check runtime and headset runs a small 32-bit OpenXR check without starting the game. A successful check does not mean VR driving is ready." & vbCrLf & vbCrLf &
+                "Choose VDXR or SteamVR explicitly. The selected runtime is used only by DiRT3VR's own processes; your system OpenXR default stays unchanged. VDXR and SteamVR need separate checks. Browse to the selected runtime file if it is installed elsewhere." & vbCrLf & vbCrLf &
+                "OpenXR add-ons… lists the add-ons turned off for DiRT 3 and turns them back on."),
+            New HelpTopic(HelpSettings,
+                "Modern / Classic follows Windows light, dark and high-contrast preferences." & vbCrLf & vbCrLf &
+                "Settings profiles keep named copies of the desktop, VR, startup, appearance, logging and recenter-key choices for this installation. Save as new profile and Overwrite profile store the current controls in a profile without saving the launcher's settings. Load copies a profile into the controls and asks before replacing unsaved edits; nothing is saved until Save settings or Launch. Rename uses the Name field, Delete removes the selected profile, Import adds a JSON profile without loading it, and Export writes the selected saved profile. Game saves, local paths and controller buttons are not included." & vbCrLf & vbCrLf &
+                "Restore launcher defaults resets every launcher choice except the VR runtime locations and the experimental VR opt-in. It asks first and changes only the controls until Save settings or Launch." & vbCrLf & vbCrLf &
+                "Choose game folder switches to another DiRT 3 Complete Edition installation. Close DiRT 3 first."),
+            New HelpTopic(HelpRestore,
+                "For a session DiRT3VR temporarily installs its renderer (d3d11.dll) and changes the game's graphics and CPU restriction files, plus the startup file when logo skipping is on. It records the originals first and restores them when DiRT 3 closes. Read-only files stay read-only." & vbCrLf & vbCrLf &
+                "Restore original files does the same by hand, for example after Windows shut down during a session. It only handles this launcher's recorded changes. A file changed by something else (another mod, a game update or repair) is left as it is and reported, and the other files are still restored." & vbCrLf & vbCrLf &
+                "DiRT 3 rewrites its resolution and refresh rate when it starts in VR. In that case the graphics settings from before VR come back automatically, and the game's version is kept in the recovery folder. If other graphics settings changed too, for example in the game's options menu, it asks whether to keep those changes (the display values from before VR come back) or restore all settings from before the session." & vbCrLf & vbCrLf &
+                "Every result is written to logs\recovery.json."),
+            New HelpTopic(HelpUpdates,
+                "Installed versions check GitHub Releases once at startup and show Update available next to ?. Check for updates checks now; development and test builds don't check on their own." & vbCrLf & vbCrLf &
+                "Download and install verifies the installer against GitHub's SHA-256 before Setup runs, restores any pending game files first, and closes the launcher so Setup can update it. Include experimental releases offers test builds too, and Return to stable… goes back to the latest stable release."),
+            New HelpTopic(HelpFiles,
+                "Preferences and diagnostics: " & context.UserRoot & vbCrLf & vbCrLf &
+                "Open logs opens that folder. It holds the launcher settings, settings profiles, desktop-backups, the recovery folder and the logs, including one session-… folder per VR session. Startup results and failures are always recorded there. Advanced → Latest diagnostic report shows the most recent report."),
+            New HelpTopic(HelpAbout,
+                "DiRT3VR " & BuildVersion & " adds VR to Steam DiRT 3 Complete Edition. It is a research build: interactive VR works with VDXR, and broader visual and gameplay validation is ongoing." & vbCrLf & vbCrLf &
+                "Source and releases: https://github.com/preseznik/DiRT3VR" & vbCrLf & vbCrLf &
+                "The native WinForms layout and appearance are adapted from DiRT2VR, with yellow DiRT3VR accents. Instructions as topics, recentering with a controller, live input, update checks and the notification-area session follow DiRT2VR and GRID2VR.")}
     End Function
 
-    Private Sub ShowHelp()
+    Public Const HelpStart As String = "Getting started", HelpStartup As String = "Startup logo skipping", HelpVr As String = "Experimental VR",
+        HelpSession As String = "During a session", HelpGraphics As String = "Graphics", HelpControls As String = "Controls and recentering",
+        HelpRuntime As String = "VR runtime and headset check", HelpSettings As String = "Settings, profiles and defaults",
+        HelpRestore As String = "Restoring original files", HelpUpdates As String = "Updates", HelpFiles As String = "Files and logs", HelpAbout As String = "About DiRT3VR"
+
+    ' An Instructions link that opens one topic.
+    Private Function TopicLink(topic As String) As LinkLabel
+        Dim link = HelpLink(Sub() ShowHelp(topic))
+        link.Tag = topic : link.AccessibleName = "Instructions: " & topic
+        Return link
+    End Function
+
+    Private Sub ShowHelp(Optional topic As String = Nothing)
         Dim changed = False
-        Using form As New AboutForm(context, HelpText(), availableUpdate, blocker:=AddressOf UpdateBlocker) With {.Font = Font}
+        Using form As New AboutForm(context, HelpTopics(), availableUpdate, blocker:=AddressOf UpdateBlocker, initialTopic:=topic) With {.Font = Font}
             AddHandler form.UpdatePreferenceChanged, Sub()
                                                          changed = True : availableUpdate = Nothing : updateNotice.Visible = False
                                                      End Sub

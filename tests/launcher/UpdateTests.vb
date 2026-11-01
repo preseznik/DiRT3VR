@@ -164,12 +164,12 @@ Module UpdateTests
             Dim started As ProcessStartInfo = Nothing
             Dim blocked = "Close DiRT 3 first."
             Dim blocker = blocked
-            Using about As New AboutForm(ctx, "Instructions text", Nothing, client, Function() blocker, Sub(info) started = info)
+            Using about As New AboutForm(ctx, {New HelpTopic("Instructions", "Instructions text")}, Nothing, client, Function() blocker, Sub(info) started = info)
                 about.ShowInTaskbar = False : about.StartPosition = FormStartPosition.Manual : about.Location = New Drawing.Point(-30000, -30000)
                 about.Show() : Application.DoEvents()
                 Dim status = DirectCast(about.Controls.Find("UpdateStatus", True).Single(), Label)
                 Dim install = DirectCast(about.Controls.Find("InstallUpdate", True).Single(), Button)
-                check(DirectCast(about.Controls.Find("InstalledVersion", True).Single(), Label).Text.Contains(BuildInfo.Version) AndAlso DirectCast(about.Controls.Find("Instructions", True).Single(), TextBox).Text = "Instructions text", "About shows the installed version and the instructions")
+                check(DirectCast(about.Controls.Find("InstalledVersion", True).Single(), Label).Text.Contains(BuildInfo.Version) AndAlso DirectCast(about.Controls.Find("Instructions", True).Single(), TextBox).Text.EndsWith("Instructions text", StringComparison.Ordinal), "About shows the installed version and the instructions")
                 check(Not install.Enabled, "nothing to install before a check")
                 Pump(about.CheckUpdateAsync(False))
                 check(status.Text.StartsWith("Stable version 99.0.0 is available", StringComparison.Ordinal) AndAlso install.Enabled, "a check finds the newer release (" & status.Text & ")")
@@ -182,7 +182,7 @@ Module UpdateTests
                 check(Not about.Visible, "the window closes once setup starts")
             End Using
             github.Responses(UpdateService.Api) = Json("Not Found", HttpStatusCode.NotFound)
-            Using about As New AboutForm(ctx, "", Nothing, client)
+            Using about As New AboutForm(ctx, {New HelpTopic("Instructions", "Text")}, Nothing, client)
                 about.ShowInTaskbar = False : about.StartPosition = FormStartPosition.Manual : about.Location = New Drawing.Point(-30000, -30000)
                 about.Show() : Application.DoEvents()
                 Pump(about.CheckUpdateAsync(False))

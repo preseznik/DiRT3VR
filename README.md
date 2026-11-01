@@ -89,7 +89,9 @@ report is investigated.
    a profile, change only the controls until **Save settings** or Launch.
 6. Use **Save settings**, **Restore original files**, and **Open logs** from
    the persistent footer when needed.
-7. **?** opens About, updates and instructions. Installed versions check GitHub
+7. **?** opens About, updates and instructions. The instructions are split into
+   topics (a list beside the text, or a dropdown in a narrow window), and the
+   **Instructions** link on each tab opens that tab's topic. Installed versions check GitHub
    Releases once at startup and show **Update available** next to **?**.
    **Download and install** verifies the installer against GitHub's SHA-256
    before Setup runs, restores any pending game files first, and closes the

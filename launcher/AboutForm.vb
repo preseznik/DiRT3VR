@@ -27,9 +27,9 @@ Public NotInheritable Class AboutForm
     Private checkGeneration As Integer
     Private restoringPreference As Boolean
 
-    Public Sub New(context As InstallContext, instructions As String, Optional knownUpdate As ReleaseUpdate = Nothing, Optional updateClient As HttpClient = Nothing,
+    Public Sub New(context As InstallContext, topics As IReadOnlyList(Of HelpTopic), Optional knownUpdate As ReleaseUpdate = Nothing, Optional updateClient As HttpClient = Nothing,
                    Optional blocker As Func(Of String) = Nothing, Optional installerStarter As Action(Of ProcessStartInfo) = Nothing,
-                   Optional rollbackConfirmation As Func(Of ReleaseUpdate, Boolean) = Nothing)
+                   Optional rollbackConfirmation As Func(Of ReleaseUpdate, Boolean) = Nothing, Optional initialTopic As String = Nothing)
         Me.context = context
         ownsClient = updateClient Is Nothing
         client = If(updateClient, UpdateService.CreateClient())
@@ -41,8 +41,8 @@ Public NotInheritable Class AboutForm
                 "Return to stable", MessageBoxButtons.OKCancel, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) = DialogResult.OK))
 
         Text = "DiRT3VR — About, updates and instructions"
-        StartPosition = FormStartPosition.CenterParent : Size = New Size(720, 660) : MinimumSize = New Size(520, 440) : Padding = New Padding(20)
-        ' The Updates stack sizes itself to its rows; the instructions fill the rest of the window.
+        StartPosition = FormStartPosition.CenterParent : Size = New Size(820, 700) : MinimumSize = New Size(520, 440) : Padding = New Padding(20)
+        ' The Updates stack sizes itself to its rows; the instruction topics fill the rest of the window.
         Dim updates As New VerticalStack With {.Name = "Updates", .Dock = DockStyle.Top, .Padding = New Padding(0, 0, 0, 12)}
         updates.Controls.Add(New Label With {.Text = "Updates", .AutoSize = True, .Font = New Font("Segoe UI", 11, FontStyle.Bold), .Margin = New Padding(0, 0, 0, 6)})
         updates.Controls.Add(New Label With {.Name = "InstalledVersion", .AutoSize = True, .Margin = New Padding(0), .Text = "Installed: DiRT3VR " & BuildInfo.Version & " (" & BuildInfo.Channel & ")"})
@@ -54,7 +54,8 @@ Public NotInheritable Class AboutForm
         buttons.Controls.AddRange({checkButton, installButton, notesButton, rollbackButton, releases, downloadBar})
         updates.Controls.Add(buttons) : updates.Controls.Add(experimental)
         ' Fill is added before Top so it takes the remaining space; tab order still starts with Updates.
-        Controls.Add(New TextBox With {.Name = "Instructions", .ReadOnly = True, .Multiline = True, .ScrollBars = ScrollBars.Vertical, .Dock = DockStyle.Fill, .BorderStyle = BorderStyle.None, .Text = instructions, .TabIndex = 1})
+        Instructions = New InstructionsView(topics, initialTopic) With {.Dock = DockStyle.Fill, .TabIndex = 1}
+        Controls.Add(Instructions)
         updates.TabIndex = 0
         Controls.Add(updates)
 
@@ -74,6 +75,9 @@ Public NotInheritable Class AboutForm
     End Sub
 
     Public ReadOnly Property InstallerStarted As Boolean
+
+    ' The instruction topics (the launcher opens the one for the section whose link was clicked).
+    Public ReadOnly Property Instructions As InstructionsView
 
     Private Shared Sub OpenUrl(url As String)
         Process.Start(New ProcessStartInfo(url) With {.UseShellExecute = True})?.Dispose()
