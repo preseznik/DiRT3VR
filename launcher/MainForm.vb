@@ -48,8 +48,14 @@ Public Class MainForm
     Private ReadOnly resolutionSummary As New Label With {.Name = "VrResolutionSummary", .AutoSize = True}
     Private ReadOnly lastSessionSummary As New Label With {.Name = "LastVrSession", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12)}
     Private ReadOnly refreshHeadset As New Button With {.Name = "RefreshHeadset", .Text = "Refresh headset resolution", .AutoSize = True}
-    Private desktopQuality As QualityChoices
-    Private vrQuality As QualityChoices
+    Private WithEvents desktopQuality As QualityChoices
+    Private WithEvents vrQuality As QualityChoices
+    Private ReadOnly potatoPreset As New Button With {.Name = "PotatoPreset", .Text = "Potato / Low-End", .AutoSize = True}
+    Private ReadOnly vrBalancedPreset As New Button With {.Name = "VrBalancedPreset", .Text = "VR Balanced", .AutoSize = True}
+    Private ReadOnly undoPreset As New Button With {.Name = "UndoGraphicsPreset", .Text = "Undo preset", .AutoSize = True, .Enabled = False}
+    ' The controls before the last preset (desktop quality, VR quality, VR render scale), for Undo preset.
+    Private presetUndo As (Desktop As Dictionary(Of String, String), Vr As Dictionary(Of String, String), Scale As Integer)?
+    Private applyingPreset As Boolean
     Private ReadOnly graphicsDefaultsButton As New Button With {.Name = "GraphicsDefaults", .Text = "Restore graphics defaults…", .AutoSize = True}
     Private ReadOnly launcherDefaultsButton As New Button With {.Name = "LauncherDefaults", .Text = "Restore launcher defaults…", .AutoSize = True}
     Private ReadOnly probe As New Button With {.Name = "CheckRuntime", .Text = "Check runtime and headset", .AutoSize = True}
@@ -356,9 +362,69 @@ Public Class MainForm
         quality.Controls.Add(Info("Desktop: written into DiRT 3's graphics file at every launch (a backup is kept before it changes). Options on Use game setting stay as DiRT 3 has them; the others replace changes made in the game's own options menu on the next launch."))
         quality.Controls.Add(Info("VR: applied only while a VR session runs, together with DiRT3VR's other temporary changes, and undone when it ends. Options on Same as desktop use the desktop choice (or the game's setting)."))
         quality.Controls.Add(Info("These are DiRT 3's own presets and options (DirectX 11 values); Medium is the game's default."))
+        Dim quick As New FlowLayoutPanel With {.Name = "GraphicsPresetActions", .AutoSize = True, .WrapContents = True, .Margin = New Padding(0, 0, 0, 8)}
+        quick.Controls.AddRange({potatoPreset, vrBalancedPreset, undoPreset})
+        quality.Controls.Add(quick)
+        quality.Controls.Add(Info("Quick VR presets: Potato / Low-End sets VR quality to Ultra Low and VR render scale to 70%. VR Balanced keeps High's look with the crowd one step lower and leaves the render scale alone. Undo preset brings back the controls from before the last preset until you change an option yourself."))
         Dim columns As New ResponsiveColumns() : content.Controls.Add(columns)
         desktopQuality = New QualityChoices(Section(columns.First, "Desktop quality"), "Quality", "Use game setting", "Use game settings")
-        vrQuality = New QualityChoices(Section(columns.Second, "VR quality"), "VrQuality", "Same as desktop", "Same as desktop")
+        vrQuality = New QualityChoices(Section(columns.Second, "VR quality"), "VrQuality", "Same as desktop", "Same as desktop", {GraphicsCatalog.Current.VrBalanced()})
+        AddHandler potatoPreset.Click, Sub() ApplyQuickPreset("potato")
+        AddHandler vrBalancedPreset.Click, Sub() ApplyQuickPreset("vrbalanced")
+        AddHandler undoPreset.Click, Sub() UndoGraphicsPreset()
+        AddHandler renderScale.ValueChanged, Sub() If Not applyingPreset Then ClearPresetUndo()
+    End Sub
+
+    Private Sub ClearPresetUndo()
+        presetUndo = Nothing : undoPreset.Enabled = False
+    End Sub
+
+    Private Sub RememberForUndo()
+        presetUndo = (desktopQuality.Values, vrQuality.Values, renderScale.Value) : undoPreset.Enabled = True
+    End Sub
+
+    Private Sub QualityPresetApplying() Handles desktopQuality.PresetApplying, vrQuality.PresetApplying
+        If Not applyingPreset Then RememberForUndo()
+    End Sub
+
+    ' A manual change must never be thrown away by an older Undo copy.
+    Private Sub QualityOptionEdited() Handles desktopQuality.OptionEdited, vrQuality.OptionEdited
+        ClearPresetUndo()
+    End Sub
+
+    ' Potato / Low-End and VR Balanced (adapted from GRID2VR); only the VR controls change.
+    Public Sub ApplyQuickPreset(id As String)
+        RememberForUndo()
+        applyingPreset = True
+        Try
+            If id = "potato" Then
+                vrQuality.ChoosePreset("ultralow")
+                renderScale.Value = 70
+                notice.Text = "Potato / Low-End selected for VR: Ultra Low quality at 70% render scale. Save settings or Launch to keep it, or choose Undo preset."
+            ElseIf id = "vrbalanced" Then
+                vrQuality.ChoosePreset("vrbalanced")
+                notice.Text = "VR Balanced selected: High quality with the crowd one step lower; render scale unchanged. Save settings or Launch to keep it, or choose Undo preset."
+            Else
+                Throw New ArgumentException("Unknown quick preset.")
+            End If
+        Finally
+            applyingPreset = False
+        End Try
+        UpdateResolutionLabels()
+    End Sub
+
+    Public Sub UndoGraphicsPreset()
+        If presetUndo Is Nothing Then Return
+        Dim previous = presetUndo.Value
+        applyingPreset = True
+        Try
+            desktopQuality.Values = previous.Desktop : vrQuality.Values = previous.Vr : renderScale.Value = previous.Scale
+        Finally
+            applyingPreset = False
+        End Try
+        ClearPresetUndo()
+        UpdateResolutionLabels()
+        notice.Text = "The graphics controls are back to how they were before the last preset."
     End Sub
 
     Private Sub InvalidateHeadset()
@@ -593,7 +659,10 @@ Public Class MainForm
         recenterDevice = settings.RecenterDevice : UpdateRecenterDeviceLabel()
         recenterKeepLevel.Checked = settings.RecenterKeepLevel
         renderScale.Value = settings.VrRenderScale
+        applyingPreset = True
         desktopQuality.Values = settings.GraphicsQuality : vrQuality.Values = settings.VrGraphicsQuality
+        applyingPreset = False
+        ClearPresetUndo()
         desktopMode.SelectedIndex = Array.IndexOf({"game", "windowed", "fullscreen", "borderless"}, settings.DesktopDisplayMode)
         desktopVSync.SelectedIndex = Array.IndexOf({"game", "off", "on"}, settings.DesktopVSync)
         desktopResolution.Items.Clear()
@@ -942,6 +1011,7 @@ Public Class MainForm
                 "Below it, Last VR session shows the headset refresh rate (when the runtime reports it) and whether DiRT 3 rendered the scene size DiRT3VR asked for, read from that session's log." & vbCrLf & vbCrLf &
                 "Quality has separate Desktop and VR columns. Choose one of DiRT 3's presets or set each option; the preset shows Custom when the options match none of them. The values are DiRT 3's DirectX 11 options; Medium is the game's default." & vbCrLf & vbCrLf &
                 "Desktop quality is written into DiRT 3's graphics file at every launch, so options not set to Use game setting replace changes made in the game's own menu. VR quality is applied only while a VR session runs, with DiRT3VR's other temporary changes, and undone afterwards; options on Same as desktop use the desktop choice." & vbCrLf & vbCrLf &
+                "Quick VR presets: Potato / Low-End sets VR quality to Ultra Low and VR render scale to 70%; VR Balanced keeps High's look with the crowd one step lower. Undo preset brings back the controls from before the last preset, until you change an option or the render scale yourself." & vbCrLf & vbCrLf &
                 "Restore graphics defaults sets the desktop and quality choices to Use game setting and the render scale to 100%. It asks first and changes only the controls until Save settings or Launch."),
             New HelpTopic(HelpControls,
                 "Use your existing keyboard, controller or wheel bindings in DiRT 3." & vbCrLf & vbCrLf &

@@ -87,6 +87,9 @@ report is investigated.
    file (backed up first) at every launch, replacing changes made in the game's
    own menu. VR options start on **Same as desktop**; chosen ones apply only
    while a VR session runs and are undone with the other temporary VR changes.
+   **Potato / Low-End** (VR Ultra Low at 70% render scale) and **VR Balanced**
+   (High with the crowd one step lower) are quick VR presets; **Undo preset**
+   brings back the previous choices.
    Changes apply on the next VR launch. Below it, **Last VR session** shows the
    headset refresh rate (when the runtime reports it) and whether DiRT 3
    rendered the requested scene size.

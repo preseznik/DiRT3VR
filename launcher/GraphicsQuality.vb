@@ -90,10 +90,19 @@ Public NotInheritable Class GraphicsCatalog
     End Function
 
     ' The preset whose values these are exactly; Nothing for "Use game settings" (no choices) or Custom.
-    Public Function MatchingPreset(choices As IDictionary(Of String, String)) As Preset
+    ' Extra presets (such as VR Balanced) are checked first.
+    Public Function MatchingPreset(choices As IDictionary(Of String, String), Optional extra As IEnumerable(Of Preset) = Nothing) As Preset
         Dim normalized = Normalize(choices)
         If normalized.Count = 0 Then Return Nothing
-        Return Presets.FirstOrDefault(Function(preset) preset.Values.Count = normalized.Count AndAlso preset.Values.All(Function(value) normalized.ContainsKey(value.Key) AndAlso normalized(value.Key) = value.Value))
+        Return If(extra, Enumerable.Empty(Of Preset)()).Concat(Presets).FirstOrDefault(Function(preset) preset.Values.Count = normalized.Count AndAlso preset.Values.All(Function(value) normalized.ContainsKey(value.Key) AndAlso normalized(value.Key) = value.Value))
+    End Function
+
+    ' VR Balanced (adapted from GRID2VR): High's look with the crowd one step lower, since VR renders
+    ' every scene twice. Not one of DiRT 3's own presets.
+    Public Function VrBalanced() As Preset
+        Dim values = New Dictionary(Of String, String)(Presets.Single(Function(preset) preset.Id = "high").Values)
+        values("Crowd") = "low"
+        Return New Preset With {.Id = "vrbalanced", .Label = "VR Balanced", .Values = values}
     End Function
 
     ' Writes the chosen values into the game's settings document. Every element named by a choice must
@@ -121,14 +130,20 @@ End Class
 Public NotInheritable Class QualityChoices
     Private ReadOnly preset As System.Windows.Forms.ComboBox
     Private ReadOnly boxes As New Dictionary(Of String, System.Windows.Forms.ComboBox)
+    Private ReadOnly choices As New List(Of GraphicsCatalog.Preset) ' Picker entries between the first and Custom.
     Private updating As Boolean
-    Public Event Changed()
+    ' Raised just before a preset replaces the options (the launcher keeps an Undo copy).
+    Public Event PresetApplying()
+    ' Raised when the player changes a single option.
+    Public Event OptionEdited()
 
-    Public Sub New(parent As System.Windows.Forms.Control, namePrefix As String, unsetOption As String, unsetPreset As String)
+    Public Sub New(parent As System.Windows.Forms.Control, namePrefix As String, unsetOption As String, unsetPreset As String, Optional extraPresets As IEnumerable(Of GraphicsCatalog.Preset) = Nothing)
         Dim catalog = GraphicsCatalog.Current
         preset = New System.Windows.Forms.ComboBox With {.Name = namePrefix & "Preset", .DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList, .AccessibleName = namePrefix & " preset"}
         preset.Items.Add(unsetPreset)
-        For Each item In catalog.Presets
+        choices.AddRange(If(extraPresets, Enumerable.Empty(Of GraphicsCatalog.Preset)()))
+        choices.AddRange(catalog.Presets)
+        For Each item In choices
             preset.Items.Add(If(item.Id = "medium", item.Label & " (game default)", item.Label))
         Next
         preset.Items.Add("Custom")
@@ -146,7 +161,7 @@ Public NotInheritable Class QualityChoices
             AddHandler box.SelectedIndexChanged, Sub()
                                                      If updating Then Return
                                                      ShowPreset()
-                                                     RaiseEvent Changed()
+                                                     RaiseEvent OptionEdited()
                                                  End Sub
         Next
         AddHandler preset.SelectedIndexChanged, Sub() PresetChosen()
@@ -178,28 +193,36 @@ Public NotInheritable Class QualityChoices
         End Set
     End Property
 
+    ' The picker's current entry: "" for the first entry, a preset id, or "custom".
+    Public ReadOnly Property PresetId As String
+        Get
+            Dim index = preset.SelectedIndex
+            Return If(index <= 0, "", If(index <= choices.Count, choices(index - 1).Id, "custom"))
+        End Get
+    End Property
+
+    ' Selects a picker entry by preset id ("" for the first entry), as if chosen by the player.
+    Public Sub ChoosePreset(id As String)
+        Dim index = If(id = "", 0, choices.FindIndex(Function(item) item.Id = id) + 1)
+        If index < 0 Then Throw New ArgumentException("Unknown graphics preset.")
+        If preset.SelectedIndex = index Then PresetChosen() Else preset.SelectedIndex = index
+    End Sub
+
     Private Sub PresetChosen()
         If updating Then Return
-        Dim catalog = GraphicsCatalog.Current
         Dim index = preset.SelectedIndex
-        If index = 0 Then
-            Values = New Dictionary(Of String, String)
-        ElseIf index >= 1 AndAlso index <= catalog.Presets.Count Then
-            Values = New Dictionary(Of String, String)(catalog.Presets(index - 1).Values)
-        Else
-            Return ' Custom keeps the individual choices.
-        End If
-        RaiseEvent Changed()
+        If index > choices.Count Then Return ' Custom keeps the individual choices.
+        RaiseEvent PresetApplying()
+        Values = If(index = 0, New Dictionary(Of String, String), New Dictionary(Of String, String)(choices(index - 1).Values))
     End Sub
 
     ' The picker names the preset the options match, or Custom.
     Private Sub ShowPreset()
-        Dim catalog = GraphicsCatalog.Current
         Dim current = Values
-        Dim match = catalog.MatchingPreset(current)
+        Dim match = GraphicsCatalog.Current.MatchingPreset(current, choices)
         updating = True
         Try
-            preset.SelectedIndex = If(current.Count = 0, 0, If(match Is Nothing, catalog.Presets.Count + 1, catalog.Presets.IndexOf(match) + 1))
+            preset.SelectedIndex = If(current.Count = 0, 0, If(match Is Nothing, choices.Count + 1, choices.IndexOf(match) + 1))
         Finally
             updating = False
         End Try
