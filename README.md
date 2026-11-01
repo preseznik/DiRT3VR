@@ -34,6 +34,13 @@ report is investigated.
    **Restore original files** before upgrading or uninstalling. Alternatively,
    extract the portable ZIP to a writable folder.
 2. Open DiRT3VR and select your DiRT 3 Complete Edition folder if needed.
+   The **Simple | Advanced** switch beside **?** picks the view: Advanced
+   (the default) shows every tab; Simple shows one **Quick start** page with
+   the essentials (launch mode and direct practice, startup logo skipping,
+   experimental VR and the runtime, the desktop and VR quality presets, VR
+   render scale and quick presets, recentering). Both views use the same
+   controls, switching never changes or saves settings, and the view is
+   remembered with the window size.
 3. Use **Launch** for ordinary desktop play through the game's own menus.
    **Startup → Skip startup logo movies** is off by default. When enabled, it
    applies to desktop and VR launches. Closing the launcher window during a

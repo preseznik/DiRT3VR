@@ -181,6 +181,16 @@ Public Class SettingRow
         If editor.AccessibleName Is Nothing Then editor.AccessibleName = title
         Controls.Add(caption) : Controls.Add(editor)
     End Sub
+    ' The row's label; Simple view renames a few rows while it borrows them.
+    <System.ComponentModel.Browsable(False), System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)>
+    Public Property CaptionText As String
+        Get
+            Return caption.Text
+        End Get
+        Set(value As String)
+            caption.Text = value : PerformLayout()
+        End Set
+    End Property
     Protected Overrides Sub OnLayout(e As LayoutEventArgs)
         MyBase.OnLayout(e)
         If arranging OrElse editor Is Nothing OrElse ClientSize.Width <= 0 Then Return

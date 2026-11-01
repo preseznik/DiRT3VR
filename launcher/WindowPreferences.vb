@@ -9,6 +9,8 @@ Public Class WindowPreferences
     Public Property Maximized As Boolean
     ' Collapsed launcher section titles joined by "|"; Nothing keeps every section open.
     Public Property CollapsedSections As String
+    ' Simple view (Quick start) instead of Advanced's tabs.
+    Public Property SimpleView As Boolean
 
     Public Shared Function SplitSections(value As String) As HashSet(Of String)
         Return New HashSet(Of String)(If(value, "").Split("|"c, StringSplitOptions.RemoveEmptyEntries), StringComparer.Ordinal)
