@@ -164,6 +164,17 @@ Module DirectPracticeTests
         opponentsTransaction.Prepare(DesktopStartupSession.Changes(opponentsCtx, race), apply:=False)
         check(opponentsTransaction.Pending AndAlso opponentsTransaction.Recover() AndAlso Not opponentsTransaction.Pending, "a config with opponents passes the recovery journal's check")
 
+        ' AI difficulty (Wrench's 7409e13): sent only while opponents race, unset = DiRT 3's own setting.
+        check(race.DirectDifficulty = -1 AndAlso Not InteractiveSession.StartInfo(ctx, runtime, logs, race, headset).Environment.ContainsKey("DIRT3VR_DIRECT_DIFFICULTY"), "by default the AI keeps the player's own DiRT 3 difficulty")
+        race.DirectDifficulty = 4
+        check(InteractiveSession.StartInfo(ctx, runtime, logs, race, headset).Environment("DIRT3VR_DIRECT_DIFFICULTY") = "4" AndAlso
+              DesktopStartupSession.StartInfo(opponentsCtx, race, Path.Combine(opponentsCtx.UserRoot, "logs", "session-fixture")).Environment("DIRT3VR_DIRECT_DIFFICULTY") = "4", "a chosen AI level reaches the renderer with Launch VR and Launch")
+        race.DirectOpponents = 0
+        check(Not InteractiveSession.StartInfo(ctx, runtime, logs, race, headset).Environment.ContainsKey("DIRT3VR_DIRECT_DIFFICULTY"), "without opponents the AI level isn't sent")
+        Dim stageRace As New LauncherSettings With {.LaunchMode = "direct", .DirectRoute = stage.DirectRoute, .DirectCar = "frx", .DirectOpponents = 3, .DirectDifficulty = 2}
+        check(DirectPractice.Difficulty(stageRace) = -1 AndAlso Not InteractiveSession.StartInfo(ctx, runtime, logs, stageRace, headset).Environment.ContainsKey("DIRT3VR_DIRECT_DIFFICULTY"), "stages, which have no opponents, get no AI level")
+        check(Refused(Sub() Call New LauncherSettings With {.DirectDifficulty = 6}.Validate()) AndAlso Refused(Sub() Call New LauncherSettings With {.DirectDifficulty = -2}.Validate()), "the AI level is DiRT 3's 0 to 5, or the game's own setting")
+
         ' DiRT 3's result file for the session is removed; other benchmark results stay.
         Dim results = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(ctx.GraphicsPath)), "benchmarks")
         Directory.CreateDirectory(results)
@@ -181,7 +192,10 @@ Module DirectPracticeTests
         check(Refused(Sub() Call New SettingsProfile With {.Kind = "DiRT3VR.SettingsProfile", .Schema = 3, .Name = "Old", .Settings = profile}.Validate()), "a schema 3 profile can't carry direct practice")
         loaded.DirectOpponents = 4 : loaded.DirectOpponentCars = "mixed"
         Dim raceProfile = ProfileValues.Capture(loaded).ApplyTo(New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = ""})
-        check(raceProfile.DirectOpponents = 4 AndAlso raceProfile.DirectOpponentCars = "mixed", "settings profiles carry the opponents")
+        loaded.DirectDifficulty = 5
+        raceProfile = ProfileValues.Capture(loaded).ApplyTo(New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = ""})
+        check(raceProfile.DirectOpponents = 4 AndAlso raceProfile.DirectOpponentCars = "mixed" AndAlso raceProfile.DirectDifficulty = 5, "settings profiles carry the opponents and their AI level")
+        check(Refused(Sub() Call New SettingsProfile With {.Kind = "DiRT3VR.SettingsProfile", .Schema = 3, .Name = "Old", .Settings = New ProfileValues With {.DirectDifficulty = 1}}.Validate()), "a schema 3 profile can't carry an AI level")
         check(Refused(Sub() Call New SettingsProfile With {.Kind = "DiRT3VR.SettingsProfile", .Schema = 3, .Name = "Old", .Settings = New ProfileValues With {.DirectOpponents = 2}}.Validate()), "a schema 3 profile can't carry opponents")
         check(LauncherDefaults.All(loaded).LaunchMode = "normal", "Restore launcher defaults goes back to Normal launch")
     End Sub
@@ -218,17 +232,22 @@ Module DirectPracticeTests
             lapSlider.Value = 3 : Application.DoEvents()
             check(find("DirectLapsValue").Text = "3 laps", "the laps slider reads 3 laps")
             Dim rivals = DirectCast(find("DirectOpponents"), ValueSlider), rivalCars = DirectCast(find("DirectOpponentCars"), ComboBox)
-            check(rivals.Enabled AndAlso rivals.Value = 0 AndAlso find("DirectOpponentsValue").Text = "None" AndAlso Not rivalCars.Enabled, "a circuit can take opponents; their cars are chosen once there are some")
+            Dim aiLevel = DirectCast(find("DirectDifficulty"), ComboBox)
+            check(rivals.Enabled AndAlso rivals.Value = 0 AndAlso find("DirectOpponentsValue").Text = "None" AndAlso Not rivalCars.Enabled AndAlso Not aiLevel.Enabled AndAlso aiLevel.SelectedIndex = 0,
+                  "a circuit can take opponents; their cars and AI level are chosen once there are some")
             rivals.Value = 3 : rivalCars.SelectedIndex = 1 : Application.DoEvents()
-            check(rivalCars.Enabled AndAlso find("DirectSummary").Text.Contains("· 3 opponents (mixed cars) ·") AndAlso form.CurrentSettings().DirectOpponents = 3 AndAlso form.CurrentSettings().DirectOpponentCars = "mixed",
+            check(aiLevel.Enabled AndAlso form.CurrentSettings().DirectDifficulty = -1 AndAlso Not find("DirectSummary").Text.Contains("AI level"), "with opponents the AI level starts on My DiRT 3 setting")
+            aiLevel.SelectedIndex = 4 : Application.DoEvents()
+            check(form.CurrentSettings().DirectDifficulty = 3 AndAlso find("DirectSummary").Text.Contains("(mixed cars, AI level 3)"), "a chosen AI level shows in the settings and the summary")
+            check(rivalCars.Enabled AndAlso find("DirectSummary").Text.Contains("· 3 opponents (mixed cars, AI level 3) ·") AndAlso form.CurrentSettings().DirectOpponents = 3 AndAlso form.CurrentSettings().DirectOpponentCars = "mixed",
                   "opponents show in the summary and the settings (" & find("DirectSummary").Text & ")")
             Dim summary = find("DirectSummary").Text
             check(summary.StartsWith("Direct practice: RALLYCROSS · ASPEN – LAKESIDE · 3 laps", StringComparison.Ordinal), "the summary names the discipline, route, laps and car (" & summary & ")")
             DirectCast(find("SaveSettings"), Button).PerformClick()
             Dim saved = LauncherSettings.Load(ctx)
-            check(saved.LaunchMode = "direct" AndAlso saved.DirectRoute = Aspen().Id AndAlso saved.DirectCar = chosenCar AndAlso saved.DirectLaps = 3 AndAlso saved.DirectOpponents = 3 AndAlso saved.DirectOpponentCars = "mixed", "Save settings keeps the direct practice choice")
+            check(saved.LaunchMode = "direct" AndAlso saved.DirectRoute = Aspen().Id AndAlso saved.DirectCar = chosenCar AndAlso saved.DirectLaps = 3 AndAlso saved.DirectOpponents = 3 AndAlso saved.DirectOpponentCars = "mixed" AndAlso saved.DirectDifficulty = 3, "Save settings keeps the direct practice choice")
             discipline.SelectedItem = EventCatalog.Current.FindDiscipline("rally") : Application.DoEvents()
-            check(Not lapSlider.Enabled AndAlso Not rivals.Enabled AndAlso Not rivalCars.Enabled AndAlso Not find("DirectSummary").Text.Contains(" laps") AndAlso Not find("DirectSummary").Text.Contains("opponents ("), "point-to-point stages have no laps and no opponents")
+            check(Not lapSlider.Enabled AndAlso Not rivals.Enabled AndAlso Not rivalCars.Enabled AndAlso Not aiLevel.Enabled AndAlso Not find("DirectSummary").Text.Contains(" laps") AndAlso Not find("DirectSummary").Text.Contains("opponents ("), "point-to-point stages have no laps and no opponents")
             discipline.SelectedItem = EventCatalog.Current.FindDiscipline("rallycross") : Application.DoEvents()
             route.SelectedItem = route.Items.Cast(Of EventCatalog.EventRoute)().Single(Function(item) item.Track = "aspen" AndAlso item.Route = "route_0")
             car.SelectedItem = car.Items.Cast(Of EventCatalog.EventCar)().Single(Function(item) item.Code = chosenCar)
