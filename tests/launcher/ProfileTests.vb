@@ -84,7 +84,7 @@ Module ProfileTests
         Dim applied = store.Read(entry.Id).Profile.Settings.ApplyTo(local)
         check(Not applied.ModernInterface AndAlso applied.RuntimeMode = "steamvr" AndAlso applied.DiagnosticLogging AndAlso applied.ExperimentalVrEnabled AndAlso applied.VrRenderScale = 75, "all portable VR and appearance choices round trip")
         check(applied.DesktopWidth = 1920 AndAlso applied.DesktopHeight = 1080 AndAlso applied.DesktopDisplayMode = "windowed" AndAlso applied.DesktopVSync = "on", "all desktop profile choices round trip")
-        check(applied.SkipStartupMovies AndAlso entry.Profile.Schema = 3, "startup choice is included in schema 3 profiles")
+        check(applied.SkipStartupMovies AndAlso entry.Profile.Schema = 4, "startup choice is included in current (schema 4) profiles")
         check(applied.SteamRuntimeManifest = local.SteamRuntimeManifest AndAlso applied.VdxrRuntimeManifest = local.VdxrRuntimeManifest, "loading preserves local runtime paths")
         check(local.VrRenderScale = 100 AndAlso local.RuntimeMode = "vdxr", "loading creates a distinct settings snapshot")
         check(New SettingsProfileStore(other).List().Count = 0, "profiles are isolated per installation")
@@ -112,10 +112,10 @@ Module ProfileTests
         check(foreignStore.Import(exportPath).Profile.Name = "Night", "export can be explicitly imported into another installation")
         Reject(Sub() store.Export(updated, Path.Combine(store.Folder, "collision.json")), check, "export cannot overwrite internal profile storage")
         Dim importPath = Path.Combine(root, "invalid-profile.json")
-        For Each bad In {"", "null", "{}", "{broken", exported.Replace("DiRT3VR.SettingsProfile", "DiRT2VR.SettingsProfile"), exported.Replace("""Schema"": 3", """Schema"": 99"),
+        For Each bad In {"", "null", "{}", "{broken", exported.Replace("DiRT3VR.SettingsProfile", "DiRT2VR.SettingsProfile"), exported.Replace("""Schema"": 4", """Schema"": 99"),
                          exported.Replace("""VrRenderScale"": 125", """VrRenderScale"": 999"), exported.Replace("""RuntimeMode"": ""vdxr""", """RuntimeMode"": null"),
                          exported.Replace("""Name"": ""Night""", """Name"": null"), exported.Replace("""Settings"": {", """Settings"": {""VdxrRuntimeManifest"":""foreign.json"","),
-                         exported.Replace("""Schema"": 3", """Schema"": 3, ""schema"": 3"), exported.Replace("""VrRenderScale"": 125", """VrRenderScale"": 125, ""vrRenderScale"": 50"), New String(" "c, 65537)}
+                         exported.Replace("""Schema"": 4", """Schema"": 4, ""schema"": 4"), exported.Replace("""VrRenderScale"": 125", """VrRenderScale"": 125, ""vrRenderScale"": 50"), New String(" "c, 65537)}
             File.WriteAllText(importPath, bad)
             Reject(Sub() store.Import(importPath), check, "malformed, foreign, unsupported or unsafe import rejected")
         Next
@@ -143,7 +143,7 @@ Module ProfileTests
         Dim legacyPath = Path.Combine(root, "legacy-settings-profile.json")
         File.WriteAllText(legacyPath, "{""Kind"":""DiRT3VR.SettingsProfile"",""Schema"":1,""Name"":""Legacy"",""Settings"":{""VrRenderScale"":125}}")
         Dim legacy = foreignStore.Import(legacyPath)
-        check(legacy.Profile.Schema = 3 AndAlso Not legacy.Profile.Settings.SkipStartupMovies AndAlso legacy.Profile.Settings.VrRenderScale = 125, "schema 1 profiles migrate with startup movies retained")
+        check(legacy.Profile.Schema = 4 AndAlso Not legacy.Profile.Settings.SkipStartupMovies AndAlso legacy.Profile.Settings.VrRenderScale = 125, "schema 1 profiles migrate with startup movies retained")
         File.WriteAllText(legacyPath, "{""Kind"":""DiRT3VR.SettingsProfile"",""Schema"":1,""Name"":""Invalid legacy"",""Settings"":{""SkipStartupMovies"":true}}")
         Reject(Sub() foreignStore.Import(legacyPath), check, "schema 1 cannot silently opt into a newer startup behavior")
     End Sub

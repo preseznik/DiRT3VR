@@ -20,7 +20,7 @@ Public Class SettingsProfilePanel
         Name = "SettingsProfiles" : Margin = New Padding(0)
         currentSettings = current : loadProfile = apply
         ' Profiles and the footer's Save settings both "save", so say which one each button changes.
-        Controls.Add(New Label With {.Name = "SettingsProfileHelp", .AutoSize = True, .Text = "A profile is a named preset of your desktop, VR, startup, appearance and logging choices. " &
+        Controls.Add(New Label With {.Name = "SettingsProfileHelp", .AutoSize = True, .Text = "A profile is a named preset of your desktop, graphics quality, VR, startup, appearance and logging choices. " &
             "Save as new profile and Overwrite profile store the current controls in a profile; Load copies a profile into the controls. " &
             "Save settings at the bottom is separate: like Launch, it keeps the current controls as the launcher's settings for next time and never changes a profile. " &
             "Game saves and local paths are not included."})

@@ -81,6 +81,9 @@ Public Class InteractiveSession
             Dim headset = preflight.Headset
             Dim scene = headset.SceneSize(settings.VrRenderScale)
             context.RequireClosed()
+            ' Quality choices are shared with desktop play and kept in the game file (with a backup), so the
+            ' VR transaction below records the quality-applied file as the original to restore.
+            DesktopGraphics.Apply(context, DesktopGraphics.QualityOnly(settings), Drawing.Size.Empty)
             Dim changes = ExperimentalFiles.Changes(context, scene.Width, scene.Height, settings.SkipStartupMovies)
             directory = Path.Combine(context.UserRoot, "logs", "session-" & Guid.NewGuid().ToString("N"))
             SafeFiles.NoLinks(directory) : IO.Directory.CreateDirectory(directory)

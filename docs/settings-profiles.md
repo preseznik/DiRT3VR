@@ -25,6 +25,11 @@ remain readable with startup skipping off; updating or importing rewrites them
 as schema 2. Older launchers refuse schema-2 files rather than dropping the choice.
 After 0.1.20, profiles export Schema=3 with RecenterKey and RecenterModifiers;
 schema-1 and schema-2 files load with F10 and refuse a recenter key.
+Profiles now export Schema=4 with GraphicsQuality, an object from catalog field
+(for example `Shadows`) to choice id (for example `high`), validated against the
+embedded `tools/data/graphics-options.json`; absent fields mean Use game
+setting. Schema-1 to schema-3 files load with every quality option on Use game
+setting and refuse quality choices.
 At most 128 profiles are accepted, with a 64 KiB document limit. Unknown fields,
 duplicate keys, foreign kinds, unsupported versions, invalid values, linked
 paths and malformed JSON are refused. UTF-8 BOMs are accepted. Writes use the

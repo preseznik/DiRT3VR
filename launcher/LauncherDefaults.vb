@@ -4,13 +4,14 @@ Public NotInheritable Class LauncherDefaults
     Private Sub New()
     End Sub
 
-    ' Desktop display choices back to "Use game setting" and VR render scale to 100%.
+    ' Desktop display and quality choices back to "Use game setting" and VR render scale to 100%.
     Public Shared Function Graphics(current As LauncherSettings) As LauncherSettings
         Dim result = Copy(current)
         Dim defaults As New LauncherSettings()
         result.DesktopWidth = defaults.DesktopWidth : result.DesktopHeight = defaults.DesktopHeight
         result.DesktopDisplayMode = defaults.DesktopDisplayMode : result.DesktopVSync = defaults.DesktopVSync
         result.VrRenderScale = defaults.VrRenderScale
+        result.GraphicsQuality = New Dictionary(Of String, String)
         Return result
     End Function
 
