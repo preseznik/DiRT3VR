@@ -179,7 +179,7 @@ Public NotInheritable Class DirectPracticePicker
         Dim chosenCar = TryCast(car.SelectedItem, EventCatalog.EventCar)
         summary.Text = If(Not direct.Checked, "Launch and Launch VR open DiRT 3's own menus.",
                           If(chosenRoute Is Nothing OrElse chosenCar Is Nothing, "Choose a route and a car (adjust the search if no car is listed).",
-                             "Direct practice: " & CurrentDisciplineName() & " · " & chosenRoute.ToString() & If(chosenRoute.TrackType = "circuit", " · " & laps.Value & If(laps.Value = 1, " lap", " laps"), "") & " · " & chosenCar.Name & ". No opponents; the end of the session follows DiRT 3's benchmark start for now."))
+                             "Direct practice: " & CurrentDisciplineName() & " · " & chosenRoute.ToString() & If(chosenRoute.TrackType = "circuit", " · " & laps.Value & If(laps.Value = 1, " lap", " laps"), "") & " · " & chosenCar.Name & ". No opponents; DiRT 3 closes by itself after the finish."))
     End Sub
 
     Private Function CurrentDisciplineName() As String

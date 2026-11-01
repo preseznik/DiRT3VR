@@ -318,7 +318,7 @@ Public Class MainForm
         content.Controls.Add(columns)
         Dim launch = Section(columns.First, "Launch mode")
         directPicker = New DirectPracticePicker(launch)
-        launch.Controls.Add(Info("Direct practice starts DiRT 3 straight on the chosen route with your car, through DiRT 3's own benchmark start: no menus, no opponents. It works with Launch (on the monitor) and Launch VR; laps apply to circuits, and the end of the session follows the benchmark start. Normal launch keeps DiRT 3's menus for careers, events and multiplayer."))
+        launch.Controls.Add(Info("Direct practice starts DiRT 3 straight on the chosen route with your car, through DiRT 3's own benchmark start: no menus, no opponents. It works with Launch (on the monitor) and Launch VR; laps apply to circuits, and DiRT 3 closes by itself a few seconds after the finish. Normal launch keeps DiRT 3's menus for careers, events and multiplayer."))
         launch.Controls.Add(TopicLink(HelpDirect))
         AddHandler directPicker.Changed, Sub() RefreshState()
         Dim startup = Section(columns.First, "Startup")
@@ -1006,7 +1006,7 @@ Public Class MainForm
             New HelpTopic(HelpDirect,
                 "Launcher → Launch mode → Direct practice starts DiRT 3 straight on a route with your car, without its menus, through the game's own benchmark start; DiRT3VR's renderer keeps the car under your control." & vbCrLf & vbCrLf &
                 "Choose the discipline (rally, rallycross, trailblazer or Land Rush), the location and route, and the car. Cars are those of the route's discipline; Show cars from other disciplines lists the rest, which are untested. Search finds cars by name, code or class, and Class narrows the list." & vbCrLf & vbCrLf &
-                "Laps (1 to 5) apply to circuits (rallycross and Land Rush); point-to-point stages are one run. Direct practice works with Launch (on the monitor) and Launch VR. There are no opponents for now, and the end of the session follows the benchmark start (quit from the game when you are done). The short config file it writes into the game folder, dirt3vr-direct.xml, is removed with DiRT3VR's other temporary changes, and DiRT 3's benchmark result file is deleted afterwards." & vbCrLf & vbCrLf &
+                "Laps (1 to 5) apply to circuits (rallycross and Land Rush); point-to-point stages are one run. Direct practice works with Launch (on the monitor) and Launch VR. There are no opponents for now. After the finish line DiRT 3 shows the finish camera and your time for a few seconds, then closes by itself; there is no results screen or Restart yet, so launch again for another run. Esc doesn't open the pause menu in this mode yet (DiRT 3's benchmark start blocks it). To stop earlier, use End session (Launch VR) or close DiRT 3's window with Alt+F4. The short config file it writes into the game folder, dirt3vr-direct.xml, is removed with DiRT3VR's other temporary changes, and DiRT 3's benchmark result file is deleted afterwards." & vbCrLf & vbCrLf &
                 "Normal launch keeps DiRT 3's menus for careers, events and multiplayer."),
             New HelpTopic(HelpStartup,
                 "Launcher → Skip startup logo movies temporarily replaces the AMD and DiRT 3 logo movie states for desktop and VR launches. Copyright, Press Start and other movies remain." & vbCrLf & vbCrLf &
