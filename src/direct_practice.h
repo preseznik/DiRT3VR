@@ -132,8 +132,68 @@ inline int DifficultyAnswer(uint8_t benchmarkActive,int requested,int original) 
     return benchmarkActive==1 && requested>=0 && requested<=maxDifficulty ? requested : original;
 }
 
+// Assists and gearbox: the race setup (0x5c0a00) reads each assist from the profile's settings
+// store through 0x9dfad0, which returns the named entry's value (0x88 bytes, the number at
+// +0x8) or null. During a benchmark start the hook answers allowlisted names from a private
+// copy carrying the requested number; the store itself is never written, and outside a
+// benchmark start the player's own values come back unchanged. Meanings (states.bin menus):
+// on/off assists 0/1; racing line 0 off, 1 braking only, 2 full; gearbox 0 automatic,
+// 1 manual sequential, 2 manual H-pattern, 3 H-pattern with clutch.
+inline constexpr uintptr_t settingLookupRva=0x5dfad0;
+inline constexpr uint8_t settingLookupEntry[]{0x55,0x8b,0xec,0x53,0x56,0x57,0x8b,0xf9,0x8b,0x77,0x7c,0x3b,0xb7,0x80,0x00,0x00};
+inline constexpr size_t settingValueBytes=0x88;
+inline constexpr size_t settingNumberOffset=0x8;
+struct AssistSetting { const char* name; int maximum; };
+inline constexpr AssistSetting assistSettings[]{
+    {"assists_abs",1},{"assists_stability",1},{"assists_dyn_race_line",2},{"assists_race_line",1},
+    {"assists_corner_braking",1},{"assists_throttle_mngt",1},{"assists_auto_steer",1},{"transmission_type",3}};
+inline constexpr size_t assistCount=sizeof(assistSettings)/sizeof(assistSettings[0]);
+inline bool SettingLookupMatches(const uint8_t* image) {
+    return std::memcmp(image+settingLookupRva,settingLookupEntry,sizeof(settingLookupEntry))==0;
+}
+// Index of an allowlisted setting name (the store compares at most 64 characters), or -1.
+inline int AssistIndex(const char* name) {
+    if(!name) return -1;
+    for(size_t i=0;i<assistCount;++i)
+        if(std::strncmp(name,assistSettings[i].name,64)==0) return static_cast<int>(i);
+    return -1;
+}
+// Parses "name=value,name=value"; values[i] is -1 where nothing was requested. Any unknown
+// name, out-of-range or malformed value, or repeated name rejects the whole request.
+inline bool ParseAssists(const char* text,int (&values)[assistCount]) {
+    for(auto& value:values) value=-1;
+    if(!text || !*text) return false;
+    int parsed[assistCount];
+    for(auto& value:parsed) value=-1;
+    const char* cursor=text;
+    while(*cursor) {
+        const char* equals=std::strchr(cursor,'=');
+        if(!equals || equals==cursor || equals-cursor>=64) return false;
+        char name[64]{};
+        std::memcpy(name,cursor,static_cast<size_t>(equals-cursor));
+        const int index=AssistIndex(name);
+        if(index<0 || parsed[index]>=0) return false;
+        const char digit=equals[1];
+        if(digit<'0' || digit>'9' || (equals[2] && equals[2]!=',')) return false;
+        const int number=digit-'0';
+        if(number>assistSettings[index].maximum) return false;
+        parsed[index]=number;
+        cursor=equals+2;
+        if(*cursor==',') { ++cursor; if(!*cursor) return false; }
+    }
+    std::memcpy(values,parsed,sizeof(parsed));
+    return true;
+}
+inline int AssistAnswer(uint8_t benchmarkActive,int requested,int original) {
+    return benchmarkActive==1 && requested>=0 ? requested : original;
+}
+
 bool Requested();
 bool ReturnRequested();
+// DIRT3VR_DIRECT_ASSISTS="name=value,...": true when a valid request is set.
+bool AssistsRequested();
+// Hooks the settings lookup once; false leaves the game's own values in charge.
+bool InstallAssists(void (*log)(const char*,...));
 // DIRT3VR_DIRECT_DIFFICULTY=N (0-5); -1 when unset or invalid.
 int RequestedDifficulty();
 // Hooks the difficulty lookup once; false leaves the game's own setting in charge.

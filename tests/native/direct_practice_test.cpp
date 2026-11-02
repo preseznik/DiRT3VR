@@ -41,7 +41,11 @@ bool InstalledGameMatches(const char* path) {
     std::vector<uint8_t> lookup(dp::difficultyRva+0x23);
     file.seekg(static_cast<std::streamoff>(dp::difficultyRva-0x1000+0x400));
     file.read(reinterpret_cast<char*>(lookup.data()+dp::difficultyRva),0x23);
-    return file && dp::DifficultySiteMatches(lookup.data());
+    if(!file || !dp::DifficultySiteMatches(lookup.data())) return false;
+    std::vector<uint8_t> settings(dp::settingLookupRva+sizeof(dp::settingLookupEntry));
+    file.seekg(static_cast<std::streamoff>(dp::settingLookupRva-0x1000+0x400));
+    file.read(reinterpret_cast<char*>(settings.data()+dp::settingLookupRva),sizeof(dp::settingLookupEntry));
+    return file && dp::SettingLookupMatches(settings.data());
 }
 
 std::vector<uint8_t> ExitImage(uintptr_t loadedBase) {
@@ -127,6 +131,28 @@ int main(int argc,char** argv) {
         Require(dp::DifficultyAnswer(1,0,3)==0 && dp::DifficultyAnswer(1,5,-1)==5,"Requested difficulty not used in a benchmark start");
         Require(dp::DifficultyAnswer(0,5,2)==2,"Difficulty changed outside a benchmark start");
         Require(dp::DifficultyAnswer(1,-1,2)==2 && dp::DifficultyAnswer(1,6,2)==2,"Unset or invalid difficulty request applied");
+
+        {
+            int values[dp::assistCount];
+            Require(dp::ParseAssists("assists_abs=0,transmission_type=3,assists_dyn_race_line=2",values),"Valid assists request rejected");
+            Require(values[dp::AssistIndex("assists_abs")]==0 && values[dp::AssistIndex("transmission_type")]==3 &&
+                    values[dp::AssistIndex("assists_dyn_race_line")]==2 && values[dp::AssistIndex("assists_stability")]==-1,
+                    "Assists request parsed into the wrong settings");
+            for(const char* bad:{"","assists_abs","assists_abs=","assists_abs=2","assists_dyn_race_line=3","transmission_type=4",
+                                 "assists_abs=0,","assists_abs=0,assists_abs=1","difficulty=1","assists_abs=0x","=1",
+                                 "assists_abs=0;assists_stability=0","assists_abs=10"}) {
+                Require(!dp::ParseAssists(bad,values),"Invalid assists request accepted");
+                for(const int value:values) Require(value==-1,"Rejected assists request left values behind");
+            }
+            Require(dp::AssistIndex("assists_abs_db_item")==-1 && dp::AssistIndex(nullptr)==-1,"Unlisted setting name accepted");
+            Require(dp::AssistAnswer(1,0,1)==0 && dp::AssistAnswer(1,3,0)==3,"Requested assist not used in a benchmark start");
+            Require(dp::AssistAnswer(0,0,1)==1 && dp::AssistAnswer(1,-1,1)==1,"Assist changed outside a benchmark start or unrequested");
+            std::vector<uint8_t> image(dp::settingLookupRva+32,0xcc);
+            std::copy(std::begin(dp::settingLookupEntry),std::end(dp::settingLookupEntry),image.begin()+dp::settingLookupRva);
+            Require(dp::SettingLookupMatches(image.data()),"Settings lookup not recognised");
+            image[dp::settingLookupRva+10]=0x78;
+            Require(!dp::SettingLookupMatches(image.data()),"Settings lookup on another table accepted");
+        }
 
         uint8_t active=1,commandLine=1;
         Require(!dp::EndBenchmark(active,commandLine,1,0) && active==1,"Benchmark ended before the track was complete");
