@@ -125,6 +125,39 @@ run inside `press_start` (and its music/audio wrappers), which presumably keeps 
 operation going. Next: what `StateWaitForLoad`/the save system waits for (vtable route
 below), or whether a `press_start`-like parent can run without showing its screen.
 
+Why it stalls (2026-11-02, research renderer: `--stacks` samples every thread's stack,
+`--count-calls` counts calls to chosen functions and keeps the first two call stacks):
+
+- The main thread keeps rendering (run 58); no thread is stuck. The flow runs as a job:
+  thread pool → `0x7660a0` → `0x9d7c60` → `0x9f1d10` → `0x4a1f60` → `0xd1cb10` → `0xb854a0`
+  → `0xd04860` → `0xcd9d90` (the flow runner's phase machine, phase in `[runner+0x20]`)
+  → `0xcd99a0` (active-state updates).
+- In the stall the root keeps ticking (~1400 calls/s) but `0xcd99a0` and every state
+  update stop (run 62), with `wait_for_load_profile`'s update (`0x54fef0`) called twice
+  (run 59): the runner is stuck in a transition phase (waiting for a state to finish
+  exiting or entering). Not caused by the research hooks (run 62 had no Steam hooks); key
+  presses don't release it (run 60).
+- `0x54fef0` decoded: it looks up the running save operation by type; operation status
+  `0x3c` while the component at `0xfe45d0` reports a status other than `0x3c`
+  (`0x5a7400`) returns `list_select`. My copies sent `list_select` out of the
+  `cleanup_profile_operation` wrapper, whose exit waits for the open operation forever.
+  The normal start sends it to `31l delay_system_events > 31i save_info_list`
+  (`ScreenOverlaySaveInfoList`), which continues to the wait.
+
+| Run | Variant | Result |
+|---|---|---|
+| 57 | `reset`: + `profile_reset` / `profile_reset_p2` before the load | same stall |
+| 63 | `list`: + `d3x delay_system_events > d3l save_info_list, d3j generic_waypoint`, `list_select` → `d3l` | flow keeps running (no freeze); black screen, only the index file read |
+| 64 | `list`, Enter at 20 s (focus test) | **all 19 profile files read**, 8 s after the index, right after Enter; then a later transition freezes again, race doesn't start |
+
+So in a direct start the save system stops at an (invisible) save list after reading
+the profile index and waits for a choice; the normal start never shows that list (its
+next screen is the AUTOSAVE WARNING, run 51), so something there chooses automatically,
+presumably what Press Start sets up (the `0xfe45d0` component's status). Next: find what
+makes the normal start skip the list (the `0xfe45d0` status object at `+0x1c`, set up
+around Press Start / `press_start_handle_signin`), or choose the save without input; then
+the transition after the load.
+
 The earlier plan: a profile load on the `skip_no_garage` route. The existing load nodes (`C` →
 `D` → `E` → `F` → `G`) are shared with the normal start and continue into the front end
 (garage, main menu), which this route never loads, so they can't simply be linked to.
