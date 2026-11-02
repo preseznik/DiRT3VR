@@ -214,3 +214,41 @@ native visibility corners, ignoring corner padding, rejecting invalid far/radius
 values, refusing activation without successful guarded installation, and a
 synthetic loaded device's native-stereo count/handle/type/instruction guards. These are
 offline contracts; headset image quality and gameplay are separate acceptance.
+
+## Tree visibility
+
+Reported in VR (#43cca478): trees pop in and out at LA Coliseum when driving
+past them, and also with the car stopped when the head turns. The widened main
+volume above does not cover trees: the tree system culls with its own frustums.
+
+- Main preparation `0x5808b0` calls `0x576fd0` at `0x580a5d`, which calls the tree
+  cull **`0xb68ed0`** (RVA `0x768ed0`, `__thiscall`, 7 stack arguments, `ret 0x1c`)
+  at `0x577509` with `ecx = renderer+0xd0` (tree system) and argument 3 =
+  `renderer+0x5f4`, the main camera context. Its other six callers (`0x5782e2`,
+  `0x57fee2`, `0x586cc5`, `0x5a08ac`, `0x5ae4d2`, `0xbd582d`) are shadow,
+  reflection and other passes.
+- The cull reads the context's native FOV (`+0xe4`, degrees), aspect (`+0xf0`) and
+  near/far (`+0xe8`/`+0xec`), builds a **symmetric** perspective with `0xc8fd30`,
+  multiplies the context view (`+0x150`) by it and passes the product to the
+  frustum builder `0x7c55d0` at `0xb690d6`, copying the result with `0x574c10` at
+  `0xb690e2`. Per tree type it rebuilds the same frustum with the far plane
+  shortened to the type's cull distance (`0xb6938c`/`0xb69398`, `0xb695a4`/`0xb695b0`).
+- It runs once per frame before both eye passes, with the game camera's own
+  direction and desktop FOV. The headset's wider, asymmetric eye projection only
+  reaches the GPU upload. Trees outside the game camera's view are never selected,
+  so they are missing when the head turns and vanish before they leave the eye's
+  view when driving past.
+
+The prototype now hooks the tree cull and marks only the main-preparation call
+(return RVA `0x17750e`) whose context is the main context the copy hook just
+widened. Inside it, the three tree frustum copies (return RVAs `0x7690e7`,
+`0x76939d`, `0x7695b5`) get a box like the main volume, centred between cameras A
+and B, but sized by the **tree volume's own corners** plus the same margins, not
+the camera far value, so each tree type keeps its cull distance. LOD and the
+distance tests elsewhere are unchanged; shadow and reflection tree culls keep
+their native volumes. A mismatch in any of the eight call and entry checks leaves
+native tree culling in place while the other projection hooks still install.
+`tests/native/scene_projection_test.cpp` covers the tree box (encloses the tree
+corners, stays below the camera far range, rejects unbounded corners and invalid
+cameras). Headset acceptance and the cost of drawing trees behind the player are
+still open.

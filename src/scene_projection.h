@@ -41,6 +41,10 @@ using Matrix = std::array<float, 16>;
 bool ApplyProjection(Matrix& projection, const Matrix& view, Matrix& combined, const XrFovf& fov) noexcept;
 bool VisibilityMatrix(const CameraRecord& a, const CameraRecord& b,
                       const std::array<float, 56>& nativeVolume, Matrix& matrix) noexcept;
+// Tree volumes use each tree type's shorter cull distance as their far plane;
+// only their own corners set the box range, never the camera far value.
+bool TreeVisibilityMatrix(const CameraRecord& a, const CameraRecord& b,
+                          const std::array<float, 56>& nativeVolume, Matrix& matrix) noexcept;
 // Same guarded reads as the runtime entry, with an explicit image for tests.
 bool NativeStereoDisabledAt(void* renderer, uintptr_t imageBase) noexcept;
 }

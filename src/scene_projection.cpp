@@ -7,6 +7,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstring>
+#include <iterator>
 #include <mutex>
 
 namespace dirt3vr {
@@ -16,6 +17,11 @@ constexpr uintptr_t CopyRva = 0x174c10, BuildRva = 0x3c55d0;
 constexpr uintptr_t RendererTableRva = 0xaac84c, CameraTableRva = 0xa85b50;
 constexpr uintptr_t ContextTableRva = 0xb075e8, DeviceTableRva = 0xb06ab8;
 constexpr uintptr_t StereoGetterRva = 0x4a8ca0;
+// The tree system culls with its own frustum, built from the camera's native FOV
+// (docs/research/asymmetric-projection.md, "Tree visibility"). Main preparation
+// calls it at 0x177509; its three frustum copies return to these addresses.
+constexpr uintptr_t TreeCullRva = 0x768ed0, TreeCullReturnRva = 0x17750e;
+constexpr uintptr_t TreeCopyReturnRvas[] = {0x7690e7, 0x76939d, 0x7695b5};
 constexpr unsigned char AlignedEntry[] = {0x53,0x8b,0xdc,0x83,0xec,0x08,0x83,0xe4,0xf0,0x83,0xc4,0x04,0x55,0x8b,0x6b,0x04};
 constexpr unsigned char CopyEntry[] = {0x55,0x8b,0xec,0x8b,0xc1,0x8b,0x4d,0x08,0x0f,0x28,0x01,0x0f,0x29,0x00,0x0f,0x28};
 constexpr unsigned char UploadCall[] = {0x8b,0x4f,0x28,0x8b,0x11,0x8b,0x82,0x48,0x01,0x00,0x00,0x56,0xff,0xd0};
@@ -23,15 +29,22 @@ constexpr unsigned char StereoGetterEntry[] = {0x55,0x8b,0xec,0x51,0x83,0xb9,0x6
 using SetupFn = void (__thiscall*)(void*, void*, void*, float, unsigned);
 using UploadFn = void (__thiscall*)(void*, void*);
 using FrustumFn = void* (__thiscall*)(void*, const void*);
+using TreeCullFn = void (__thiscall*)(void*, uint32_t, uint32_t, void*, uint32_t, uint32_t, uint32_t, uint32_t);
 SetupFn realSetup{};
 UploadFn realUpload{};
 FrustumFn realCopy{}, buildFrustum{};
+TreeCullFn realTreeCull{};
 uintptr_t base{};
 DiagnosticLogger logMessage{};
 std::atomic_bool installed{}, active{};
-std::atomic_uint64_t visibilityCount{}, visibilityRejected{};
+std::atomic_uint64_t visibilityCount{}, visibilityRejected{}, treeCount{}, treeRejected{};
 thread_local ProjectionScope* current{};
 thread_local ProjectionScope* setupScope{};
+// The main renderer whose visibility was last widened on this (render) thread.
+// Tree volumes are widened only inside its own preparation's tree cull.
+struct PreparedRenderer { void* renderer; void* context; };
+thread_local PreparedRenderer prepared{};
+thread_local const PreparedRenderer* treeScope{};
 
 void Report(const char* text) noexcept {
     try { if(logMessage) logMessage("%s", text); } catch(...) { }
@@ -81,6 +94,13 @@ struct RestoreSetup {
     ProjectionScope* previous;
     ~RestoreSetup() { setupScope = previous; }
 };
+struct RestoreTree {
+    const PreparedRenderer* previous;
+    ~RestoreTree() { treeScope = previous; }
+};
+bool TreeCopy(uintptr_t caller) noexcept {
+    return std::find(std::begin(TreeCopyReturnRvas), std::end(TreeCopyReturnRvas), caller) != std::end(TreeCopyReturnRvas);
+}
 // The engine owns these matrices on the render thread. Only projection and its
 // derived product change; inverse view at +70 and view at +150 stay untouched.
 bool WriteMatrices(void* context, const projection_detail::Matrix& projection,
@@ -134,12 +154,13 @@ bool ApplyProjection(Matrix& projection, const Matrix& view, Matrix& combined, c
     projection = replacement; combined = product;
     return true;
 }
-bool VisibilityMatrix(const CameraRecord& a, const CameraRecord& b,
-                      const std::array<float, 56>& nativeVolume, Matrix& matrix) noexcept {
+namespace {
+bool VisibilityBox(const CameraRecord& a, const CameraRecord& b, const std::array<float, 56>& nativeVolume,
+                   bool cameraFar, Matrix& matrix) noexcept {
     if(!ValidReplayCamera(a) || !ValidReplayCamera(b)) return false;
     const float farA = CameraFloat(a, 0x58), farB = CameraFloat(b, 0x58);
     if(!std::isfinite(farA) || !std::isfinite(farB) || farA < 25 || farA > 5000 || farB < 25 || farB > 5000) return false;
-    double range = std::max(farA, farB);
+    double range = cameraFar ? std::max(farA, farB) : 0.;
     std::array<double, 3> center{};
     for(unsigned axis = 0; axis < 3; ++axis)
         center[axis] = (double(CameraFloat(a, 0x40 + axis*4)) + CameraFloat(b, 0x40 + axis*4))*.5;
@@ -160,6 +181,15 @@ bool VisibilityMatrix(const CameraRecord& a, const CameraRecord& b,
     for(float value : result) if(!std::isfinite(value)) return false;
     matrix = result;
     return true;
+}
+}
+bool VisibilityMatrix(const CameraRecord& a, const CameraRecord& b,
+                      const std::array<float, 56>& nativeVolume, Matrix& matrix) noexcept {
+    return VisibilityBox(a, b, nativeVolume, true, matrix);
+}
+bool TreeVisibilityMatrix(const CameraRecord& a, const CameraRecord& b,
+                          const std::array<float, 56>& nativeVolume, Matrix& matrix) noexcept {
+    return VisibilityBox(a, b, nativeVolume, false, matrix);
 }
 }
 
@@ -187,9 +217,36 @@ struct ProjectionHooks {
         }
         realUpload(self, context);
     }
+    // Main preparation culls trees once per frame against the game camera's own
+    // FOV and direction. Mark that call so its tree volumes can be widened too;
+    // shadow and reflection tree culls keep their native volumes.
+    static void __fastcall TreeCull(void* self, void*, uint32_t a1, uint32_t a2, void* context, uint32_t a4, uint32_t a5, uint32_t a6, uint32_t a7) {
+        const auto caller = reinterpret_cast<uintptr_t>(_ReturnAddress()) - base;
+        RestoreTree restore{treeScope};
+        treeScope = active.load(std::memory_order_acquire) && caller == TreeCullReturnRva &&
+            prepared.context && context == prepared.context ? &prepared : nullptr;
+        realTreeCull(self, a1, a2, context, a4, a5, a6, a7);
+    }
     static void* __fastcall Copy(void* self, void*, const void* source) {
         const auto caller = reinterpret_cast<uintptr_t>(_ReturnAddress()) - base;
+        if(active.load(std::memory_order_acquire) && treeScope && TreeCopy(caller)) {
+            const auto renderer = reinterpret_cast<uintptr_t>(treeScope->renderer);
+            CameraRecord a{}, b{};
+            std::array<float, 56> original{};
+            alignas(16) std::array<float, 56> volume{};
+            alignas(16) projection_detail::Matrix matrix{};
+            if(Identity(treeScope->renderer, treeScope->context, reinterpret_cast<void*>(renderer + 0x600), reinterpret_cast<void*>(renderer + 0x690)) &&
+               Read(reinterpret_cast<void*>(renderer + 0x600), a.data(), a.size()) &&
+               Read(reinterpret_cast<void*>(renderer + 0x690), b.data(), b.size()) && Read(source, original.data(), sizeof(original)) &&
+               projection_detail::TreeVisibilityMatrix(a, b, original, matrix) && BuildVolume(volume.data(), matrix.data()) &&
+               std::all_of(volume.begin(), volume.end(), [](float value) { return std::isfinite(value); })) {
+                if(treeCount.fetch_add(1) == 0) Report("XR tree visibility expanded before preparation; tree cull distances and LOD retained");
+                return realCopy(self, volume.data());
+            }
+            if(treeRejected.fetch_add(1) == 0) Report("XR tree visibility expansion rejected; original tree volume retained");
+        }
         if(active.load(std::memory_order_acquire) && caller == 0x18093f) {
+            prepared = {};
             const auto renderer = reinterpret_cast<uintptr_t>(self) - 0x350;
             void* context{};
             CameraRecord a{}, b{};
@@ -203,6 +260,7 @@ struct ProjectionHooks {
                projection_detail::VisibilityMatrix(a, b, original, matrix) && BuildVolume(volume.data(), matrix.data()) &&
                std::all_of(volume.begin(), volume.end(), [](float value) { return std::isfinite(value); })) {
                 if(visibilityCount.fetch_add(1) == 0) Report("XR main visibility expanded before preparation; native distance and LOD retained");
+                prepared = {reinterpret_cast<void*>(renderer), context};
                 return realCopy(self, volume.data());
             }
             if(visibilityRejected.fetch_add(1) == 0) Report("XR visibility expansion rejected; original volume retained");
@@ -243,15 +301,21 @@ bool InstallSceneProjection(DiagnosticLogger logger) noexcept {
                !Call(0x180932, BuildRva) || !Call(0x18093a, CopyRva)) {
                 Report("XR projection hooks refused: loaded binary contract mismatch"); return;
             }
+            // Tree widening is optional: a mismatch keeps native tree culling only.
+            const bool trees = Bytes(TreeCullRva, AlignedEntry, 16) && Call(0x177509, TreeCullRva) &&
+                Call(0x7690d6, BuildRva) && Call(0x76938c, BuildRva) && Call(0x7695a4, BuildRva) &&
+                Call(0x7690e2, CopyRva) && Call(0x769398, CopyRva) && Call(0x7695b0, CopyRva);
+            if(!trees) Report("XR tree visibility hook refused: loaded binary contract mismatch; native tree culling retained");
             const auto initialized = MH_Initialize();
             if(initialized != MH_OK && initialized != MH_ERROR_ALREADY_INITIALIZED) { Report("XR projection hooks unavailable: MinHook initialization"); return; }
-            void* addresses[] = {reinterpret_cast<void*>(base + SetupRva), reinterpret_cast<void*>(base + UploadRva), reinterpret_cast<void*>(base + CopyRva)};
-            void* detours[] = {reinterpret_cast<void*>(&ProjectionHooks::Setup), reinterpret_cast<void*>(&ProjectionHooks::Upload), reinterpret_cast<void*>(&ProjectionHooks::Copy)};
-            void** originals[] = {reinterpret_cast<void**>(&realSetup), reinterpret_cast<void**>(&realUpload), reinterpret_cast<void**>(&realCopy)};
+            void* addresses[] = {reinterpret_cast<void*>(base + SetupRva), reinterpret_cast<void*>(base + UploadRva), reinterpret_cast<void*>(base + CopyRva), reinterpret_cast<void*>(base + TreeCullRva)};
+            void* detours[] = {reinterpret_cast<void*>(&ProjectionHooks::Setup), reinterpret_cast<void*>(&ProjectionHooks::Upload), reinterpret_cast<void*>(&ProjectionHooks::Copy), reinterpret_cast<void*>(&ProjectionHooks::TreeCull)};
+            void** originals[] = {reinterpret_cast<void**>(&realSetup), reinterpret_cast<void**>(&realUpload), reinterpret_cast<void**>(&realCopy), reinterpret_cast<void**>(&realTreeCull)};
+            const unsigned wanted = trees ? 4 : 3;
             unsigned created{};
-            for(; created < 3; ++created) if(MH_CreateHook(addresses[created], detours[created], originals[created]) != MH_OK) break;
-            bool enabled = created == 3;
-            if(enabled) for(void* address : addresses) if(MH_QueueEnableHook(address) != MH_OK) enabled = false;
+            for(; created < wanted; ++created) if(MH_CreateHook(addresses[created], detours[created], originals[created]) != MH_OK) break;
+            bool enabled = created == wanted;
+            if(enabled) for(unsigned i = 0; i < wanted; ++i) if(MH_QueueEnableHook(addresses[i]) != MH_OK) enabled = false;
             if(enabled) enabled = MH_ApplyQueued() == MH_OK;
             if(!enabled) {
                 for(unsigned i = 0; i < created; ++i) { MH_DisableHook(addresses[i]); MH_RemoveHook(addresses[i]); }
@@ -262,7 +326,8 @@ bool InstallSceneProjection(DiagnosticLogger logger) noexcept {
             GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
                 reinterpret_cast<LPCWSTR>(&ProjectionHooks::Setup), &pinned);
             installed.store(true, std::memory_order_release);
-            Report("XR projection hooks attached inactive; activation and ProjectionScope required");
+            Report(trees ? "XR projection hooks attached inactive, including tree visibility; activation and ProjectionScope required"
+                         : "XR projection hooks attached inactive; activation and ProjectionScope required");
         });
     } catch(...) { Report("XR projection hook initialization failed"); }
     return installed.load(std::memory_order_acquire);
