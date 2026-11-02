@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- SteamVR's desktop theater no longer opens over the game during SteamVR sessions (#24867b69, as in GRID2VR). The launcher turns that SteamVR setting off for the session and puts your own setting back afterwards; Restore original files does it too if a session ended unexpectedly. SteamVR must already be running for this.
 - SteamVR works with Launch VR again (#da2bcde1). It was switched off after one upside-down report from a session with another VR game open; it is new and still being checked, so please report any upside-down, tilted or mirrored picture with the session logs.
 
 ## 0.1.21 — direct practice, driving controls and seat positions (Experimental)
