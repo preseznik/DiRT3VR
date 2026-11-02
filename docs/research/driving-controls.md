@@ -202,6 +202,26 @@ files; the saves were unchanged throughout.
 **Decision (iztok, 2026-11-02):** keep DiRT 3's defaults in direct launch; the launcher
 supplies what the profile would have (AI level, assists, controls).
 
+### Launcher-written action maps (step 2), runs 93–94
+
+Focus tests in a direct start (`run_benchmark.py --actionmap-test`, Space tapped at 50 s,
+Esc at 56 s and 62 s, screenshots in between):
+
+| Run | Change | Space | Esc |
+|---|---|---|---|
+| 93 `edit` | stock `wm_keyboard.xml` with Space added to Pause | nothing | pauses (the race takes input) |
+| 94 `add` | new `actionmap/dirt3vr-session.xml` (`deviceName="keyboard"`, priority 100, only Pause on Space), listed in `actionMapPaths.xml` right after the keyboard map | **pause menu** | closes the menu; then **no longer pauses** |
+
+So an added map for the same `deviceName` with a higher priority (listed after the stock
+one) is used, and it **replaces** the stock map for that device rather than merging with
+it: Esc stopped pausing once only the added map's Pause binding was left (the menu itself
+handles Esc). Editing the stock file in place was not picked up. For the launcher: write a
+complete map per device (the stock bindings, `tools/data/stock-bindings.json`, with the
+player's changes), with a priority above every stock map (the highest stock value is 18),
+listed after the stock maps in a journaled `actionMapPaths.xml`; restore both after the
+session. No renderer hook needed. Not yet checked: a DirectInput wheel's map (same rule
+expected), and a normal start with a loaded profile (whose own bindings may still win).
+
 ### Assists in direct launch
 
 A direct race reads its settings from one key/value store through `0x9dfad0` (entries of
