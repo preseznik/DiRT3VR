@@ -193,7 +193,8 @@ def diagnostic_environment(directory: Path, *, scene_observer: bool = False, rep
                            xr_runtime: Path | None = None, background_play: bool = False) -> dict:
     env = dict(os.environ, DIRT3VR_DIAGNOSTICS="1", DIRT3VR_LOG_DIR=str(directory), SteamAppId="321040")
     for flag in ("DIRT3VR_ENABLE_VR", "DIRT3VR_SCENE_DIAGNOSTICS", "DIRT3VR_REPLAY_DIAGNOSTICS",
-                 "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH", "DIRT3VR_RESEARCH_FILE_TRACE", "DIRT3VR_DIRECT_PRACTICE", "DIRT3VR_DIRECT_LAPS", "DIRT3VR_DIRECT_RETURN", "DIRT3VR_DIRECT_DIFFICULTY", "DIRT3VR_RESEARCH_LAPS", "DIRT3VR_SCREENSHOT_SECONDS", "DIRT3VR_RESEARCH_SETTINGS_TRACE"):
+                 "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH", "DIRT3VR_RESEARCH_FILE_TRACE", "DIRT3VR_DIRECT_PRACTICE", "DIRT3VR_DIRECT_LAPS", "DIRT3VR_DIRECT_RETURN", "DIRT3VR_DIRECT_DIFFICULTY", "DIRT3VR_RESEARCH_LAPS", "DIRT3VR_SCREENSHOT_SECONDS", "DIRT3VR_RESEARCH_SETTINGS_TRACE",
+                "DIRT3VR_RESEARCH_STACKS", "DIRT3VR_RESEARCH_COUNT"):
         env.pop(flag, None)
     if background_play:
         env["DIRT3VR_BACKGROUND_PLAY"] = "1"
@@ -512,7 +513,7 @@ def main() -> int:
     parser.add_argument("--car", metavar="CODE", help="The (first) car, a catalog code; default frx, or the route discipline's first car")
     parser.add_argument("--opponents", type=int, default=0, metavar="N",
                         help="Add N more cars (0-7) of the route's discipline from the catalog")
-    parser.add_argument("--load-profile", nargs="?", const="full", choices=("signin", "dataset", "begin", "full"),
+    parser.add_argument("--load-profile", nargs="?", const="full", choices=("signin", "dataset", "begin", "reset", "list", "full"),
                         help="Research: journaled system/flow.bin change that makes the benchmark start load the player's "
                              "profile (skipfe normally skips it)")
     parser.add_argument("--seat-test", type=parse_seat_offset, metavar="SIDE,UP,FORWARD",
@@ -540,6 +541,12 @@ def main() -> int:
                              "afterwards, keeping the game-written copy")
     parser.add_argument("--normal-start", action="store_true",
                         help="Research: start DiRT 3 normally (logos, Press Start, menus) instead of -benchmark; no result is expected")
+    parser.add_argument("--stacks", metavar="SECONDS",
+                        help="Research only: the research proxy logs every thread's call stack at these seconds, "
+                             "e.g. 40,50")
+    parser.add_argument("--count-calls", metavar="ADDRESSES",
+                        help="Research only: count calls to up to 8 functions (hex addresses at base 0x400000, "
+                             "comma-separated), logged at the --stacks seconds instead of stacks")
     parser.add_argument("--settings-trace", action="store_true",
                         help="Research only: the research proxy logs each profile setting the game looks up (name=value)")
     parser.add_argument("--file-trace", action="store_true",
@@ -673,6 +680,10 @@ def main() -> int:
             env["DIRT3VR_RESEARCH_FILE_TRACE"] = "1"
         if args.settings_trace:
             env["DIRT3VR_RESEARCH_SETTINGS_TRACE"] = "1"
+        if args.stacks:
+            env["DIRT3VR_RESEARCH_STACKS"] = args.stacks
+        if args.count_calls:
+            env["DIRT3VR_RESEARCH_COUNT"] = args.count_calls
         if args.direct_practice:
             env["DIRT3VR_DIRECT_PRACTICE"] = "1"
         if args.direct_laps:

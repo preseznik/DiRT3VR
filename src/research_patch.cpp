@@ -1,5 +1,6 @@
 #include "research_patch.h"
 #include <windows.h>
+#include <tlhelp32.h>
 #include <MinHook.h>
 #include <atomic>
 #include <cstdio>
@@ -122,6 +123,153 @@ void InstallSettingsTrace(void (*log)(const char*,...)) {
     log("Research settings trace installed created=%d enabled=%d",created,enabled);
     InstallCloudTrace(log);
 }
+
+// Stack sampler: at each second listed in DIRT3VR_RESEARCH_STACKS (e.g. "40,50"), briefly
+// suspends every other thread and logs its EIP and EBP-chain return addresses as module+offset.
+void Describe(uintptr_t address,char* out,size_t size) {
+    HMODULE module{};
+    wchar_t path[MAX_PATH]{};
+    if(GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                          reinterpret_cast<LPCWSTR>(address),&module) && GetModuleFileNameW(module,path,MAX_PATH)) {
+        const wchar_t* name=wcsrchr(path,L'\\');
+        std::snprintf(out,size,"%ls+0x%x",name ? name+1 : path,static_cast<unsigned>(address-reinterpret_cast<uintptr_t>(module)));
+    } else std::snprintf(out,size,"0x%x",static_cast<unsigned>(address));
+}
+bool Readable(const void* address,size_t size) {
+    MEMORY_BASIC_INFORMATION info{};
+    if(!VirtualQuery(address,&info,sizeof(info)) || info.State!=MEM_COMMIT || (info.Protect&(PAGE_GUARD|PAGE_NOACCESS))) return false;
+    return reinterpret_cast<uintptr_t>(address)+size<=reinterpret_cast<uintptr_t>(info.BaseAddress)+info.RegionSize;
+}
+void SampleThreads(void (*log)(const char*,...),unsigned second) {
+    const HANDLE snapshot=CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD,0);
+    if(snapshot==INVALID_HANDLE_VALUE) return;
+    THREADENTRY32 entry{sizeof(entry)};
+    for(BOOL more=Thread32First(snapshot,&entry); more; more=Thread32Next(snapshot,&entry)) {
+        if(entry.th32OwnerProcessID!=GetCurrentProcessId() || entry.th32ThreadID==GetCurrentThreadId()) continue;
+        const HANDLE thread=OpenThread(THREAD_SUSPEND_RESUME|THREAD_GET_CONTEXT|THREAD_QUERY_INFORMATION,FALSE,entry.th32ThreadID);
+        if(!thread) continue;
+        uintptr_t frames[18]{};
+        unsigned count{};
+        if(SuspendThread(thread)!=static_cast<DWORD>(-1)) {
+            CONTEXT context{};
+            context.ContextFlags=CONTEXT_CONTROL|CONTEXT_INTEGER;
+            if(GetThreadContext(thread,&context)) {
+                frames[count++]=context.Eip;
+                auto ebp=static_cast<uintptr_t>(context.Ebp);
+                // Only reads the suspended thread's stack; no allocation or locks while it is stopped.
+                while(count<18 && ebp>=context.Esp && ebp-context.Esp<0x100000 && Readable(reinterpret_cast<void*>(ebp),8)) {
+                    const auto* frame=reinterpret_cast<const uintptr_t*>(ebp);
+                    if(!frame[1] || frame[0]<=ebp) { if(frame[1]) frames[count++]=frame[1]; break; }
+                    frames[count++]=frame[1];
+                    ebp=frame[0];
+                }
+            }
+            ResumeThread(thread);
+        }
+        CloseHandle(thread);
+        std::string line;
+        char text[96];
+        for(unsigned i=0;i<count;++i) { Describe(frames[i],text,sizeof(text)); line+=i ? " < " : ""; line+=text; }
+        log("Research stack t=%us tid=%lu: %s",second,entry.th32ThreadID,line.c_str());
+    }
+    CloseHandle(snapshot);
+}
+// Call counter: DIRT3VR_RESEARCH_COUNT lists up to 8 function addresses (hex, as in the
+// disassembly at the preferred base 0x400000). Each gets a thunk that counts calls and jumps on
+// unchanged; the counts are logged with every stack sample.
+constexpr unsigned CountSlots=8;
+volatile long callCounts[CountSlots]{};
+void* countTrampolines[CountSlots]{};
+unsigned countAddresses[CountSlots]{};
+unsigned countInstalled{};
+constexpr unsigned CapturedCalls=2,CapturedFrames=14;
+void* capturedStacks[CountSlots][CapturedCalls][CapturedFrames]{};
+// Keeps the call stacks of each function's first calls (logged with the counts).
+// Frame 0 is the target's return address; the rest come from the caller's EBP chain.
+void __cdecl CaptureCall(unsigned slot,void* returnAddress) {
+    const auto call=static_cast<unsigned>(callCounts[slot]);
+    if(slot>=CountSlots || call>=CapturedCalls) return;
+    capturedStacks[slot][call][0]=returnAddress;
+    RtlCaptureStackBackTrace(2,CapturedFrames-1,capturedStacks[slot][call]+1,nullptr);
+}
+// Registers and flags are saved around the capture, so the target sees its original entry state.
+// After pushad (32 bytes) and pushfd (4) the target's return address is at [esp+36].
+#define DIRT3VR_COUNT_THUNK(n) __declspec(naked) void CountThunk##n() { \
+    __asm { pushad } __asm { pushfd } __asm { push dword ptr [esp+36] } __asm { push n } \
+    __asm { call CaptureCall } __asm { add esp,8 } __asm { popfd } __asm { popad } \
+    __asm { lock inc dword ptr [callCounts+n*4] } __asm { jmp dword ptr [countTrampolines+n*4] } }
+DIRT3VR_COUNT_THUNK(0) DIRT3VR_COUNT_THUNK(1) DIRT3VR_COUNT_THUNK(2) DIRT3VR_COUNT_THUNK(3)
+DIRT3VR_COUNT_THUNK(4) DIRT3VR_COUNT_THUNK(5) DIRT3VR_COUNT_THUNK(6) DIRT3VR_COUNT_THUNK(7)
+#undef DIRT3VR_COUNT_THUNK
+void (*const countThunks[CountSlots])(){&CountThunk0,&CountThunk1,&CountThunk2,&CountThunk3,
+                                         &CountThunk4,&CountThunk5,&CountThunk6,&CountThunk7};
+void InstallCallCounter(void (*log)(const char*,...)) {
+    char text[160]{};
+    const auto length=GetEnvironmentVariableA("DIRT3VR_RESEARCH_COUNT",text,sizeof(text));
+    if(!length || length>=sizeof(text)) return;
+    const auto initialized=MH_Initialize();
+    if(initialized!=MH_OK && initialized!=MH_ERROR_ALREADY_INITIALIZED) { log("Research call counter unavailable: MinHook=%d",initialized); return; }
+    auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+    for(const char* cursor=text; *cursor && countInstalled<CountSlots;) {
+        char* end{};
+        const auto address=std::strtoul(cursor,&end,16);
+        if(end==cursor || address<0x401000 || address>=0xe00000) { log("Research call counter refused: bad address list"); break; }
+        void* target=image+(address-0x400000);
+        const auto slot=countInstalled;
+        const auto created=MH_CreateHook(target,reinterpret_cast<void*>(countThunks[slot]),&countTrampolines[slot]);
+        const auto enabled=created==MH_OK ? MH_EnableHook(target) : created;
+        log("Research call counter 0x%lx created=%d enabled=%d",address,created,enabled);
+        if(enabled==MH_OK) countAddresses[countInstalled++]=address;
+        cursor=*end==',' ? end+1 : end;
+    }
+}
+void LogCallCounts(void (*log)(const char*,...),unsigned second) {
+    if(!countInstalled) return;
+    std::string line;
+    char text[40];
+    for(unsigned i=0;i<countInstalled;++i) {
+        std::snprintf(text,sizeof(text),"%s0x%x=%ld",i ? " " : "",countAddresses[i],callCounts[i]);
+        line+=text;
+    }
+    log("Research calls t=%us: %s",second,line.c_str());
+    static bool stacksLogged[CountSlots][CapturedCalls]{};
+    for(unsigned i=0;i<countInstalled;++i)
+        for(unsigned call=0;call<CapturedCalls;++call) {
+            if(stacksLogged[i][call] || !capturedStacks[i][call][0]) continue;
+            stacksLogged[i][call]=true;
+            std::string stack;
+            char frame[96];
+            for(unsigned f=0;f<CapturedFrames && capturedStacks[i][call][f];++f) {
+                Describe(reinterpret_cast<uintptr_t>(capturedStacks[i][call][f]),frame,sizeof(frame));
+                stack+=f ? " < " : "";
+                stack+=frame;
+            }
+            log("Research call 0x%x #%u from %s",countAddresses[i],call+1,stack.c_str());
+        }
+}
+void InstallStackSampler(void (*log)(const char*,...)) {
+    static char seconds[128]{};
+    const auto length=GetEnvironmentVariableA("DIRT3VR_RESEARCH_STACKS",seconds,sizeof(seconds));
+    if(!length || length>=sizeof(seconds)) return;
+    static void (*sampleLog)(const char*,...)=log;
+    const HANDLE thread=CreateThread(nullptr,0,[](void*)->DWORD {
+        const auto start=GetTickCount64();
+        for(const char* cursor=seconds; *cursor;) {
+            char* end{};
+            const auto second=std::strtoul(cursor,&end,10);
+            if(end==cursor || second>600) break;
+            const auto due=start+second*1000ull;
+            while(GetTickCount64()<due) Sleep(50);
+            // With a call counter the counts are the point; stacks only without one.
+            if(countInstalled) LogCallCounts(sampleLog,static_cast<unsigned>(second));
+            else SampleThreads(sampleLog,static_cast<unsigned>(second));
+            cursor=*end==',' ? end+1 : end;
+        }
+        return 0;
+    },nullptr,0,nullptr);
+    if(thread) CloseHandle(thread);
+    log("Research stack sampler at %s s",seconds);
+}
 }
 void Tick(void (*log)(const char*,...)) {
     static const unsigned laps=[] {
@@ -147,6 +295,8 @@ void Apply(void (*log)(const char*,...)) {
     std::call_once(once,[log] {
         InstallFileTrace(log);
         InstallSettingsTrace(log);
+        InstallCallCounter(log);
+        InstallStackSampler(log);
         char text[513]{};
         const auto length=GetEnvironmentVariableA("DIRT3VR_RESEARCH_PATCH",text,sizeof(text));
         if(!length) return;

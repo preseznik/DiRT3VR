@@ -189,6 +189,24 @@ def profile_load_redirect(data: bytes) -> bytes:
     elif PROFILE_LOAD_STEPS == "begin":
         added[1].children[-1].children[-1].children = [
             node("d3e", "begin_load_profile", [link("next", "32u")])]
+    elif PROFILE_LOAD_STEPS == "reset":
+        # As the normal start: profile_reset -> profile_reset_p2 between sign-in and the load.
+        added[0].children = [link(i, "d3r") for i in ("autoload", "signin", "createprofile")]
+        added[1:1] = [node("d3r", "profile_reset", [link("next", "d3q")]),
+                      node("d3q", "profile_reset_p2", [link("next", "d3c")])]
+    elif PROFILE_LOAD_STEPS == "list":
+        # After reading the profile index the load asks for a save to be chosen (list_select);
+        # the normal start answers with 31l delay_system_events > 31i save_info_list, which
+        # continues back to the wait. Leaving the cleanup wrapper instead never finishes.
+        cleanup = added[1].children[-1].children[-1]
+        wait = cleanup.children[1]
+        wait.children = [link("next", "d3g"), link("list_select", "d3l")] + \
+            [link(i, "32u") for i in ("cancelled", "create_new", "corrupt")]
+        cleanup.children.append(node("d3x", "delay_system_events", [
+            node("d3l", "save_info_list", [link("next", "d3f"),
+                                           Node("link", None, [("id", "refresh"), ("target", "d3j"), ("type", "overlay")], [])]),
+            node("d3j", "generic_waypoint", [link("next", "d3l")]),
+        ]))
     elif PROFILE_LOAD_STEPS != "full":
         raise ValueError("Unknown profile load steps")
     links[0].attributes = [("id", "next"), ("target", "d3s")]
