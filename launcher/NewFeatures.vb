@@ -18,6 +18,8 @@ Public NotInheritable Class NewFeatures
         {"GraphicsDefaults", NextVersion}, {"LiveInput", NextVersion}, {"RecenterKey", NextVersion}, {"RecenterDevice", NextVersion},
         {"RecenterKeepLevel", NextVersion}, {"VrCompatibility", NextVersion}, {"SectionSeat", NextVersion}, {"SectionDrivingcontrols", NextVersion}}
     Private Shared ReadOnly marked As New ConditionalWeakTable(Of Control, Object)
+    ' Whether the running build is an experimental one (BuildInfo.Experimental); tests may set it.
+    Public Shared Property ExperimentalBuild As Boolean = BuildInfo.Experimental
 
     Private Sub New()
     End Sub
@@ -42,7 +44,7 @@ Public NotInheritable Class NewFeatures
 
     ' Marks the listed controls under root for this build; returns the names marked.
     Public Shared Function Apply(root As Control, Optional buildVersion As String = Nothing, Optional experimental As Boolean? = Nothing) As IReadOnlyList(Of String)
-        Dim names = NamesFor(If(buildVersion, BuildInfo.Version), experimental.GetValueOrDefault(BuildInfo.Experimental)).ToHashSet(StringComparer.Ordinal)
+        Dim names = NamesFor(If(buildVersion, BuildInfo.Version), experimental.GetValueOrDefault(ExperimentalBuild)).ToHashSet(StringComparer.Ordinal)
         Dim done As New List(Of String)
         For Each item In Descendants(root).ToArray()
             If names.Contains(item.Name) Then MarkControl(item) : done.Add(item.Name)
