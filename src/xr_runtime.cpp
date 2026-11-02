@@ -80,6 +80,13 @@ bool XrRuntime::InitializeResources(ID3D11Device* device,float scale,uint32_t ex
     create.applicationInfo.apiVersion=XR_MAKE_VERSION(1,0,0);
     create.enabledExtensionCount=refreshRate ? 2 : 1; create.enabledExtensionNames=extensions;
     if(!Check(xrCreateInstance(&create,&instance_),"create instance")) return false;
+    // Diagnostics only: names the runtime (VDXR, SteamVR...) in the session log.
+    XrInstanceProperties properties{XR_TYPE_INSTANCE_PROPERTIES};
+    if(XR_SUCCEEDED(xrGetInstanceProperties(instance_,&properties))) {
+        properties.runtimeName[XR_MAX_RUNTIME_NAME_SIZE-1]='\0';
+        Report("XR runtime=%s %u.%u.%u",properties.runtimeName,unsigned(XR_VERSION_MAJOR(properties.runtimeVersion)),
+               unsigned(XR_VERSION_MINOR(properties.runtimeVersion)),unsigned(XR_VERSION_PATCH(properties.runtimeVersion)));
+    }
     XrSystemGetInfo get{XR_TYPE_SYSTEM_GET_INFO}; get.formFactor=XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
     if(!Check(xrGetSystem(instance_,&get,&system_),"get system")) return false;
     PFN_xrGetD3D11GraphicsRequirementsKHR requirementsFn{};

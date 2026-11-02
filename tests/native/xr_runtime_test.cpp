@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <deque>
 #include <limits>
 #include <stdexcept>
@@ -64,6 +65,9 @@ extern "C" {
 // No optional extensions: the session must work without XR_FB_display_refresh_rate.
 XRAPI_ATTR XrResult XRAPI_CALL xrEnumerateInstanceExtensionProperties(const char*,uint32_t,uint32_t* count,XrExtensionProperties*) { *count=0; return XR_SUCCESS; }
 XRAPI_ATTR XrResult XRAPI_CALL xrCreateInstance(const XrInstanceCreateInfo*,XrInstance* instance) { *instance=XrInstance(1); return XR_SUCCESS; }
+XRAPI_ATTR XrResult XRAPI_CALL xrGetInstanceProperties(XrInstance,XrInstanceProperties* properties) {
+    strcpy_s(properties->runtimeName,"SyntheticXR"); properties->runtimeVersion=XR_MAKE_VERSION(2,18,4); return XR_SUCCESS;
+}
 XRAPI_ATTR XrResult XRAPI_CALL xrDestroyInstance(XrInstance) { ++destroyedInstances; return XR_SUCCESS; }
 XRAPI_ATTR XrResult XRAPI_CALL xrGetSystem(XrInstance,const XrSystemGetInfo*,XrSystemId* system) { *system=1; return XR_SUCCESS; }
 XRAPI_ATTR XrResult XRAPI_CALL GetRequirements(XrInstance,XrSystemId,XrGraphicsRequirementsD3D11KHR* requirements) {
@@ -280,6 +284,7 @@ int main() {
                         message.find("reference_q=(")!=std::string::npos,"Orientation diagnostic truncated or incomplete");
             }
             Require(samples==8 && inverted && firstScreen,"Orientation diagnostic lost inversion, first mode or output bound");
+            Require(std::count(diagnosticMessages.begin(),diagnosticMessages.end(),"XR runtime=SyntheticXR 2.18.4")==1,"Session log does not name the runtime");
         }
         Reset(); {
             XrRuntime runtime; Require(runtime.Initialize(device.Get()),"Init failed");
