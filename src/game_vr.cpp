@@ -12,6 +12,8 @@
 #include "intro_state.h"
 #include "frontend_shadow_state.h"
 #include "recenter_shortcut.h"
+#include "seat_menu.h"
+#include "seat_panel.h"
 #include <windows.h>
 #include <MinHook.h>
 #include <array>
@@ -29,6 +31,11 @@ constexpr uintptr_t VelocityTableRva=0xaca3a8, HistorySelectRva=0x332d90, Histor
 using HistorySelectFn=void (__thiscall*)(void*,unsigned);
 using HistoryInvalidateFn=void (__thiscall*)(void*);
 constexpr std::array<size_t,4> PoseOffsets{0x10,0x20,0x30,0x40};
+// The seat menu's keys and buttons must not reach the game while it's open. Until
+// the input filters exist (#88b7f778) the menu stays closed (status 2) and only the
+// saved seat positions apply.
+constexpr bool SeatInputFiltering=false;
+static_assert(SeatPanelImage::Width==XrRuntime::SeatPanelWidth && SeatPanelImage::Height==XrRuntime::SeatPanelHeight);
 
 void RuntimeLog(const char*) noexcept;
 struct PrototypeState {
@@ -61,6 +68,13 @@ struct PrototypeState {
     HWND window{};
     WNDPROC previousWindowProc{};
     bool attempted{}, stopped{}, stopPathChecked{}, waitingReported{};
+    // In-game seat menu (#35826889), when the launcher passes DIRT3VR_SEAT_CHANNEL.
+    std::optional<seat::Menu> seat;
+    SeatPanelImage seatImage;
+    TexturePresenter seatPresenter{RuntimeLog};
+    XrPosef seatPanelPose{{0,0,0,1},{0,0,-1}};
+    unsigned seatOpenings{};
+    bool seatActive{};
 };
 // Explicit render-thread teardown is necessary. A static XR destructor would
 // otherwise run under the DLL loader lock during process exit.
@@ -204,6 +218,8 @@ void Stop(PrototypeState& state,const char* reason) noexcept {
         }
     } catch(...) { }
     state.pendingFrame.reset(); EndPresentationFrame(); ResetFrontendShadowResources();
+    if(state.seat) state.seat->Inactive();
+    state.seatActive=false; state.seatPresenter.Reset();
     state.hud.Reset(); state.hudPresenter.Reset(); state.presenter.Reset(); state.xr.Shutdown(); state.device.Reset();
     RuntimeLog("XR prototype shutdown complete");
 }
@@ -279,6 +295,55 @@ bool SceneMatches(const HeadsetResolutionRequest& request,ID3D11Texture2D* back)
     D3D11_TEXTURE2D_DESC desc{}; back->GetDesc(&desc);
     return desc.Width==request.sceneWidth && desc.Height==request.sceneHeight;
 }
+// The launcher's seat channel (docs/seat-channel.md). A missing or invalid channel leaves the menu off.
+void OpenSeatChannel(PrototypeState& state,ID3D11Device* device) {
+    wchar_t name[96]{};
+    const DWORD length=GetEnvironmentVariableW(L"DIRT3VR_SEAT_CHANNEL",name,96);
+    if(!length) return;
+    if(length>=96 || wcsncmp(name,L"Local\\DiRT3VR.Seat.",19)) { RuntimeLog("Seat menu off: channel name rejected"); return; }
+    const HANDLE mapping=OpenFileMappingW(FILE_MAP_ALL_ACCESS,FALSE,name);
+    auto* view=mapping ? static_cast<unsigned char*>(MapViewOfFile(mapping,FILE_MAP_ALL_ACCESS,0,0,seat::Channel::Bytes)) : nullptr;
+    if(mapping) CloseHandle(mapping);
+    if(!view || !seat::Channel::Acceptable(view) || !state.seatPresenter.Initialize(device)) {
+        if(view) UnmapViewOfFile(view);
+        RuntimeLog("Seat menu off: channel unavailable or invalid"); return;
+    }
+    // The mapping stays for the process: the launcher reads commits until it exits.
+    state.seat.emplace(seat::Channel(view),SeatInputFiltering,[](unsigned key) { return (GetAsyncKeyState(int(key))&0x8000)!=0; });
+    if(state.log) state.log("Seat menu channel open cars=%u every_car=%u input_filtering=%u",
+        state.seat->View().Cars(),unsigned(state.seat->View().Universal()),unsigned(SeatInputFiltering));
+}
+// 1 m ahead of the head, upright and facing it, where the menu opened (DiRT2VR's panel placement).
+XrPosef SeatPanelPose(const std::array<XrView,2>& views) {
+    const auto head=math::RecenterPose(math::CenterPose(views),{{0,0,0,1},{0,0,0}});
+    return math::OffsetPose(head,{0,-.1f,-1.f});
+}
+// One stereo frame's seat menu step: cockpit frames run the menu, others close it once.
+seat::Position UpdateSeat(PrototypeState& state,const XrRuntime::Frame& frame,bool cockpit) {
+    if(!state.seat) return {};
+    if(!cockpit) {
+        if(state.seatActive) { state.seat->Inactive(); state.seatActive=false; }
+        return {};
+    }
+    DWORD process{};
+    GetWindowThreadProcessId(GetForegroundWindow(),&process);
+    state.seat->Update(GetTickCount64(),GetTickCount(),process==GetCurrentProcessId());
+    state.seatActive=true;
+    if(state.seat->Openings()!=state.seatOpenings) {
+        state.seatOpenings=state.seat->Openings();
+        state.seatPanelPose=SeatPanelPose(frame.Views());
+    }
+    return state.seat->Offset();
+}
+// The open seat menu's panel, on top of the HUD. Only an image that was drawn is acquired.
+void DrawSeatPanel(PrototypeState& state,XrRuntime::Frame& frame) {
+    if(!state.seat || !state.seat->PanelOpen()) return;
+    auto* panel=state.seatImage.Render(state.device.Get(),*state.seat);
+    if(!panel) return;
+    auto image=frame.AcquireSeatPanel();
+    if(image && state.seatPresenter.Draw(panel,image.Target(),image.Width(),image.Height(),TexturePresenter::Mode::StraightAlpha) && image.Complete())
+        frame.ShowSeatPanel(state.seatPanelPose,.6f,.8f);
+}
 bool Prepare(PrototypeState& state,ID3D11Texture2D* back) {
     if(InteractiveVrEnabled()) BindPresentationBackbuffer(back);
     ComPtr<ID3D11Device> device; back->GetDevice(&device);
@@ -296,9 +361,10 @@ bool Prepare(PrototypeState& state,ID3D11Texture2D* back) {
             Stop(state,"scene-resolution-mismatch"); return false;
         }
     }
+    if(InteractiveVrEnabled()) OpenSeatChannel(state,device.Get());
     if(!state.presenter.Initialize(device.Get()) ||
        (state.resolution.width && !state.hudPresenter.Initialize(device.Get())) ||
-       !state.xr.Initialize(device.Get(),state.resolution.width ? 1.f : .5f,state.resolution.width,state.resolution.height,state.resolution.width!=0)) {
+       !state.xr.Initialize(device.Get(),state.resolution.width ? 1.f : .5f,state.resolution.width,state.resolution.height,state.resolution.width!=0,state.seat.has_value())) {
         Stop(state,"initialization"); return false;
     }
     state.device=device;
@@ -402,6 +468,7 @@ void VrBeforePresent(IDXGISwapChain* chain) noexcept {
             const bool introScreen=IntroScreenActive(video);
             const auto transitions=TransitionDrawsSuppressed();
             auto& frame=*state->pendingFrame;
+            if(!introScreen) DrawSeatPanel(*state,frame);
             auto* image=state->hud.Current(state->pendingScene);
             bool successful{};
             if(introScreen || image) {
@@ -434,6 +501,7 @@ void VrBeforePresent(IDXGISwapChain* chain) noexcept {
             return;
         }
         if(!InteractiveVrEnabled() || !state->boundary.Claim()) return;
+        if(state->seat && state->seatActive) { state->seat->Inactive(); state->seatActive=false; } // A virtual-screen frame: no cockpit.
         ComPtr<ID3D11Texture2D> back; std::filesystem::path directory;
         if(!AcquireDiagnosticBackbuffer(&back,directory) || !Prepare(*state,back.Get())) return;
         D3D11_TEXTURE2D_DESC desc{}; back->GetDesc(&desc);
@@ -457,6 +525,7 @@ bool RenderVrScene(void* renderer,void* lists,void* a,void* b,void* context,void
         if(!state) state=State();
         if(!state || GetCurrentThreadId()!=state->ownerThread || state->stopped || state->rendering || StopRequested(*state)) return false;
         RenderingScope rendering(*state);
+        bool cockpit{};
         if(InteractiveVrEnabled()) {
             const auto camera=ClassifyMainCamera(renderer,a,b);
             if(!state->cameraReported || camera.kind!=state->previousCamera || camera.owner!=state->previousCameraOwner ||
@@ -469,6 +538,7 @@ bool RenderVrScene(void* renderer,void* lists,void* a,void* b,void* context,void
                 state->history.Reset(); // Neither eye may reuse the previous camera.
             }
             if(!camera.stereoEligible) return false;
+            cockpit=camera.kind==CameraKind::Cockpit;
         }
         if(!NativeStereoDisabled(renderer)) { Stop(*state,"native-driver-stereo-contract"); return false; }
         const auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
@@ -518,6 +588,8 @@ bool RenderVrScene(void* renderer,void* lists,void* a,void* b,void* context,void
                 else if(!state->waitingReported) { RuntimeLog("XR prototype awaiting renderable frame; original engine pass retained"); state->waitingReported=true; }
                 return false;
             }
+            // The seat menu's live offset moves the eyes in the car; the camera files hold the launch seat.
+            const auto seatOffset=UpdateSeat(*state,frame,cockpit);
             prime=state->history.NeedsPrime(plugin,state->boundary.Sequence(),state->xr.ReferenceRevision());
             const auto select=reinterpret_cast<HistorySelectFn>(base+HistorySelectRva);
             const auto invalidate=reinterpret_cast<HistoryInvalidateFn>(base+HistoryInvalidateRva);
@@ -531,7 +603,9 @@ bool RenderVrScene(void* renderer,void* lists,void* a,void* b,void* context,void
                 ScopedEyeCameras cameras(a,b,originalA,originalB,index==1);
                 ScopedRendererNear nearPlane(renderer);
                 if(!nearPlane.Valid()) { ready=false; break; }
-                if(!cameras.Apply(frame.RelativeEyePose(index))) { restored&=cameras.Restore(); ready=false; break; }
+                auto eyePose=frame.RelativeEyePose(index);
+                eyePose.position.x+=seatOffset.x; eyePose.position.y+=seatOffset.y; eyePose.position.z+=seatOffset.z;
+                if(!cameras.Apply(eyePose)) { restored&=cameras.Restore(); ready=false; break; }
                 ProjectionScope projection(renderer,context,a,b,frame.Views()[index].fov);
                 if(!projection.Valid()) { restored&=cameras.Restore(); ready=false; break; }
                 select(plugin,index);
