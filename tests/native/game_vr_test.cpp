@@ -118,6 +118,16 @@ int main() {
         } catch(int) { }
         float restoredNear{}; std::memcpy(&restoredNear,renderer.data()+0x40,sizeof(float));
         Require(restoredNear==nativeNear && renderer[0x60]==42,"Foreground near plane or unrelated state not restored correctly");
+        {   // The seat menu panel opens 1 m ahead of the head, 10 cm lower, upright even when the head is tilted.
+            const float s=std::sin(.25f),c=std::cos(.25f); // 30° yaw left plus a 20° roll.
+            const XrQuaternionf yaw{0,s,0,c},roll{0,0,std::sin(.1745f),std::cos(.1745f)};
+            const auto head=dirt3vr::math::Multiply(yaw,roll);
+            std::array<XrView,2> views{{{XR_TYPE_VIEW},{XR_TYPE_VIEW}}};
+            views[0].pose={head,{-.032f,1.4f,0}}; views[1].pose={head,{.032f,1.4f,0}};
+            const auto panel=dirt3vr::SeatPanelPose(views);
+            Near(panel.position.x,-std::sin(.5f)); Near(panel.position.y,1.3f); Near(panel.position.z,-std::cos(.5f));
+            Near(panel.orientation.x,0); Near(panel.orientation.z,0); Near(std::abs(panel.orientation.y),s); Near(std::abs(panel.orientation.w),c);
+        }
         CheckShutdown();
         puts("Game VR camera transaction: identity, translation, yaw, selective restore, partial-write rollback and invalid pose passed"); return 0;
     } catch(const std::exception& e) { puts(e.what()); return 1; }
