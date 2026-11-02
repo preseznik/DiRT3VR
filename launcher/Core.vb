@@ -185,6 +185,8 @@ Public Class LauncherSettings
     Public Property SeatOffsets As New Dictionary(Of String, SeatOffset)
     Public Property SeatSameForAll As Boolean
     Public Property SeatAllCars As New SeatOffset
+    ' VR: start races in the cockpit view (each car's views before head-cam hidden for the session).
+    Public Property StartInCockpit As Boolean
     ' Optional controller/wheel button; machine-specific, so never part of settings profiles.
     Public Property RecenterDevice As RecenterDeviceBinding
 
@@ -209,12 +211,13 @@ Public Class LauncherSettings
         If Not DirectPractice.OpponentCarChoices.Contains(DirectOpponentCars) Then Throw New IOException("Choose which cars the opponents drive.")
         If DirectDifficulty < -1 OrElse DirectDifficulty > DirectPractice.MaxDifficulty Then Throw New IOException("Choose the AI difficulty for direct practice.")
         If Not DirectPractice.AfterFinishChoices.Contains(DirectAfterFinish) Then Throw New IOException("Choose what happens after the finish.")
-        SeatAllCars = If(SeatAllCars, New SeatOffset) : SeatAllCars.Validate()
+        SeatAllCars = If(SeatAllCars, New SeatOffset) : SeatAllCars.Validate() : SeatAllCars.Cockpit = False
         Dim seats As New Dictionary(Of String, SeatOffset)(StringComparer.Ordinal)
         For Each pair In If(SeatOffsets, New Dictionary(Of String, SeatOffset)).OrderBy(Function(item) item.Key, StringComparer.Ordinal)
             If EventCatalog.Current.FindCar(pair.Key) Is Nothing Then Throw New IOException("Seat positions name an unknown car.")
             If pair.Value Is Nothing OrElse pair.Value.IsZero Then Continue For
             pair.Value.Validate()
+            pair.Value.Cockpit = False
             seats.Add(pair.Key, pair.Value)
         Next
         SeatOffsets = seats

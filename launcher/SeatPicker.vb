@@ -11,6 +11,9 @@ Public NotInheritable Class SeatPicker
     Private ReadOnly forward As New ValueSlider("SeatForward", -SeatOffset.Limit, SeatOffset.Limit, 0, valueLabels:=Labels("forward", "back"))
     Private ReadOnly reset As New Button With {.Name = "SeatReset", .Text = "Reset this car", .AutoSize = True}
     Private ReadOnly summary As New Label With {.Name = "SeatSummary", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 6, 0, 10)}
+    Private ReadOnly cockpitStart As New CheckBox With {.Name = "SeatStartInCockpit", .Text = "Start races in the cockpit view", .AutoSize = True}
+    Private ReadOnly cockpitNote As New Label With {.Name = "SeatStartInCockpitNote", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12),
+        .Text = "DiRT 3 starts a race with the first view in each car's camera list. This hides the views listed before the cockpit view for the session, so they can't be chosen while it's on; the other views still work. Launch VR only."}
     Private ReadOnly perCar As New Dictionary(Of String, SeatOffset)(StringComparer.Ordinal)
     Private everyCarOffset As New SeatOffset
     Private updating As Boolean
@@ -40,6 +43,9 @@ Public NotInheritable Class SeatPicker
         Field(parent, "Forward", forward)
         parent.Controls.Add(reset)
         parent.Controls.Add(summary)
+        parent.Controls.Add(cockpitStart)
+        parent.Controls.Add(cockpitNote)
+        AddHandler cockpitStart.CheckedChanged, Sub() If Not updating Then RaiseEvent Changed()
         AddHandler car.SelectedIndexChanged, Sub() ShowCurrent()
         AddHandler everyCar.CheckedChanged, Sub()
                                                  If updating Then Return
@@ -57,7 +63,7 @@ Public NotInheritable Class SeatPicker
                                     End Try
                                     Store()
                                 End Sub
-        Apply(Nothing, False, Nothing, "")
+        Apply(Nothing, False, Nothing, "", False)
     End Sub
 
     ' "12 cm left" … "0 cm" … "12 cm right" for -50..50.
@@ -90,6 +96,12 @@ Public NotInheritable Class SeatPicker
         End Get
     End Property
 
+    Public ReadOnly Property StartInCockpit As Boolean
+        Get
+            Return cockpitStart.Checked
+        End Get
+    End Property
+
     Public ReadOnly Property SummaryText As String
         Get
             Return summary.Text
@@ -97,9 +109,10 @@ Public NotInheritable Class SeatPicker
     End Property
 
     ' Shows saved positions; the list opens on preferredCar (for example the direct practice car).
-    Public Sub Apply(offsets As IDictionary(Of String, SeatOffset), sameForAll As Boolean, allCarsOffset As SeatOffset, preferredCar As String)
+    Public Sub Apply(offsets As IDictionary(Of String, SeatOffset), sameForAll As Boolean, allCarsOffset As SeatOffset, preferredCar As String, cockpit As Boolean)
         updating = True
         Try
+            cockpitStart.Checked = cockpit
             perCar.Clear()
             For Each pair In If(offsets, New Dictionary(Of String, SeatOffset))
                 If pair.Value IsNot Nothing AndAlso Not pair.Value.IsZero Then perCar(pair.Key) = pair.Value.Copy()
