@@ -144,6 +144,8 @@ public:
     Menu& operator=(const Menu&)=delete;
     // The identified car's table index, or -1 when it isn't known.
     void Select(int index) { Lock lock(mutex_); selected_=index>=0 && unsigned(index)<channel_.Cars() ? index : -1; }
+    // Once the input filters are installed: the menu opens only when its inputs can be kept from the game.
+    void SetInputReady(bool ready) { Lock lock(mutex_); inputReady_=ready; }
     // One rendered frame. now: milliseconds; tick: GetTickCount() for the launcher's heartbeat.
     void Update(uint64_t now,uint32_t tick,bool foreground) {
         Lock lock(mutex_);
@@ -242,7 +244,7 @@ public:
     bool PanelOpen() const { Lock lock(mutex_); return panel_; }
     bool SidewaysHeld() const { Lock lock(mutex_); return sideways_; }
     bool CanAdjust() const { Lock lock(mutex_); return CanAdjustLocked(); }
-    bool InputReady() const { return inputReady_; }
+    bool InputReady() const { Lock lock(mutex_); return inputReady_; }
     unsigned Openings() const { Lock lock(mutex_); return openings_; }
     int Active() const { Lock lock(mutex_); return active_; }
     Position Current() const { Lock lock(mutex_); return current_; }

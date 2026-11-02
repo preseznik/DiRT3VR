@@ -61,6 +61,8 @@ int main() {
             clock.Frame(menu); down={F11}; clock.Frame(menu); down={VK_NUMPAD8}; clock.Frame(menu); clock.Frame(menu);
             Require(!menu.PanelOpen() && c.Read<uint32_t>(84)==InputUnavailable && Generation(c)==0,"Menu worked without input filtering");
             Require(Near(menu.Offset(),{0,.01f,0}),"Saved position not applied live");
+            menu.SetInputReady(true); down.clear(); clock.Frame(menu); down={F11}; clock.Frame(menu);
+            Require(menu.PanelOpen() && c.Read<uint32_t>(84)==Ready,"Menu did not open once its input filters were installed");
         }
         { // Car not identified: status 1, no offset, no movement.
             down.clear(); auto bytes=Launcher(); Channel c(bytes.data()); Clock clock;
