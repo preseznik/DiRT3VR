@@ -14,6 +14,7 @@
 #include "recenter_shortcut.h"
 #include "seat_menu.h"
 #include "seat_panel.h"
+#include "seat_input.h"
 #include <windows.h>
 #include <MinHook.h>
 #include <array>
@@ -31,10 +32,6 @@ constexpr uintptr_t VelocityTableRva=0xaca3a8, HistorySelectRva=0x332d90, Histor
 using HistorySelectFn=void (__thiscall*)(void*,unsigned);
 using HistoryInvalidateFn=void (__thiscall*)(void*);
 constexpr std::array<size_t,4> PoseOffsets{0x10,0x20,0x30,0x40};
-// The seat menu's keys and buttons must not reach the game while it's open. Until
-// the input filters exist (#88b7f778) the menu stays closed (status 2) and only the
-// saved seat positions apply.
-constexpr bool SeatInputFiltering=false;
 static_assert(SeatPanelImage::Width==XrRuntime::SeatPanelWidth && SeatPanelImage::Height==XrRuntime::SeatPanelHeight);
 
 void RuntimeLog(const char*) noexcept;
@@ -308,10 +305,19 @@ void OpenSeatChannel(PrototypeState& state,ID3D11Device* device) {
         if(view) UnmapViewOfFile(view);
         RuntimeLog("Seat menu off: channel unavailable or invalid"); return;
     }
-    // The mapping stays for the process: the launcher reads commits until it exits.
-    state.seat.emplace(seat::Channel(view),SeatInputFiltering,[](unsigned key) { return (GetAsyncKeyState(int(key))&0x8000)!=0; });
+    // The mapping and the menu stay for the process: the launcher reads commits until it exits.
+    auto& menu=state.seat.emplace(seat::Channel(view),false,[](unsigned key) { return (GetAsyncKeyState(int(key))&0x8000)!=0; });
+    // The menu's keys and buttons must not reach the game (src/seat_input.*). Without every
+    // filter it stays closed (status 2) and only the saved seat positions apply.
+    seatinput::Policy policy;
+    policy.blocksKey=[&menu](unsigned key) { return menu.BlocksKey(key); };
+    policy.filterXbox=[&menu](unsigned slot,WORD& buttons) { menu.FilterXbox(slot,buttons); };
+    policy.blocksButton=[&menu](const GUID& device,unsigned button,bool pressed) { return menu.BlocksButton(device,button,pressed); };
+    policy.blocksHat=[&menu](const GUID& device,unsigned hat,bool centred) { return menu.BlocksHat(device,hat,centred); };
+    const bool filtering=state.log && seatinput::Install(std::move(policy),state.log);
+    menu.SetInputReady(filtering);
     if(state.log) state.log("Seat menu channel open cars=%u every_car=%u input_filtering=%u",
-        state.seat->View().Cars(),unsigned(state.seat->View().Universal()),unsigned(SeatInputFiltering));
+        menu.View().Cars(),unsigned(menu.View().Universal()),unsigned(filtering));
 }
 // 1 m ahead of the head, upright and facing it, where the menu opened (DiRT2VR's panel placement).
 XrPosef SeatPanelPose(const std::array<XrView,2>& views) {
