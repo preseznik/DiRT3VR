@@ -242,6 +242,42 @@ after `32t`/`32u` and returning to `2Q`. In the binary flow file that means inse
 elements and renumbering the element table's child ranges, a bigger edit than changing a
 value.
 
+### A wheel in a direct start is never bound (#16fa2aa3, static)
+
+iztok's G920 did nothing in a direct start although the launcher wrote its session map
+(`session.json`: `Logitech G HUB G920 Driving Force Racing Wheel USB`, built on
+`dinput_default.xml`; DiRT 3 ships no G920 preset). A map only says what a device's inputs
+do; the device must also be bound to the player, which the **Press Start** screen does and
+a direct start skips. GRID 2 (same engine family) behaves the same, and GRID2VR fixed it on
+the same G920 with a native "device claim" (its `src/driving_controls.cpp`, bind target
+`Input2 5c1db0` from `ScreenPressStart 7dcec4`) plus a session preset for wheels without
+one.
+
+DiRT 3's counterparts (static only, fingerprint `c502b495…`):
+
+- `ScreenPressStart` (factory `0x4e6c20`, constructor `0x4cced0`, vtable `0xe93ca0`).
+  Its update, vtable slot 13 `0x4f95b0`, asks `0x4e70e0` which device pressed Start (a
+  16-byte device descriptor built by `0xcbb720`). On a press it takes the user index from
+  `0x486150` (always 0 on PC), stores it at the input service `+0x1b4` and in the
+  data store as `press_start_user_index`, and calls `0xb31c70(index, &descriptor)`.
+- `0xb31c70`, a method of that input service: looks up the user's map for the device
+  (`0xccec70` on `+0x78`), creates and binds one when there is none (`0xcc6280`,
+  `0xcc63f0`), then compares the index with `+0x1b0`. This is the bind to call.
+- `StateSkipFePressStartDecision` (factory `0x54b680`, vtable `0xea412c`) is the flow
+  node a skip-frontend start uses instead of the screen; `press_start_user_index` is read
+  back at `0x559f8c` and passed to `0x5a8f80`.
+
+- The input service itself: constructor `0xb3b990`, vtables `0xf29380` (7 slots),
+  `0xf29360` and `0xf29354` (at `+0x4` and `+0x6c`), user index `+0x1b4` (initially -1), map
+  library at `+0x78`, last Start device at `+0x248`. Unlike GRID 2's `Input2`, slot 2 of
+  the main vtable is not the per-frame update, so GRID2VR's private-vtable hook does not
+  carry over as is; the update, the map tree and the device registry still need mapping.
+
+Next: a research renderer probe that, in a direct start, logs the devices bound to the
+player's map and calls `0xb31c70` for a launcher-bound device (on this PC, the Bluetooth
+Xbox pad, checked by reading the map back rather than by pressing anything). The G920 itself
+is on PC4090.
+
 ## Recommendation
 
 1. **Load the profile in direct launch** (so the game's own controls menu works for
