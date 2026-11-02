@@ -196,7 +196,8 @@ def diagnostic_environment(directory: Path, *, scene_observer: bool = False, rep
     for flag in ("DIRT3VR_ENABLE_VR", "DIRT3VR_SCENE_DIAGNOSTICS", "DIRT3VR_REPLAY_DIAGNOSTICS",
                  "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH", "DIRT3VR_RESEARCH_FILE_TRACE", "DIRT3VR_DIRECT_PRACTICE", "DIRT3VR_DIRECT_LAPS", "DIRT3VR_DIRECT_RETURN", "DIRT3VR_DIRECT_DIFFICULTY", "DIRT3VR_DIRECT_ASSISTS", "DIRT3VR_RESEARCH_LAPS", "DIRT3VR_SCREENSHOT_SECONDS", "DIRT3VR_RESEARCH_SETTINGS_TRACE",
                 "DIRT3VR_RESEARCH_STACKS", "DIRT3VR_RESEARCH_COUNT", "DIRT3VR_RESEARCH_PRESS_START_USER",
-                "DIRT3VR_RESEARCH_AUTO_SAVE_CHOICE", "DIRT3VR_RESEARCH_STORE_TRACE"):
+                "DIRT3VR_RESEARCH_AUTO_SAVE_CHOICE", "DIRT3VR_RESEARCH_STORE_TRACE",
+                "DIRT3VR_RESEARCH_DATA_WATCH"):
         env.pop(flag, None)
     if background_play:
         env["DIRT3VR_BACKGROUND_PLAY"] = "1"
@@ -553,6 +554,8 @@ def main() -> int:
     parser.add_argument("--actionmap-test", choices=("edit", "add"),
                         help="Research: bind Pause to Space through a journaled change to the stock keyboard map "
                              "(edit) or an added keyboard map listed in actionMapPaths.xml (add)")
+    parser.add_argument("--data-watch", action="store_true",
+                        help="Research only: log the auto_save / hasEverSaved flags (they gate profile saves) when read")
     parser.add_argument("--store-trace", action="store_true",
                         help="Research only: log each value the game reads from its settings store (assists, difficulty)")
     parser.add_argument("--auto-save-choice", action="store_true",
@@ -715,6 +718,8 @@ def main() -> int:
             env["DIRT3VR_RESEARCH_STACKS"] = args.stacks
         if args.store_trace:
             env["DIRT3VR_RESEARCH_STORE_TRACE"] = "1"
+        if args.data_watch:
+            env["DIRT3VR_RESEARCH_DATA_WATCH"] = "1"
         if args.auto_save_choice:
             env["DIRT3VR_RESEARCH_AUTO_SAVE_CHOICE"] = "1"
         elif args.log_profile_wait:

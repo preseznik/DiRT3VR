@@ -386,6 +386,57 @@ void InstallStoreTrace(void (*log)(const char*,...)) {
     log("Research store trace: created=%d enabled=%d",created,enabled);
 }
 
+// Data flag watch: 0xd04300 looks a named game variable up (thiscall data, store, name). With
+// DIRT3VR_RESEARCH_DATA_WATCH=1 each lookup of auto_save or hasEverSaved (which gate every
+// profile save) logs the variable's value (getter: vtable slot 2), once per distinct value.
+using DataLookupFn=void*(__thiscall*)(void*,void*,const char*);
+DataLookupFn realDataLookup{};
+std::string dataSeen;
+std::atomic<void*> lastDataComponent{};
+// At a sample time: the two save flags as the game would read them now (store 0x10da300).
+void LogSaveFlags(void (*log)(const char*,...),unsigned second) {
+    void* data=lastDataComponent.load();
+    if(!data || !realDataLookup) return;
+    auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+    int values[2]{-1,-1};
+    const char* names[2]{"auto_save","hasEverSaved"};
+    for(int i=0;i<2;++i) {
+        void* variable=realDataLookup(data,image+(0x10da300-0x400000),names[i]);
+        using GetFn=int(__thiscall*)(void*);
+        if(variable) values[i]=reinterpret_cast<GetFn>((*reinterpret_cast<void***>(variable))[2])(variable)&0xff;
+    }
+    log("Research save flags t=%us: auto_save=%d hasEverSaved=%d",second,values[0],values[1]);
+}
+void* __fastcall DataLookup(void* data,void*,void* store,const char* name) {
+    lastDataComponent.store(data);
+    void* variable=realDataLookup(data,store,name);
+    if(variable && name && traceLog && (std::strcmp(name,"auto_save")==0 || std::strcmp(name,"hasEverSaved")==0)) {
+        using GetFn=int(__thiscall*)(void*);
+        const int value=reinterpret_cast<GetFn>((*reinterpret_cast<void***>(variable))[2])(variable)&0xff;
+        char entry[64];
+        std::snprintf(entry,sizeof(entry),"|%s=%d|",name,value);
+        std::lock_guard lock(settingsMutex);
+        if(dataSeen.find(entry)==std::string::npos) {
+            dataSeen+=entry;
+            traceLog("Research data %s=%d",name,value);
+        }
+    }
+    return variable;
+}
+void InstallDataWatch(void (*log)(const char*,...)) {
+    wchar_t flag[8]{};
+    if(GetEnvironmentVariableW(L"DIRT3VR_RESEARCH_DATA_WATCH",flag,8)!=1 || flag[0]!=L'1') return;
+    static const uint8_t entry[]{0x55,0x8b,0xec,0x83,0xec,0x24,0x8b,0x45,0x0c,0x53,0x56,0x57};
+    auto* target=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr))+(0xd04300-0x400000);
+    if(std::memcmp(target,entry,sizeof(entry))!=0) { log("Research data watch refused: lookup instructions differ"); return; }
+    traceLog=log;
+    const auto initialized=MH_Initialize();
+    if(initialized!=MH_OK && initialized!=MH_ERROR_ALREADY_INITIALIZED) return;
+    const auto created=MH_CreateHook(target,reinterpret_cast<void*>(&DataLookup),reinterpret_cast<void**>(&realDataLookup));
+    const auto enabled=created==MH_OK ? MH_EnableHook(target) : created;
+    log("Research data watch: created=%d enabled=%d",created,enabled);
+}
+
 // Call counter: DIRT3VR_RESEARCH_COUNT lists up to 8 function addresses (hex, as in the
 // disassembly at the preferred base 0x400000). Each gets a thunk that counts calls and jumps on
 // unchanged; the counts are logged with every stack sample.
@@ -514,7 +565,8 @@ void InstallStackSampler(void (*log)(const char*,...)) {
             const auto due=start+second*1000ull;
             while(GetTickCount64()<due) Sleep(50);
             // With a call counter the counts are the point; stacks only without one.
-            if(countInstalled) LogCallCounts(sampleLog,static_cast<unsigned>(second));
+            if(realDataLookup) LogSaveFlags(sampleLog,static_cast<unsigned>(second));
+            else if(countInstalled) LogCallCounts(sampleLog,static_cast<unsigned>(second));
             else SampleThreads(sampleLog,static_cast<unsigned>(second));
             cursor=*end==',' ? end+1 : end;
         }
@@ -551,6 +603,7 @@ void Apply(void (*log)(const char*,...)) {
         InstallPressStartUser(log);
         InstallAutoSaveChoice(log);
         InstallStoreTrace(log);
+        InstallDataWatch(log);
         InstallCallCounter(log);
         InstallStackSampler(log);
         char text[513]{};
