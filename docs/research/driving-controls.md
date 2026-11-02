@@ -158,6 +158,35 @@ makes the normal start skip the list (the `0xfe45d0` status object at `+0x1c`, s
 around Press Start / `press_start_handle_signin`), or choose the save without input; then
 the transition after the load.
 
+Runs 65–83 (research hooks; all in the background unless noted):
+
+- `press_start_user_index` (read by `StateHandleSignIn`'s enter `0x55eaf0`, written by
+  `ScreenPressStart`'s Start handler `0x4f95b0`) is already 0 in a direct start; setting
+  the input component's user (`+0x1b4`) as well changes nothing (runs 65, 76).
+- The save list is part of the normal start too (run 72, reference: Press Start, then the
+  second Enter chooses the save). Its confirm (`0x4e9340`) calls
+  `SaveSystemUserInterface::0x5a7420(action, index)`: `(0, i)` loads save i, `(1, 0)`
+  creates one, `(2, 0)` backs out. The load worker waits for that answer on the UI's
+  event (`0x5b9780`). `--auto-save-choice` answers `(0, 0)` from
+  `wait_for_load_profile`'s update: all 17 profile files are then read with no input
+  (run 67).
+- But the load then reports the save as corrupt: the UI is asked to show
+  `lng_ss_save_corrupt` (`0x5a7490`, flag `+0x48`, which the wait returns as `corrupt`),
+  and the operation never finishes (status stays `0x3c` = running). The save system's
+  own log (sink `[[0xfe5a18]+0xc]`, research hook) shows the save mounted from
+  `Steam\userdata\…\321040\local\savegame\profile0`, then error `0fdf:0056` =
+  "Serialiser reports the save '%s' is corrupted" (`0xcc7b38`). The serialiser
+  (`0xb2ef00`, vtable `0xf29278`) allocates fine, but a section decoder fails: **section
+  `career manager sdu name`, error `0x37`** (run 83).
+
+So the profile files are fine (the normal start loads them) but the career manager
+cannot take its data in a direct start, presumably because it is only set up with the
+front end (garage / events database), which the race route never loads. Skipping that
+section is not safe: the career would not be loaded, and a later profile save would
+write a profile without it. Next: what the career manager needs before loading, and
+whether the direct route can provide it without the front end. Every run restored its
+files; the saves were unchanged throughout.
+
 The earlier plan: a profile load on the `skip_no_garage` route. The existing load nodes (`C` →
 `D` → `E` → `F` → `G`) are shared with the normal start and continue into the front end
 (garage, main menu), which this route never loads, so they can't simply be linked to.
