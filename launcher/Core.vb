@@ -197,6 +197,11 @@ Public Class LauncherSettings
     Public Property StartInCockpit As Boolean
     ' Seat positions on the monitor too (Launch, #b330cc4f): the same camera files, journaled for a desktop session.
     Public Property SeatOnDesktop As Boolean
+    ' The in-game seat menu's key (#bd820b32, docs/seat-channel.md): opens it, and saves and closes it; 0 = none.
+    ' F11 by default, a key DiRT 3's own keyboard map leaves free. Kept with the other seat settings.
+    Public Const DefaultSeatMenuKey As Integer = 122
+    Public Property SeatMenuKey As Integer = DefaultSeatMenuKey
+    Public Property SeatMenuModifiers As Integer
     ' Optional controller/wheel button; machine-specific, so never part of settings profiles.
     Public Property RecenterDevice As RecenterDeviceBinding
 
@@ -208,6 +213,9 @@ Public Class LauncherSettings
         If VdxrRuntimeManifest Is Nothing OrElse VdxrRuntimeManifest.Length > 32768 Then Throw New IOException("Invalid VDXR runtime path.")
         If VrRenderScale < 50 OrElse VrRenderScale > 300 Then Throw New IOException("Choose a VR render scale between 50% and 300%.")
         If Not RecenterShortcut.Valid(RecenterKey, RecenterModifiers) Then Throw New IOException("Choose another recenter key. Windows shortcuts such as Alt+Tab are reserved.")
+        If SeatMenuKey <> 0 AndAlso (Not RecenterShortcut.Valid(SeatMenuKey, SeatMenuModifiers) OrElse (SeatMenuKey >= 37 AndAlso SeatMenuKey <= 40) OrElse SeatMenuKey = 13) Then Throw New IOException("Choose another seat menu key. The arrows and Enter move and save in the menu, and Windows shortcuts are reserved.")
+        If SeatMenuKey <> 0 AndAlso SeatMenuKey = RecenterKey AndAlso SeatMenuModifiers = RecenterModifiers Then Throw New IOException("The seat menu and recentering need different keys.")
+        If SeatMenuKey = 0 Then SeatMenuModifiers = 0
         RecenterDevice?.Validate()
         DesktopGraphics.Validate(Me)
         GraphicsQuality = GraphicsCatalog.Current.Normalize(GraphicsQuality)
