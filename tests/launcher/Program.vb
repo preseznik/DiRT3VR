@@ -36,6 +36,7 @@ Module Program
             DirectPracticeTests.Run(root, AddressOf Check)
             NewFeaturesTests.Run(root, AddressOf Check)
             SeatTests.Run(root, AddressOf Check)
+            MotionBlurTests.Run(root, AddressOf Check)
             StartupTests.Run(root, AddressOf Check)
             InstallerTests.Run(root, AddressOf Check)
             TestHeadsetResolution(root)

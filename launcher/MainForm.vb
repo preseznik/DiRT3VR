@@ -206,7 +206,8 @@ Public Class MainForm
                                                                                                         RefreshState()
                                                                                                     End Sub
                                                               notice.Text = "Starting experimental VR. Original files are restored when DiRT 3 closes, even if you close this window." &
-                                                                  If(interactive.SeatsSkipped.Count > 0, " Seat position not applied for " & String.Join(", ", interactive.SeatsSkipped) & ": its camera file is missing or not in the expected format.", "")
+                                                                  If(interactive.SeatsSkipped.Count > 0, " Seat position not applied for " & String.Join(", ", interactive.SeatsSkipped) & ": its camera file is missing or not in the expected format.", "") &
+                                                                  If(interactive.MotionBlurNote <> "", " " & interactive.MotionBlurNote, "")
                                                               launchProgress.Start()
                                                               ObserveInteractive()
                                                           End Function)
@@ -1028,6 +1029,7 @@ Public Class MainForm
             New HelpTopic(HelpVr,
                 "Advanced → Enable experimental VR turns on the VDXR session when this package supports it. Connect the headset through Virtual Desktop and choose VDXR under Settings → VR runtime. Interactive SteamVR launch stays unavailable until its orientation is validated. Close other VR games first." & vbCrLf & vbCrLf &
                 "All rendered 3D camera views use stereo and headset tracking, including cockpit, bonnet, bumper, chase and replay. Loading screens, movies and frames without a 3D scene use a virtual screen, and recognized HUD and menu draws use a transparent panel 2 metres away. Camera transitions are still experimental." & vbCrLf & vbCrLf &
+                "DiRT 3's motion blur is switched off for VR sessions: in the headset every head movement counts as camera movement, so it smeared the nearest ground and objects. DiRT3VR writes the game's postprocess\effects.xml with the blur lengths at zero for the session and restores it after exit; desktop play keeps the game's motion blur." & vbCrLf & vbCrLf &
                 ExperimentalFiles.ProfileDescription & vbCrLf & vbCrLf &
                 "If an OpenXR add-on such as ReShade or the OBS mirror stops VR from starting, Launch VR names it and offers Disable and retry, which turns it off for DiRT 3 only. Turn it back on under Settings → VR runtime → OpenXR add-ons…." & vbCrLf & vbCrLf &
                 "If DiRT 3 starts without DiRT3VR's renderer, the launcher says why once the game window is up: its d3d11.dll was removed (usually by antivirus) or replaced by another mod, Windows' 'prefer system32 images' rule applied, or Windows used its own copy (install the Visual C++ 2015-2022 Redistributable, x86)."),

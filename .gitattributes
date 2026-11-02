@@ -2,3 +2,5 @@
 tests/launcher/fixtures/rewrite-2026-10-31/*.xml binary
 # Synthetic seat camera files (tests/launcher/fixtures/seat/make_seat_fixture.py), compared byte for byte.
 tests/launcher/fixtures/seat/*.bin binary
+# Synthetic effects files (tests/launcher/fixtures/effects/make_effects_fixture.py), compared byte for byte.
+tests/launcher/fixtures/effects/*.bin binary
