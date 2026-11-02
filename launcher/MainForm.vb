@@ -21,6 +21,7 @@ Public Class MainForm
     Private ReadOnly layerSummary As New Label With {.Name = "LayerSummary", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12)}
     Private availableUpdate As ReleaseUpdate
     Private ReadOnly recenterHint As New Label With {.Name = "RecenterHint", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12)}
+    Private ReadOnly drivingSummary As New Label With {.Name = "DrivingSummary", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12)}
     Private recenterKey As Integer = RecenterShortcut.DefaultKey, recenterModifiers As Integer
     Private capturingRecenter As Boolean
     Private ReadOnly recenterDeviceButton As New Button With {.Name = "RecenterDevice", .AutoSize = True}
@@ -170,7 +171,7 @@ Public Class MainForm
                                                                                                                  RefreshState()
                                                                                                              End Sub
                                                                        notice.Text = If(desktopStartup Is Nothing, "Starting DiRT 3… Closing this launcher leaves the game running.",
-                                                                                        If(selected.LaunchMode = "direct", "Starting direct practice on the monitor… DiRT3VR's temporary files are removed after exit, even if you close this window.",
+                                                                                        If(selected.LaunchMode = "direct", "Starting direct practice on the monitor… DiRT3VR's temporary files are removed after exit, even if you close this window." & If(desktopStartup.DrivingNote <> "", " " & desktopStartup.DrivingNote, ""),
                                                                                            "Starting DiRT 3… The original startup file is restored after exit, even if you close this window."))
                                                                        launchProgress.Start()
                                                                    Finally
@@ -207,7 +208,8 @@ Public Class MainForm
                                                                                                     End Sub
                                                               notice.Text = "Starting experimental VR. Original files are restored when DiRT 3 closes, even if you close this window." &
                                                                   If(interactive.SeatsSkipped.Count > 0, " Seat position not applied for " & String.Join(", ", interactive.SeatsSkipped) & ": its camera file is missing or not in the expected format.", "") &
-                                                                  If(interactive.MotionBlurNote <> "", " " & interactive.MotionBlurNote, "")
+                                                                  If(interactive.MotionBlurNote <> "", " " & interactive.MotionBlurNote, "") &
+                                                                  If(interactive.DrivingNote <> "", " " & interactive.DrivingNote, "")
                                                               launchProgress.Start()
                                                               ObserveInteractive()
                                                           End Function)
@@ -475,6 +477,18 @@ Public Class MainForm
                           End Function)
     End Function
 
+    ' One line on the launcher's driving bindings, under Controls → Driving controls.
+    Private Sub UpdateDrivingSummary()
+        Try
+            Dim saved = DrivingControls.Load(context)
+            Dim devices = saved.Bindings.Select(Function(b) b.Device).Distinct(StringComparer.Ordinal).ToArray()
+            drivingSummary.Text = If(Not saved.Enabled OrElse saved.Bindings.Count = 0, "Off: direct practice uses DiRT 3's default preset for each device.",
+                                     "On for direct practice: " & saved.Bindings.Count.ToString(Globalization.CultureInfo.CurrentCulture) & If(saved.Bindings.Count = 1, " binding on ", " bindings on ") & String.Join(", ", devices) & ".")
+        Catch ex As IOException
+            drivingSummary.Text = "The driving controls file can't be read: " & ex.Message
+        End Try
+    End Sub
+
     Private Sub BuildControls()
         Dim content = Page("Controls")
         Dim general = Section(content, "General")
@@ -487,6 +501,22 @@ Public Class MainForm
                                             monitor.ShowDialog(Me)
                                         End Using
                                     End Sub
+        Dim driving = Section(content, "Driving controls")
+        driving.Controls.Add(Info("Bind your wheel, pedals, shifter, controller and keys here for direct practice (Launch and Launch VR). A direct start doesn't load your DiRT 3 profile, so without these DiRT 3 uses its default preset for each device. Actions you don't bind keep DiRT 3's binding for that device. Normal launches keep your profile's controls."))
+        Dim drivingButton As New Button With {.Name = "DrivingControls", .Text = "Driving controls…", .AutoSize = True}
+        driving.Controls.Add(drivingButton)
+        driving.Controls.Add(drivingSummary)
+        AddHandler drivingButton.Click, Sub()
+                                            Try
+                                                Using dialog As New DrivingControlsForm(context)
+                                                    dialog.ShowDialog(Me)
+                                                End Using
+                                            Catch ex As IOException
+                                                notice.Text = ex.Message
+                                            End Try
+                                            UpdateDrivingSummary()
+                                        End Sub
+        UpdateDrivingSummary()
         Dim vrControls = Section(content, "VR and seat controls")
         Field(vrControls, "Recenter key", recenterButton)
         vrControls.Controls.Add(recenterHint)
@@ -1051,6 +1081,7 @@ Public Class MainForm
                 "Restore graphics defaults sets the desktop and quality choices to Use game setting and the render scale to 100%. It asks first and changes only the controls until Save settings or Launch."),
             New HelpTopic(HelpControls,
                 "Use your existing keyboard, controller or wheel bindings in DiRT 3." & vbCrLf & vbCrLf &
+                "Driving controls… binds your wheel, pedals, shifter, controller and keys for direct practice, with Launch and Launch VR. A direct start doesn't load your DiRT 3 profile, so DiRT 3 would otherwise use its default preset for each device. The Binding wizard asks for the essentials (steering, pedals, clutch, handbrake, gear up and down, change view, look back and pause), then offers the H-pattern shifter, flashback and replays, menus, and look and horn; Skip keeps an action's current binding, and only finished groups are kept. Key… and Device… rebind one action, Calibrate… sets an axis's direction, dead zone and saturation, and Xbox preset loads DiRT 3's own Xbox controller layout. Presets save and load whole binding sets. For each bound device the session writes a complete action map (DiRT 3's own map for that device with your bindings in place) and lists it in actionmap\actionMapPaths.xml; both are removed after exit, like DiRT3VR's other temporary changes. Two identical devices share one map, as DiRT 3 tells devices apart by name." & vbCrLf & vbCrLf &
                 "Live input and force feedback shows your wheel, pedals, shifter and controllers as Windows reports them and tests rumble or force feedback on each one. It reads devices without taking them over and changes no game or Windows setting. Close DiRT 3 before testing force feedback." & vbCrLf & vbCrLf &
                 recenter & " recenters the headset view while DiRT 3 is in front. To change it, click the key under VR and seat controls and press another key, optionally with Ctrl, Alt or Shift; Esc cancels. DiRT 3 still receives the key, so pick one the game doesn't use. Alt+Tab, Alt+F4 and Ctrl+Alt+Delete are reserved." & vbCrLf & vbCrLf &
                 "Bind a button… adds a controller, wheel or button-box button, or a D-pad / hat direction, as another way to recenter. During VR the launcher watches it only while DiRT 3 is in front, without taking the device over. Clear removes it." & vbCrLf & vbCrLf &

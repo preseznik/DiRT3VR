@@ -5,6 +5,8 @@ Public NotInheritable Class DesktopStartupSession
     Private ReadOnly context As InstallContext
     Private ReadOnly lease As FileStream
     Public ReadOnly Game As Process
+    ' Devices whose launcher driving bindings couldn't go into the session's action maps, or "".
+    Public Property DrivingNote As String = ""
 
     Private Sub New(install As InstallContext, child As Process, sessionLease As FileStream)
         context = install : Game = child : lease = sessionLease
@@ -17,8 +19,13 @@ Public NotInheritable Class DesktopStartupSession
         Return settings.SkipStartupMovies OrElse settings.LaunchMode = "direct"
     End Function
 
-    ' The temporary changes: the startup definitions and/or the direct practice config plus the renderer.
+    ' The temporary changes: the startup definitions and/or the direct practice config plus the renderer,
+    ' and the launcher's driving bindings as session action maps (#8121970e).
     Public Shared Function Changes(context As InstallContext, settings As LauncherSettings) As Dictionary(Of String, Byte())
+        Return Changes(context, settings, Nothing)
+    End Function
+
+    Public Shared Function Changes(context As InstallContext, settings As LauncherSettings, actionMaps As SessionActionMaps.SessionChanges) As Dictionary(Of String, Byte())
         Dim result As New Dictionary(Of String, Byte())
         If settings.SkipStartupMovies Then result.Add("startup", StartupMovies.ReadPatch(context))
         If settings.LaunchMode = "direct" Then
@@ -27,6 +34,10 @@ Public NotInheritable Class DesktopStartupSession
             If Not File.Exists(payload) Then Throw New IOException("DiRT3VR's renderer is missing from this package: " & payload)
             result.Add("proxy", File.ReadAllBytes(payload))
             result.Add("direct", DirectPractice.Config(settings))
+            Dim maps = If(actionMaps, SessionActionMaps.Changes(context, DrivingControls.Load(context)))
+            For Each pair In maps.Files
+                result.Add(pair.Key, pair.Value)
+            Next
         End If
         Return result
     End Function
@@ -56,12 +67,13 @@ Public NotInheritable Class DesktopStartupSession
                 Dim blocked = RendererLoad.LaunchBlock(context)
                 If blocked <> "" Then Throw New IOException(blocked)
             End If
-            Dim changes = DesktopStartupSession.Changes(context, settings)
+            Dim actionMaps = If(settings.LaunchMode = "direct", SessionActionMaps.Changes(context, DrivingControls.Load(context)), New SessionActionMaps.SessionChanges())
+            Dim changes = DesktopStartupSession.Changes(context, settings, actionMaps)
             Dim logs = Path.Combine(context.UserRoot, "logs", "session-" & Guid.NewGuid().ToString("N"))
             If settings.LaunchMode = "direct" Then
                 SafeFiles.NoLinks(logs) : Directory.CreateDirectory(logs)
                 ' Marks the folder as a desktop session, so Last VR session skips it.
-                SafeFiles.SaveJson(Path.Combine(logs, "session.json"), New With {.schema = 1, .mode = DirectMode, .startedUtc = DateTime.UtcNow, .launchMode = settings.LaunchMode, .directRoute = settings.DirectRoute, .directCar = settings.DirectCar, .directLaps = DirectPractice.Laps(settings), .directOpponents = DirectPractice.Opponents(settings), .directOpponentCars = settings.DirectOpponentCars, .directDifficulty = DirectPractice.Difficulty(settings), .directAfterFinish = settings.DirectAfterFinish, .directAssists = DirectPractice.Assists(settings)})
+                SafeFiles.SaveJson(Path.Combine(logs, "session.json"), New With {.schema = 1, .mode = DirectMode, .startedUtc = DateTime.UtcNow, .launchMode = settings.LaunchMode, .directRoute = settings.DirectRoute, .directCar = settings.DirectCar, .directLaps = DirectPractice.Laps(settings), .directOpponents = DirectPractice.Opponents(settings), .directOpponentCars = settings.DirectOpponentCars, .directDifficulty = DirectPractice.Difficulty(settings), .directAfterFinish = settings.DirectAfterFinish, .directAssists = DirectPractice.Assists(settings), .drivingMaps = actionMaps.Devices.Select(Function(d) d.DeviceName & " (" & d.BaseFile & ")").ToArray(), .drivingSkipped = actionMaps.Skipped.ToArray()})
             End If
             settings.Save(context)
             DesktopGraphics.Apply(context, settings, monitor)
@@ -72,7 +84,7 @@ Public NotInheritable Class DesktopStartupSession
             game = Process.Start(StartInfo(context, settings, logs))
             If game Is Nothing Then Throw New IOException("DiRT 3 could not start.")
             Session.WriteLaunchStatus(context, "starting", "Waiting for the game window. DiRT3VR's temporary files are removed after exit.", game.Id, DateTime.UtcNow, mode:=If(settings.LaunchMode = "direct", "direct-practice", "desktop"))
-            Return New DesktopStartupSession(context, game, lease)
+            Return New DesktopStartupSession(context, game, lease) With {.DrivingNote = actionMaps.Note}
         Catch ex As Exception
             failure = ex
         End Try
