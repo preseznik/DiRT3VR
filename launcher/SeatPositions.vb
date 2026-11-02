@@ -85,8 +85,8 @@ Public NotInheritable Class SeatPositions
     End Function
 
     ' The offset each car gets in a session: the shared one for every catalog car, or each car's own;
-    ' cars left unchanged are not listed.
-    Public Shared Function Effective(settings As LauncherSettings) As SortedDictionary(Of String, SeatOffset)
+    ' cars left unchanged are not listed. The cockpit-only start is a VR option.
+    Public Shared Function Effective(settings As LauncherSettings, Optional vr As Boolean = True) As SortedDictionary(Of String, SeatOffset)
         Dim result As New SortedDictionary(Of String, SeatOffset)(StringComparer.Ordinal)
         If settings.SeatSameForAll Then
             If settings.SeatAllCars IsNot Nothing AndAlso Not settings.SeatAllCars.IsZero Then
@@ -102,7 +102,7 @@ Public NotInheritable Class SeatPositions
         For Each item In result.Values
             item.Cockpit = False
         Next
-        If settings.StartInCockpit Then
+        If vr AndAlso settings.StartInCockpit Then
             For Each car In EventCatalog.Current.Cars
                 If Not result.ContainsKey(car.Code) Then result(car.Code) = New SeatOffset
                 result(car.Code).Cockpit = True
@@ -113,11 +113,12 @@ Public NotInheritable Class SeatPositions
 
     ' The session's camera file changes. A car whose camera file is missing or not the expected
     ' format is left alone and named in Skipped, so one modded car doesn't block VR.
-    Public Shared Function Changes(context As InstallContext, settings As LauncherSettings) As (Files As Dictionary(Of String, Byte()), Offsets As Dictionary(Of String, SeatOffset), Skipped As List(Of String))
+    Public Shared Function Changes(context As InstallContext, settings As LauncherSettings, Optional vr As Boolean = True) As (Files As Dictionary(Of String, Byte()), Offsets As Dictionary(Of String, SeatOffset), Skipped As List(Of String))
         Dim files As New Dictionary(Of String, Byte())(StringComparer.Ordinal)
         Dim offsets As New Dictionary(Of String, SeatOffset)(StringComparer.Ordinal)
         Dim skipped As New List(Of String)
-        For Each pair In Effective(settings)
+        If Not vr AndAlso Not settings.SeatOnDesktop Then Return (files, offsets, skipped)
+        For Each pair In Effective(settings, vr)
             Dim target = CameraPath(context, pair.Key)
             Try
                 SafeFiles.NoLinks(target)
@@ -134,5 +135,10 @@ Public NotInheritable Class SeatPositions
             End Try
         Next
         Return (files, offsets, skipped)
+    End Function
+
+    ' Whether Launch (desktop) moves seats: the option is on and some car has a position of its own.
+    Public Shared Function OnDesktop(settings As LauncherSettings) As Boolean
+        Return settings.SeatOnDesktop AndAlso Effective(settings, vr:=False).Count > 0
     End Function
 End Class

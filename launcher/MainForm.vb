@@ -171,8 +171,9 @@ Public Class MainForm
                                                                                                                  RefreshState()
                                                                                                              End Sub
                                                                        notice.Text = If(desktopStartup Is Nothing, "Starting DiRT 3… Closing this launcher leaves the game running.",
-                                                                                        If(selected.LaunchMode = "direct", "Starting direct practice on the monitor… DiRT3VR's temporary files are removed after exit, even if you close this window." & If(desktopStartup.DrivingNote <> "", " " & desktopStartup.DrivingNote, ""),
-                                                                                           "Starting DiRT 3… The original startup file is restored after exit, even if you close this window."))
+                                                                                        If(selected.LaunchMode = "direct", "Starting direct practice on the monitor… ", "Starting DiRT 3… ") & "DiRT3VR's temporary files are removed after exit, even if you close this window." &
+                                                                                        If(desktopStartup.DrivingNote <> "", " " & desktopStartup.DrivingNote, "") &
+                                                                                        If(desktopStartup.SeatsSkipped.Count > 0, " Seat position not applied for " & String.Join(", ", desktopStartup.SeatsSkipped) & ": its camera file is missing or not in the expected format.", ""))
                                                                        launchProgress.Start()
                                                                    Finally
                                                                        If desktopStartup IsNot Nothing Then ObserveDesktopStartup()
@@ -545,8 +546,8 @@ Public Class MainForm
                                              End Sub
         tips.SetToolTip(recenterButton, "Click, then press the key or key combination that recenters the headset view while DiRT 3 is in front.")
         UpdateRecenterLabel()
-        Dim seat = Section(content, "Seat (VR)")
-        seat.Controls.Add(Info("Moves your eye point in the cockpit, per car, for example to match the headset to your seat and rig: sideways (+ left), height and forward. Launch VR applies it: DiRT3VR writes the car's camera file for the session and restores it after exit. Desktop play keeps DiRT 3's own seat."))
+        Dim seat = Section(content, "Seat")
+        seat.Controls.Add(Info("Moves your eye point in the cockpit, per car, for example to match the headset to your seat and rig: sideways (+ left), height and forward. Launch VR applies it, and Launch too when Also when playing on the monitor is on: DiRT3VR writes the car's camera file for the session and restores it after exit."))
         seatPicker = New SeatPicker(seat)
         content.Controls.Add(TopicLink(HelpControls))
     End Sub
@@ -704,7 +705,7 @@ Public Class MainForm
         renderScale.Value = settings.VrRenderScale
         applyingPreset = True
         desktopQuality.Values = settings.GraphicsQuality : vrQuality.Values = settings.VrGraphicsQuality
-        seatPicker.Apply(settings.SeatOffsets, settings.SeatSameForAll, settings.SeatAllCars, settings.DirectCar, settings.StartInCockpit)
+        seatPicker.Apply(settings.SeatOffsets, settings.SeatSameForAll, settings.SeatAllCars, settings.DirectCar, settings.StartInCockpit, settings.SeatOnDesktop)
         directPicker.ApplyAssists(settings.DirectGearbox, settings.DirectAbs, settings.DirectStability, settings.DirectCornerBraking, settings.DirectThrottle, settings.DirectSteering)
         directPicker.Apply(settings.LaunchMode, settings.DirectRoute, settings.DirectCar, settings.DirectLaps, settings.DirectOpponents, settings.DirectOpponentCars, settings.DirectDifficulty, settings.DirectAfterFinish)
         applyingPreset = False
@@ -733,7 +734,7 @@ Public Class MainForm
             .DirectOpponents = directPicker.OpponentCount, .DirectOpponentCars = directPicker.OpponentCars, .DirectDifficulty = directPicker.DifficultyLevel, .DirectAfterFinish = directPicker.AfterFinish,
             .DirectGearbox = directPicker.Gearbox, .DirectAbs = directPicker.AssistStates.Abs, .DirectStability = directPicker.AssistStates.Stability,
             .DirectCornerBraking = directPicker.AssistStates.CornerBraking, .DirectThrottle = directPicker.AssistStates.Throttle, .DirectSteering = directPicker.AssistStates.Steering,
-            .SeatOffsets = seatPicker.Offsets, .SeatSameForAll = seatPicker.SameForAll, .SeatAllCars = seatPicker.AllCars, .StartInCockpit = seatPicker.StartInCockpit}
+            .SeatOffsets = seatPicker.Offsets, .SeatSameForAll = seatPicker.SameForAll, .SeatAllCars = seatPicker.AllCars, .StartInCockpit = seatPicker.StartInCockpit, .SeatOnDesktop = seatPicker.OnDesktop}
     End Function
 
     Private Sub RememberSavedSettings()
@@ -1086,7 +1087,7 @@ Public Class MainForm
                 recenter & " recenters the headset view while DiRT 3 is in front. To change it, click the key under VR and seat controls and press another key, optionally with Ctrl, Alt or Shift; Esc cancels. DiRT 3 still receives the key, so pick one the game doesn't use. Alt+Tab, Alt+F4 and Ctrl+Alt+Delete are reserved." & vbCrLf & vbCrLf &
                 "Bind a button… adds a controller, wheel or button-box button, or a D-pad / hat direction, as another way to recenter. During VR the launcher watches it only while DiRT 3 is in front, without taking the device over. Clear removes it." & vbCrLf & vbCrLf &
                 "Keep the horizon level when recentering is on by default: recentering turns the view to face forward but leaves pitch and roll alone. Turn it off if your headset sits tilted; the key or button then also makes the way you hold your head level. The automatic centering at the start of VR always keeps the horizon level." & vbCrLf & vbCrLf &
-                "Seat (VR) moves your eye point in the cockpit, for each car, up to 50 cm in each direction: sideways (+ left), height and forward. Pick the car (cars with their own position say adjusted), move the sliders, and Reset this car to go back to DiRT 3's seat. Same position for all cars uses one position everywhere. Launch VR writes each adjusted car's camera file (cars\models\<car>\cameras.xml) for the session and restores it after exit, like DiRT3VR's other temporary changes; a car whose camera file isn't in the expected format keeps its own seat, and the launcher names it. Desktop play keeps DiRT 3's seat. Seat positions stay with this PC: settings profiles and Restore launcher defaults keep them." & vbCrLf & vbCrLf &
+                "Seat moves your eye point in the cockpit, for each car, up to 50 cm in each direction: sideways (+ left), height and forward. Pick the car (cars with their own position say adjusted), move the sliders, and Reset this car to go back to DiRT 3's seat. Same position for all cars uses one position everywhere. Launch VR writes each adjusted car's camera file (cars\models\<car>\cameras.xml) for the session and restores it after exit, like DiRT3VR's other temporary changes; a car whose camera file isn't in the expected format keeps its own seat, and the launcher names it. Also when playing on the monitor (off by default) does the same for Launch, including direct practice on the monitor; without it desktop play keeps DiRT 3's seat. Seat positions stay with this PC: settings profiles and Restore launcher defaults keep them." & vbCrLf & vbCrLf &
                 "Cockpit view only (off by default): DiRT 3 starts a race with the first view in each car's camera list (chase close, chase far, bumper, bonnet, then cockpit), so for the VR session DiRT3VR hides those four views in every car's camera file. Races then start in the cockpit and Change View stays there. It is restored after exit with the seat changes."),
             New HelpTopic(HelpRuntime,
                 "Settings → Check runtime and headset runs a small 32-bit OpenXR check without starting the game. A successful check does not mean VR driving is ready." & vbCrLf & vbCrLf &

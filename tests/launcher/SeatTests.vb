@@ -85,8 +85,9 @@ Module SeatTests
         check(Refused(Sub() transaction.Prepare(changes, experimental:=True, apply:=False)) AndAlso Not transaction.Pending, "seat changes without their offsets are refused before anything is staged")
         Dim wrong = seats.Offsets.ToDictionary(Function(pair) pair.Key, Function(pair) New SeatOffset With {.Up = 9})
         check(Refused(Sub() transaction.Prepare(changes, experimental:=True, apply:=False, seats:=wrong)) AndAlso Not transaction.Pending, "a camera file that isn't the recorded offset's edit is refused")
-        check(Refused(Sub() transaction.Prepare(New Dictionary(Of String, Byte()) From {{"seat/frx", seats.Files("seat/frx")}}, apply:=False, seats:=seats.Offsets.Where(Function(pair) pair.Key = "frx").ToDictionary(Function(pair) pair.Key, Function(pair) pair.Value))) AndAlso Not transaction.Pending,
-              "seat positions belong to a VR session")
+        check(Refused(Sub() transaction.Prepare(New Dictionary(Of String, Byte()) From {{"seat/frx", SeatPositions.Apply(Fixture("cameras.bin"), New SeatOffset With {.Up = 3, .Cockpit = True})}}, apply:=False,
+                                                seats:=New Dictionary(Of String, SeatOffset) From {{"frx", New SeatOffset With {.Up = 3, .Cockpit = True}}})) AndAlso Not transaction.Pending,
+              "the cockpit-only start belongs to a VR session")
         transaction.Prepare(changes, experimental:=True, apply:=False, seats:=seats.Offsets)
         Dim journal = SafeFiles.ReadJson(Of RecoveryJournal)(transaction.JournalPath)
         check(journal.Schema = 6 AndAlso journal.Seats.Keys.OrderBy(Function(key) key, StringComparer.Ordinal).SequenceEqual({"frx", "stx"}) AndAlso journal.Seats("stx").Up = 3, "the journal is schema 6 and records each car's offset")
@@ -125,6 +126,42 @@ Module SeatTests
         check(cockpitTransaction.Recover() AndAlso File.ReadAllBytes(SeatPositions.CameraPath(cockpitCtx, "stx")).SequenceEqual(original) AndAlso File.ReadAllBytes(SeatPositions.CameraPath(cockpitCtx, "frx")).SequenceEqual(original),
               "recovery restores every car's original camera file")
 
+        ' Seat positions on the monitor (#b330cc4f): Launch journals only the camera files (schema 9), alone or with
+        ' the startup change or direct practice; the cockpit-only start stays a VR option.
+        Dim desktopCtx = Context(root, "desktop")
+        Dim desktopSettings As New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = "", .StartInCockpit = True,
+            .SeatOffsets = New Dictionary(Of String, SeatOffset) From {{"frx", New SeatOffset With {.Up = 3, .Forward = -2}}}}
+        check(Not DesktopStartupSession.NeedsSession(desktopSettings) AndAlso DesktopStartupSession.Changes(desktopCtx, desktopSettings).Count = 0, "seat positions stay off the monitor unless asked")
+        desktopSettings.SeatOnDesktop = True
+        check(DesktopStartupSession.NeedsSession(desktopSettings) AndAlso SeatPositions.OnDesktop(desktopSettings), "with Also when playing on the monitor, Launch needs a managed session")
+        check(Not SeatPositions.OnDesktop(New LauncherSettings With {.SeatOnDesktop = True, .StartInCockpit = True}), "the cockpit-only start alone doesn't change desktop play")
+        Dim desktopChanges = DesktopStartupSession.Changes(desktopCtx, desktopSettings)
+        Dim desktopSeats = SeatPositions.Changes(desktopCtx, desktopSettings, vr:=False)
+        check(desktopChanges.Keys.SequenceEqual({"seat/frx"}) AndAlso desktopSeats.Offsets("frx").Up = 3 AndAlso Not desktopSeats.Offsets("frx").Cockpit AndAlso
+              desktopChanges("seat/frx").SequenceEqual(SeatPositions.Apply(original, New SeatOffset With {.Up = 3, .Forward = -2})), "Launch changes only the adjusted car's camera file, without the cockpit-only start")
+        Dim desktopTransaction As New OwnedFileTransaction(desktopCtx)
+        Dim withGraphics = New Dictionary(Of String, Byte())(desktopChanges)
+        withGraphics.Add("graphics", File.ReadAllBytes(desktopCtx.GraphicsPath))
+        check(Refused(Sub() desktopTransaction.Prepare(withGraphics, apply:=False, seats:=desktopSeats.Offsets)) AndAlso Not desktopTransaction.Pending, "a desktop seat session changes no other file")
+        desktopTransaction.Prepare(desktopChanges, apply:=False, seats:=desktopSeats.Offsets)
+        Dim desktopJournal = SafeFiles.ReadJson(Of RecoveryJournal)(desktopTransaction.JournalPath)
+        check(desktopJournal.Schema = 9 AndAlso desktopJournal.Seats.Keys.SequenceEqual({"frx"}) AndAlso desktopJournal.ActionMaps Is Nothing, "a desktop seat session writes a schema 9 journal (older launchers refuse it)")
+        File.WriteAllBytes(SeatPositions.CameraPath(desktopCtx, "frx"), desktopChanges("seat/frx"))
+        Dim desktopText = File.ReadAllText(desktopTransaction.JournalPath)
+        For Each relabelled In {System.Text.RegularExpressions.Regex.Replace(desktopText, """Schema"":\s*9", """Schema"": 6"), System.Text.RegularExpressions.Regex.Replace(desktopText, """Schema"":\s*9", """Schema"": 3")}
+            File.WriteAllText(desktopTransaction.JournalPath, relabelled)
+            check(relabelled <> desktopText AndAlso Refused(Sub() desktopTransaction.Recover()) AndAlso File.ReadAllBytes(SeatPositions.CameraPath(desktopCtx, "frx")).SequenceEqual(desktopChanges("seat/frx")), "a desktop seat journal relabelled as another kind is refused and nothing is touched")
+        Next
+        File.WriteAllText(desktopTransaction.JournalPath, desktopText)
+        check(desktopTransaction.Recover() AndAlso File.ReadAllBytes(SeatPositions.CameraPath(desktopCtx, "frx")).SequenceEqual(original), "recovery restores the camera file after desktop play")
+        Dim directSeats As New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = "", .SeatOnDesktop = True, .LaunchMode = "direct", .DirectCar = "frx",
+            .DirectRoute = EventCatalog.Current.Routes.Single(Function(route) route.Track = "aspen" AndAlso route.Route = "route_0" AndAlso route.Discipline = "rallycross").Id,
+            .SeatOffsets = New Dictionary(Of String, SeatOffset) From {{"frx", New SeatOffset With {.Sideways = 2}}}}
+        Dim directChanges = DesktopStartupSession.Changes(desktopCtx, directSeats)
+        check(directChanges.Keys.Order().SequenceEqual({"direct", "proxy", "seat/frx"}), "desktop direct practice moves the seat too")
+        desktopTransaction.Prepare(directChanges, apply:=False, seats:=SeatPositions.Changes(desktopCtx, directSeats, vr:=False).Offsets)
+        check(SafeFiles.ReadJson(Of RecoveryJournal)(desktopTransaction.JournalPath).Schema = 9 AndAlso desktopTransaction.Recover(), "desktop direct practice with a seat position is a schema 9 journal too")
+
         ' A car whose camera file isn't usable keeps its own seat and is named.
         File.WriteAllBytes(SeatPositions.CameraPath(ctx, "stx"), Text.Encoding.UTF8.GetBytes("<not binary xml/>"))
         Dim partialSeats = SeatPositions.Changes(ctx, settings)
@@ -145,7 +182,7 @@ Module SeatTests
             Dim car = DirectCast(find("SeatCar"), ComboBox), sameForAll = DirectCast(find("SeatSameForAll"), CheckBox)
             Dim sideways = DirectCast(find("SeatSideways"), ValueSlider), height = DirectCast(find("SeatHeight"), ValueSlider), forward = DirectCast(find("SeatForward"), ValueSlider)
             Dim summary = find("SeatSummary")
-            check(car.Items.Count = EventCatalog.Current.Cars.Count AndAlso summary.Text = "Every car uses DiRT 3's own seat." AndAlso form.SectionHeaders.Any(Function(header) header.Title = "Seat (VR)"), "Controls has a Seat (VR) section listing every car, all unchanged")
+            check(car.Items.Count = EventCatalog.Current.Cars.Count AndAlso summary.Text = "Every car uses DiRT 3's own seat." AndAlso form.SectionHeaders.Any(Function(header) header.Title = "Seat"), "Controls has a Seat section listing every car, all unchanged")
             car.SelectedIndex = car.Items.Cast(Of Object)().ToList().FindIndex(Function(item) item.ToString().StartsWith(EventCatalog.Current.FindCar("frx").Name, StringComparison.Ordinal))
             height.Value = 4 : forward.Value = -2 : Application.DoEvents()
             check(form.CurrentSettings().SeatOffsets.Keys.SequenceEqual({"frx"}) AndAlso form.CurrentSettings().SeatOffsets("frx").Up = 4 AndAlso form.CurrentSettings().SeatOffsets("frx").Forward = -2 AndAlso form.HasUnsavedSettings(),
@@ -171,6 +208,10 @@ Module SeatTests
             check(Not cockpit.Checked AndAlso Not form.CurrentSettings().StartInCockpit, "Start races in the cockpit view is off by default")
             cockpit.Checked = True : Application.DoEvents()
             check(form.CurrentSettings().StartInCockpit AndAlso form.HasUnsavedSettings(), "turning it on is a launcher setting")
+            Dim onDesktop = DirectCast(find("SeatOnDesktop"), CheckBox)
+            check(Not onDesktop.Checked AndAlso Not form.CurrentSettings().SeatOnDesktop, "seat positions on the monitor are off by default")
+            onDesktop.Checked = True : Application.DoEvents()
+            check(form.CurrentSettings().SeatOnDesktop, "Also when playing on the monitor is a launcher setting")
             form.Close()
         End Using
     End Sub

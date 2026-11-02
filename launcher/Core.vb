@@ -195,6 +195,8 @@ Public Class LauncherSettings
     Public Property SeatAllCars As New SeatOffset
     ' VR: start races in the cockpit view (each car's views before head-cam hidden for the session).
     Public Property StartInCockpit As Boolean
+    ' Seat positions on the monitor too (Launch, #b330cc4f): the same camera files, journaled for a desktop session.
+    Public Property SeatOnDesktop As Boolean
     ' Optional controller/wheel button; machine-specific, so never part of settings profiles.
     Public Property RecenterDevice As RecenterDeviceBinding
 
