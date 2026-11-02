@@ -9,6 +9,7 @@
 #include <cstring>
 #include <mutex>
 #include <string>
+#include <thread>
 
 namespace dirt3vr::research {
 namespace {
@@ -252,6 +253,7 @@ int OperationStatus(void* self,uint8_t* image) {
 using SaveSinkFn=void(__cdecl*)(void*,const char*,const char*,...);
 SaveSinkFn realSaveSink{};
 std::atomic<unsigned> saveMessages{};
+unsigned saveMessageLimit=300;
 void __cdecl SaveSink(void* sink,const char* tag,const char* format,...) {
     char text[512]{};
     if(format) {
@@ -260,7 +262,7 @@ void __cdecl SaveSink(void* sink,const char* tag,const char* format,...) {
         std::vsnprintf(text,sizeof(text),format,arguments);
         va_end(arguments);
     }
-    if(traceLog && saveMessages.fetch_add(1)<300) traceLog("Research save log [%.16s] %s",tag ? tag : "",text);
+    if(traceLog && saveMessages.fetch_add(1)<saveMessageLimit) traceLog("Research save log [%.16s] %s",tag ? tag : "",text);
     if(realSaveSink) realSaveSink(sink,tag,"%s",text);
 }
 void InstallSaveSink(uint8_t* image) {
@@ -276,6 +278,21 @@ void InstallSaveSink(uint8_t* image) {
     *slot=&SaveSink;
     VirtualProtect(slot,sizeof(*slot),protection,&protection);
     if(traceLog) traceLog("Research save log sink installed (was %p)",reinterpret_cast<void*>(realSaveSink));
+}
+// The whole game log for a run, e.g. the race load's "Vehicle %2d: %s" lines (0x53d33b),
+// which name each car of the race from the table at 0xf9fc08. DIRT3VR_RESEARCH_GAME_LOG=1.
+// The log object appears during startup, so a thread waits for it (at most a minute).
+void InstallGameLog(void (*log)(const char*,...)) {
+    char text[4]{};
+    if(GetEnvironmentVariableA("DIRT3VR_RESEARCH_GAME_LOG",text,sizeof(text))!=1 || text[0]!='1') return;
+    traceLog=log;
+    saveMessageLimit=4000;
+    std::thread([] {
+        auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+        for(int i=0;i<600 && !*reinterpret_cast<uint8_t* volatile*>(image+(0xfe5a18-0x400000));++i) Sleep(100);
+        InstallSaveSink(image);
+    }).detach();
+    log("Research game log: waiting for the log sink");
 }
 int* __fastcall WaitUpdate(void* self,void*,int* out) {
     auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
@@ -606,6 +623,7 @@ void Apply(void (*log)(const char*,...)) {
         InstallDataWatch(log);
         InstallCallCounter(log);
         InstallStackSampler(log);
+        InstallGameLog(log);
         char text[513]{};
         const auto length=GetEnvironmentVariableA("DIRT3VR_RESEARCH_PATCH",text,sizeof(text));
         if(!length) return;
