@@ -37,3 +37,38 @@ document = {
 out = Path("tools/data/action-names.json")
 out.write_text(json.dumps(document, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
 print(len(uses), "actions,", sum(a["driving"] for a in document["actions"]), "driving,", len(maps), "maps ->", out)
+
+
+def bindings(path: Path) -> list[dict]:
+    """Every (action, input, calibrator) of one map, in file order."""
+    text = path.read_text(encoding="utf-8", errors="replace")
+    result = []
+    for action in re.finditer(r'<Action\s+actionName="([^"]+)"\s*>(.*?)</Action>', text, re.S):
+        for axis in re.finditer(r'<Axis\s+axisName="([^"]+)"\s*>(.*?)</Axis>', action.group(2), re.S):
+            calibrator = re.search(r"<CalibratorSimple\s+([^/>]*)/?>", axis.group(2))
+            attributes = dict(re.findall(r'(\w+)="([^"]*)"', calibrator.group(1))) if calibrator else {}
+            entry = {"action": action.group(1), "axisName": axis.group(1), "type": attributes.get("type")}
+            for key in ("deadZone", "saturation"):
+                if key in attributes:
+                    entry[key] = float(attributes[key])
+            result.append(entry)
+    return result
+
+
+axis_names = set()
+for path in sorted(GAME.glob("*.xml")):
+    if path.name != "actionMapPaths.xml":
+        axis_names.update(re.findall(r'axisName="([^"]+)"', path.read_text(encoding="utf-8", errors="replace")))
+buttons = sorted(int(n.rsplit("_", 1)[1]) for n in axis_names if re.fullmatch(r"di_button_\d+", n))
+stock = {
+    "source": document["source"],
+    "notes": {"di_button": f"zero-based: di_button_{buttons[0]} .. di_button_{buttons[-1]} in the stock maps",
+              "vk_code": "Windows virtual-key code, e.g. vk_code_0x26 = Up arrow",
+              "defaults": "a CalibratorSimple without deadZone/saturation uses the map's stated defaults "
+                          "(0.2 / 0.8, threshold 0.5, per the map comments)"},
+    "maps": {name: bindings(GAME / name) for name in ("wm_keyboard.xml", "xinput_pad.xml", "dinput_default.xml")},
+    "axisNames": sorted(axis_names),
+}
+stock_out = Path("tools/data/stock-bindings.json")
+stock_out.write_text(json.dumps(stock, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+print({name: len(entries) for name, entries in stock["maps"].items()}, len(axis_names), "axis names ->", stock_out)
