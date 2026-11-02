@@ -60,8 +60,30 @@ int main() {
         const auto validBox = box;
         volume[24] = 1000010;
         Require(!VisibilityMatrix(a, b, volume, box) && box == validBox, "Unbounded visibility accepted or changed output");
+        // Tree volumes end at each tree type's own cull distance (here 200 of a
+        // 1000 camera far): the box must enclose them without growing to the
+        // camera far, so tree types keep their distance culling.
+        std::array<float, 56> trees{};
+        for(unsigned i = 24; i < 56; i += 4) {
+            trees[i] = (i/4) % 2 ? 210.f : -190.f; trees[i + 1] = (i/8) % 2 ? 40.f : -40.f; trees[i + 2] = 0;
+            trees[i + 3] = std::numeric_limits<float>::quiet_NaN();
+        }
+        Matrix treeBox{};
+        Require(TreeVisibilityMatrix(a, b, trees, treeBox), "Valid tree volume rejected");
+        Require(treeBox[0] > 1.f/1000 && treeBox[0] < 1.f/200 && treeBox[10] < 0 && treeBox[15] == 1,
+                "Tree visibility box grew to the camera far range or lost its axis convention");
+        for(unsigned i = 24; i < 56; i += 4)
+            Require(std::abs(trees[i]*treeBox[0] + treeBox[12]) <= 1 && std::abs(trees[i + 1]*treeBox[5] + treeBox[13]) <= 1,
+                    "Tree volume corner clipped by its widened box");
+        Require(VisibilityMatrix(a, b, trees, box) && box[0] < 1.f/1000, "Main visibility no longer starts at the camera far range");
+        box = validBox;
+        const auto validTrees = treeBox;
+        trees[24] = 1000010;
+        Require(!TreeVisibilityMatrix(a, b, trees, treeBox) && treeBox == validTrees, "Unbounded tree volume accepted or changed output");
         volume[24] = 2010; Set(a, 0x58, 0);
         Require(!VisibilityMatrix(a, b, volume, box) && box == validBox, "Invalid camera far plane changed visibility");
+        trees[24] = 210;
+        Require(!TreeVisibilityMatrix(a, b, trees, treeBox) && treeBox == validTrees, "Invalid camera accepted for tree visibility");
         ProjectionScope inactive(nullptr, nullptr, nullptr, nullptr, fov);
         Require(!inactive.Valid() && inactive.Uploads() == 0, "Projection scope active without guarded installation");
         SetSceneProjectionActive(true);
@@ -91,7 +113,7 @@ int main() {
         image[0x4a8ca0 + 20] ^= 1; Put(device.data(), imageBase + 0xb06abc);
         Require(!NativeStereoDisabledAt(renderer.data(), imageBase), "Wrong device vtable accepted");
         Require(!NativeStereoDisabledAt(nullptr, imageBase), "Missing renderer accepted");
-        puts("Scene projection: eye rays, native depth, bounded visibility, activation and guarded native stereo refusal passed");
+        puts("Scene projection: eye rays, native depth, bounded main and tree visibility, activation and guarded native stereo refusal passed");
         return 0;
     } catch(const std::exception& error) { puts(error.what()); return 1; }
 }
