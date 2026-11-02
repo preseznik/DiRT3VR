@@ -127,6 +127,38 @@ int main() {
             c.Write(12,uint32_t(1000)); c.Write(20,unsigned(Open)); down.clear(); clock.Frame(menu);
             Require(!menu.PanelOpen(),"Input from a stale launcher opened the menu");
         }
+        { // Controller filters: the menu's buttons on the launcher's held device, while it's open.
+            down.clear(); auto bytes=Launcher(); Channel c(bytes.data()); Clock clock;
+            Menu menu(c,true,KeyDown); menu.Select(1); clock.Frame(menu);
+            const GUID wheel{0x1234,1,2,{3,4,5,6,7,8,9,10}},other{0x5678,1,2,{3,4,5,6,7,8,9,10}};
+            c.Write(36,1u); c.Write(40,0u); c.Write(60,0x100fu); // XInput pad 0: D-pad and A.
+            WORD buttons=0x100f|0x2000; menu.FilterXbox(0,buttons);
+            Require(buttons==0x300f,"Pad filtered while the menu is closed");
+            c.Write(20,unsigned(Open)); clock.Frame(menu); c.Write(20,0u); clock.Frame(menu);
+            Require(menu.PanelOpen(),"Controller did not open the menu");
+            buttons=0x1001|0x2000; menu.FilterXbox(0,buttons);
+            Require(buttons==0x2000,"Menu buttons reached the game, or B was taken");
+            buttons=0x1001; menu.FilterXbox(1,buttons);
+            Require(buttons==0x1001,"Another pad was filtered");
+            c.Write(20,unsigned(Open)); clock.Frame(menu); c.Write(20,0u); clock.Frame(menu);
+            Require(!menu.PanelOpen(),"Controller did not close the menu");
+            buttons=0x1000; menu.FilterXbox(0,buttons);
+            Require(buttons==0,"A held from the menu reached the game after it closed");
+            buttons=0; menu.FilterXbox(0,buttons); buttons=0x1000; menu.FilterXbox(0,buttons);
+            Require(buttons==0x1000,"A stayed blocked after its release");
+
+            c.Write(36,2u); c.Write(44,wheel); c.Write(60,1u<<3); c.Write(64,1u<<1); c.Write(76,1u); // Wheel: buttons 3 and 33, its hat.
+            Require(!menu.BlocksButton(wheel,3,true) && !menu.BlocksHat(wheel,0,false),"Wheel filtered while the menu is closed");
+            c.Write(20,unsigned(Open)); clock.Frame(menu); c.Write(20,0u); clock.Frame(menu);
+            Require(menu.BlocksButton(wheel,3,true) && menu.BlocksButton(wheel,33,false) && !menu.BlocksButton(wheel,4,true) && !menu.BlocksButton(wheel,200,true),
+                    "Wheel buttons filtered wrongly");
+            Require(!menu.BlocksButton(other,3,true) && !menu.BlocksHat(other,0,false),"Another device was filtered");
+            Require(menu.BlocksHat(wheel,0,false) && !menu.BlocksHat(wheel,1,false),"Wheel hat filtered wrongly");
+            c.Write(20,unsigned(Open)); clock.Frame(menu); c.Write(20,0u); clock.Frame(menu);
+            Require(menu.BlocksButton(wheel,3,true) && menu.BlocksHat(wheel,0,false),"Held wheel input reached the game after the menu closed");
+            Require(menu.BlocksButton(wheel,3,false) && menu.BlocksHat(wheel,0,true),"Release of a held wheel input not kept");
+            Require(!menu.BlocksButton(wheel,3,true) && !menu.BlocksHat(wheel,0,false),"Wheel input stayed blocked after its release");
+        }
         { // One position for every car.
             down.clear(); auto bytes=Launcher(true); Channel c(bytes.data()); Clock clock;
             Menu menu(c,true,KeyDown); clock.Frame(menu);
