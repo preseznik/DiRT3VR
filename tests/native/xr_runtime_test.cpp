@@ -21,8 +21,10 @@ LUID adapterLuid{};
 std::vector<std::string> calls;
 std::vector<std::string> diagnosticMessages;
 std::deque<XrSessionState> events;
-std::array<ComPtr<ID3D11Texture2D>,3> textures;
-std::array<bool,3> acquired{},waited{};
+std::array<ComPtr<ID3D11Texture2D>,4> textures;
+std::array<bool,4> acquired{},waited{};
+XrSwapchain seatChain{};
+XrCompositionLayerQuad lastSeat{XR_TYPE_COMPOSITION_LAYER_QUAD};
 bool shouldRender=true,validTracking=true,fullTracking=true,badLuid=false,badPose=false,timeoutForever=false;
 unsigned chainCount{},imageCount=2,timeoutCount{},layers{},endFrames{},sessions{},destroyedSessions{},destroyedInstances{},destroyedChains{};
 int failAcquire=-1,failChain=-1;
@@ -44,7 +46,7 @@ void Reset() {
     chainCount=timeoutCount=layers=endFrames=sessions=destroyedSessions=destroyedInstances=destroyedChains=imageIndex=0;
     imageCount=2; failAcquire=failChain=-1; headHeight=1.4f; headX=headZ=0;
     recommendedWidth=64; recommendedHeight=48;
-    headOrientation={0,0,0,1}; lastLayerType=XR_TYPE_UNKNOWN; lastQuad={XR_TYPE_COMPOSITION_LAYER_QUAD};
+    headOrientation={0,0,0,1}; lastLayerType=XR_TYPE_UNKNOWN; lastQuad=lastSeat={XR_TYPE_COMPOSITION_LAYER_QUAD}; seatChain={};
 }
 void CompletePair(XrRuntime::Frame& frame) {
     for(unsigned index=0;index<2;++index) {
@@ -101,7 +103,8 @@ XRAPI_ATTR XrResult XRAPI_CALL xrCreateReferenceSpace(XrSession,const XrReferenc
 XRAPI_ATTR XrResult XRAPI_CALL xrDestroySpace(XrSpace) { return XR_SUCCESS; }
 XRAPI_ATTR XrResult XRAPI_CALL xrCreateSwapchain(XrSession,const XrSwapchainCreateInfo* info,XrSwapchain* chain) {
     if(int(chainCount)==failChain) return XR_ERROR_RUNTIME_FAILURE;
-    Require(chainCount<3 && info->arraySize==1 && info->sampleCount==1,"Unexpected eye resource count or layout");
+    Require(chainCount<4 && info->arraySize==1 && info->sampleCount==1,"Unexpected eye resource count or layout");
+    if(info->width==XrRuntime::SeatPanelWidth && info->height==XrRuntime::SeatPanelHeight) seatChain=XrSwapchain(10+chainCount);
     D3D11_TEXTURE2D_DESC desc{}; desc.Width=info->width; desc.Height=info->height;
     desc.Format=DXGI_FORMAT(info->format); desc.MipLevels=desc.ArraySize=desc.SampleDesc.Count=1;
     desc.BindFlags=D3D11_BIND_RENDER_TARGET;
@@ -158,10 +161,18 @@ XRAPI_ATTR XrResult XRAPI_CALL xrEndFrame(XrSession,const XrFrameEndInfo* info) 
     lastLayerType=layers ? info->layers[0]->type : XR_TYPE_UNKNOWN;
     Require(info->displayTime==12345,"Frame ended with wrong display time");
     if(layers) {
-        Require(layers<=2 && !acquired[0] && !acquired[1] && !acquired[2],"Submitted layer retains an acquired image");
-        if(layers==2) {
-            Require(lastLayerType==XR_TYPE_COMPOSITION_LAYER_PROJECTION && info->layers[1]->type==XR_TYPE_COMPOSITION_LAYER_QUAD,"HUD must follow the stereo world");
-            lastQuad=*reinterpret_cast<const XrCompositionLayerQuad*>(info->layers[1]);
+        Require(layers<=3 && std::none_of(acquired.begin(),acquired.end(),[](bool image) { return image; }),"Submitted layer retains an acquired image");
+        for(unsigned i=1;i<layers;++i) {
+            Require(lastLayerType==XR_TYPE_COMPOSITION_LAYER_PROJECTION && info->layers[i]->type==XR_TYPE_COMPOSITION_LAYER_QUAD,"HUD and seat panel must follow the stereo world");
+            const auto& quad=*reinterpret_cast<const XrCompositionLayerQuad*>(info->layers[i]);
+            if(seatChain && quad.subImage.swapchain==seatChain) {
+                lastSeat=quad;
+                Require(i==layers-1 && quad.space==XrSpace(3) && quad.eyeVisibility==XR_EYE_VISIBILITY_BOTH &&
+                    quad.subImage.imageRect.extent.width==int32_t(XrRuntime::SeatPanelWidth) && quad.subImage.imageRect.extent.height==int32_t(XrRuntime::SeatPanelHeight) &&
+                    quad.layerFlags==(XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT|XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT),"Seat panel not on top, or its image or transparency invalid");
+                continue;
+            }
+            lastQuad=quad;
             Require(lastQuad.space==XrSpace(3) && lastQuad.eyeVisibility==XR_EYE_VISIBILITY_BOTH &&
                 lastQuad.subImage.swapchain==XrSwapchain(12) && lastQuad.subImage.imageRect.extent.width==64 &&
                 lastQuad.subImage.imageRect.extent.height==48 && lastQuad.layerFlags==
@@ -207,6 +218,33 @@ int main() {
             { auto frame=runtime.BeginFrame(6); CompletePair(frame); { auto panel=frame.AcquireOverlay(); Require(panel.Complete(),"HUD release failed"); }
               Require(!frame.SubmitOverlay(1.f,.1f) && layers==0,"Uncomfortable HUD distance accepted"); }
             { auto frame=runtime.BeginScreenFrame(7); auto panel=frame.AcquireOverlay(); Require(!panel && !frame.SubmitScreen(1.f),"Screen-only mode acquired stereo HUD"); }
+        }
+        Reset(); {
+            XrRuntime runtime; Require(runtime.Initialize(device.Get(),1.f,0,0,true,true) && chainCount==4 && seatChain==XrSwapchain(13),"Seat panel resources unavailable");
+            const XrPosef pose{{0,0,0,1},{0,1.2f,-1}};
+            { auto frame=runtime.BeginFrame(1); { auto seat=frame.AcquireSeatPanel(); Require(!seat,"Seat panel acquired before the stereo pair"); } frame.Abort(); }
+            { auto frame=runtime.BeginFrame(2); CompletePair(frame);
+              { auto seat=frame.AcquireSeatPanel(); Require(seat && seat.Width()==XrRuntime::SeatPanelWidth && seat.Height()==XrRuntime::SeatPanelHeight && seat.Complete(),"Seat panel acquire/release failed"); }
+              Require(frame.ShowSeatPanel(pose,.6f,.8f) && frame.Submit() && layers==2,"Stereo plus seat panel did not submit");
+              Require(Near(lastSeat.size.width,.6f) && Near(lastSeat.size.height,.8f) && Near(lastSeat.pose.position.y,1.2f) && Near(lastSeat.pose.position.z,-1.f),"Seat panel size or placement differs"); }
+            { auto frame=runtime.BeginFrame(3); CompletePair(frame);
+              { auto hud=frame.AcquireOverlay(); Require(hud.Complete(),"HUD release failed"); }
+              { auto seat=frame.AcquireSeatPanel(); Require(seat.Complete(),"Seat panel release failed"); }
+              Require(frame.ShowSeatPanel(pose,.6f,.8f) && frame.SubmitOverlay(4.f/3.f) && layers==3 && Near(lastQuad.size.width,1.6f),"Stereo, HUD and seat panel did not submit"); }
+            { auto frame=runtime.BeginFrame(4); CompletePair(frame); { auto seat=frame.AcquireSeatPanel(); Require(seat.Complete(),"Seat panel release failed"); }
+              Require(!frame.Submit() && layers==0,"Seat panel without a placement submitted"); }
+            { auto frame=runtime.BeginFrame(5); CompletePair(frame); { auto seat=frame.AcquireSeatPanel(); Require(seat.Complete(),"Seat panel release failed"); }
+              Require(!frame.ShowSeatPanel(pose,0,.8f) && !frame.ShowSeatPanel(pose,.6f,3.f) && !frame.ShowSeatPanel({{0,0,0,1},{NAN,0,0}},.6f,.8f),"Invalid seat panel placement accepted");
+              frame.Abort(); Require(layers==0,"Aborted seat panel submitted"); }
+            { auto frame=runtime.BeginFrame(6); CompletePair(frame);
+              Require(!frame.ShowSeatPanel(pose,.6f,.8f) && frame.Submit() && layers==1,"Seat placement without an image, or a stale panel submitted"); }
+            { auto frame=runtime.BeginScreenFrame(7); { auto seat=frame.AcquireSeatPanel(); Require(!seat,"Screen frame acquired the seat panel"); } frame.Abort(); }
+        }
+        Reset(); {
+            XrRuntime runtime; Require(runtime.Initialize(device.Get()) && chainCount==2 && !seatChain,"Seat panel created without the menu");
+            auto frame=runtime.BeginFrame(1); CompletePair(frame);
+            { auto seat=frame.AcquireSeatPanel(); Require(!seat,"Seat panel acquired without the menu"); }
+            frame.Abort();
         }
         Reset(); failChain=2; {
             XrRuntime runtime; Require(!runtime.Initialize(device.Get(),1.f,0,0,true) && destroyedChains==2 && destroyedSessions==1 && destroyedInstances==1,"HUD allocation failure leaked XR resources");

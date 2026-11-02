@@ -53,11 +53,11 @@ void XrRuntime::ReportRefreshRate(bool enabled) noexcept {
         Report("XR display refresh rate unavailable: query failed");
 }
 XrRuntime::~XrRuntime() { Shutdown(); }
-bool XrRuntime::Initialize(ID3D11Device* device,float scale,uint32_t expectedWidth,uint32_t expectedHeight,bool overlay) noexcept {
+bool XrRuntime::Initialize(ID3D11Device* device,float scale,uint32_t expectedWidth,uint32_t expectedHeight,bool overlay,bool seatPanel) noexcept {
     if((expectedWidth || expectedHeight) && (scale!=1.f || !ValidHeadsetSize(expectedWidth,expectedHeight))) return false;
     if(instance_ || !device || !std::isfinite(scale) || scale<.25f || scale>1.f) return false;
     ownerThread_=GetCurrentThreadId(); failed_=exiting_=false;
-    overlayEnabled_=overlay;
+    overlayEnabled_=overlay; seatPanelEnabled_=seatPanel;
     try {
         if(InitializeResources(device,scale,expectedWidth,expectedHeight)) return true;
     } catch(const std::exception& error) { Report("XR initialization exception: %s",error.what()); }
@@ -147,27 +147,36 @@ bool XrRuntime::InitializeResources(ID3D11Device* device,float scale,uint32_t ex
             eye.width=std::max(1u,uint32_t(width*panelScale));
             eye.height=std::max(1u,uint32_t(height*panelScale));
         }
-        XrSwapchainCreateInfo info{XR_TYPE_SWAPCHAIN_CREATE_INFO};
-        info.usageFlags=XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT|XR_SWAPCHAIN_USAGE_TRANSFER_DST_BIT;
-        info.format=format_; info.sampleCount=1; info.width=eye.width; info.height=eye.height;
-        info.faceCount=info.arraySize=info.mipCount=1;
-        if(!Check(xrCreateSwapchain(session_,&info,&eye.handle),"create eye swapchain")) return false;
-        if(!Check(xrEnumerateSwapchainImages(eye.handle,0,&count,nullptr),"image count") || !count || count>MaxImages) return false;
-        if((expectedWidth || i==2) && count>4) { Report("XR recommended-size output requires at most four images per layer"); return false; }
-        textureBytes+=uint64_t(eye.width)*eye.height*4*count;
-        if(textureBytes>MaxTextureBytes) { Report("XR color resource budget exceeded"); return false; }
-        eye.images.resize(count,{XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR});
-        if(!Check(xrEnumerateSwapchainImages(eye.handle,count,&count,reinterpret_cast<XrSwapchainImageBaseHeader*>(eye.images.data())),"images") || count!=eye.images.size()) return false;
-        eye.targets.resize(count);
-        for(unsigned image=0;image<count;++image) {
-            D3D11_RENDER_TARGET_VIEW_DESC target{}; target.Format=format_; target.ViewDimension=D3D11_RTV_DIMENSION_TEXTURE2D;
-            if(!eye.images[image].texture || FAILED(device->CreateRenderTargetView(eye.images[image].texture,&target,&eye.targets[image]))) {
-                Report("XR image RTV allocation failed"); return false;
-            }
-        }
-        Report("XR eye=%u dimensions=%ux%u images=%u format=%u",i,eye.width,eye.height,count,unsigned(format_));
+        if(!CreateSwapchain(device,i,textureBytes,expectedWidth || i==2)) return false;
+    }
+    if(seatPanelEnabled_) {
+        eyes_[3].width=SeatPanelWidth; eyes_[3].height=SeatPanelHeight;
+        if(!CreateSwapchain(device,3,textureBytes,true)) return false;
     }
     Report("XR initialized with game D3D11 device; awaiting session focus and tracked recenter");
+    return true;
+}
+bool XrRuntime::CreateSwapchain(ID3D11Device* device,unsigned index,uint64_t& textureBytes,bool limitImages) {
+    auto& eye=eyes_[index]; uint32_t count{};
+    XrSwapchainCreateInfo info{XR_TYPE_SWAPCHAIN_CREATE_INFO};
+    info.usageFlags=XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT|XR_SWAPCHAIN_USAGE_TRANSFER_DST_BIT;
+    info.format=format_; info.sampleCount=1; info.width=eye.width; info.height=eye.height;
+    info.faceCount=info.arraySize=info.mipCount=1;
+    if(!Check(xrCreateSwapchain(session_,&info,&eye.handle),"create eye swapchain")) return false;
+    if(!Check(xrEnumerateSwapchainImages(eye.handle,0,&count,nullptr),"image count") || !count || count>MaxImages) return false;
+    if(limitImages && count>4) { Report("XR recommended-size output requires at most four images per layer"); return false; }
+    textureBytes+=uint64_t(eye.width)*eye.height*4*count;
+    if(textureBytes>MaxTextureBytes) { Report("XR color resource budget exceeded"); return false; }
+    eye.images.resize(count,{XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR});
+    if(!Check(xrEnumerateSwapchainImages(eye.handle,count,&count,reinterpret_cast<XrSwapchainImageBaseHeader*>(eye.images.data())),"images") || count!=eye.images.size()) return false;
+    eye.targets.resize(count);
+    for(unsigned image=0;image<count;++image) {
+        D3D11_RENDER_TARGET_VIEW_DESC target{}; target.Format=format_; target.ViewDimension=D3D11_RTV_DIMENSION_TEXTURE2D;
+        if(!eye.images[image].texture || FAILED(device->CreateRenderTargetView(eye.images[image].texture,&target,&eye.targets[image]))) {
+            Report("XR image RTV allocation failed"); return false;
+        }
+    }
+    Report("XR eye=%u dimensions=%ux%u images=%u format=%u",index,eye.width,eye.height,count,unsigned(format_));
     return true;
 }
 bool XrRuntime::PollEvents() noexcept {
@@ -219,7 +228,7 @@ bool XrRuntime::StartFrame(uint64_t sequence,FrameMode mode) noexcept {
     if(!Check(xrWaitFrame(session_,&wait,&state),"wait frame")) return false;
     XrFrameBeginInfo begin{XR_TYPE_FRAME_BEGIN_INFO};
     if(!Check(xrBeginFrame(session_,&begin),"begin frame")) return false;
-    frameOpen_=true; frameFailed_=frameRenderable_=false; frameMode_=mode; ++generation_; displayTime_=state.predictedDisplayTime;
+    frameOpen_=true; frameFailed_=frameRenderable_=seatShown_=false; frameMode_=mode; ++generation_; displayTime_=state.predictedDisplayTime;
     for(auto& eye:eyes_) { eye.completed=false; eye.acquired=eye.waited=false; }
     if(!state.shouldRender) { EndFrame(generation_,false); return false; }
     if(spaceChangeTime_ && displayTime_>=spaceChangeTime_) {
@@ -259,6 +268,7 @@ bool XrRuntime::Acquire(uint64_t generation,unsigned index) noexcept {
     if(!Current(generation) || !frameRenderable_ || frameFailed_ || failed_ || exiting_ || index>=eyes_.size()) return false;
     if(frameMode_==FrameMode::Screen && index!=0) { frameFailed_=true; return false; }
     if(index==2 && (!overlayEnabled_ || !eyes_[0].completed || !eyes_[1].completed)) { frameFailed_=true; return false; }
+    if(index==3 && (!seatPanelEnabled_ || frameMode_!=FrameMode::Stereo || !eyes_[0].completed || !eyes_[1].completed)) { frameFailed_=true; return false; }
     auto& eye=eyes_[index];
     if(eye.completed || std::any_of(eyes_.begin(),eyes_.end(),[](const auto& image){return image.acquired;})) { frameFailed_=true; return false; }
     XrSwapchainImageAcquireInfo acquire{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
@@ -296,6 +306,7 @@ bool XrRuntime::EndFrame(uint64_t generation,bool submit,FrameMode mode,float as
     complete&=mode==FrameMode::Stereo ? eyes_[1].completed : !eyes_[1].completed;
     complete&=overlay ? (overlayEnabled_ && mode==FrameMode::Stereo && eyes_[2].completed) : !eyes_[2].completed;
     complete&=!video || (overlay && mode==FrameMode::Stereo);
+    complete&=!eyes_[3].completed || (seatShown_ && mode==FrameMode::Stereo && !video);
     std::array<XrCompositionLayerProjectionView,2> views{{{XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW},{XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW}}};
     for(unsigned i=0;i<2;++i) {
         views[i].pose=views_[i].pose; views[i].fov=views_[i].fov;
@@ -329,11 +340,20 @@ bool XrRuntime::EndFrame(uint64_t generation,bool submit,FrameMode mode,float as
     const XrCompositionLayerBaseHeader* layer=mode==FrameMode::Stereo && !video ?
         reinterpret_cast<const XrCompositionLayerBaseHeader*>(&projection) :
         reinterpret_cast<const XrCompositionLayerBaseHeader*>(&screen);
+    // The seat menu panel stays where it opened in LOCAL space, in front of the HUD.
+    XrCompositionLayerQuad seat{XR_TYPE_COMPOSITION_LAYER_QUAD};
+    seat.space=space_; seat.eyeVisibility=XR_EYE_VISIBILITY_BOTH; seat.pose=seatPose_; seat.size=seatSize_;
+    seat.layerFlags=XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT|XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT;
+    seat.subImage.swapchain=eyes_[3].handle;
+    seat.subImage.imageRect.extent={int32_t(eyes_[3].width),int32_t(eyes_[3].height)};
     XrFrameEndInfo end{XR_TYPE_FRAME_END_INFO}; end.displayTime=displayTime_; end.environmentBlendMode=XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
-    const std::array<const XrCompositionLayerBaseHeader*,2> layers{layer,reinterpret_cast<const XrCompositionLayerBaseHeader*>(&screen)};
-    if(complete) { end.layerCount=overlay && !video ? 2 : 1; end.layers=layers.data(); }
+    std::array<const XrCompositionLayerBaseHeader*,3> layers{layer};
+    uint32_t layerCount=1;
+    if(overlay && !video) layers[layerCount++]=reinterpret_cast<const XrCompositionLayerBaseHeader*>(&screen);
+    if(eyes_[3].completed) layers[layerCount++]=reinterpret_cast<const XrCompositionLayerBaseHeader*>(&seat);
+    if(complete) { end.layerCount=layerCount; end.layers=layers.data(); }
     const bool ended=Check(xrEndFrame(session_,&end),"end frame");
-    frameOpen_=frameRenderable_=false; canRecenter_=false;
+    frameOpen_=frameRenderable_=seatShown_=false; canRecenter_=false;
     if(complete && ended) {
         if(mode==FrameMode::Stereo && !video) ++submitted_;
         else ++screenSubmitted_;
@@ -357,7 +377,7 @@ void XrRuntime::Shutdown() noexcept {
     recenterPending_=true; recenterTilt_=false; haveGameSequence_=false; spaceChangeTime_=0;
     orientationModes_=0;
     referenceRevision_=0;
-    overlayEnabled_=false;
+    overlayEnabled_=seatPanelEnabled_=seatShown_=false;
     reference_={{0,0,0,1},{0,0,0}}; ++generation_;
 }
 std::array<uint32_t,4> XrRuntime::EyeDimensions() const noexcept {
@@ -380,11 +400,25 @@ XrPosef XrRuntime::Frame::RelativeEyePose(unsigned eye) const {
 }
 XrRuntime::Eye XrRuntime::Frame::AcquireEye(unsigned eye) {
     if(!owner_) throw std::logic_error("XR frame is not active");
-    return Eye(*owner_,generation_,eye<2 ? eye : 3);
+    return Eye(*owner_,generation_,eye<2 ? eye : NoImage);
 }
 XrRuntime::Eye XrRuntime::Frame::AcquireOverlay() {
     if(!owner_) throw std::logic_error("XR frame is not active");
     return Eye(*owner_,generation_,2);
+}
+XrRuntime::Eye XrRuntime::Frame::AcquireSeatPanel() {
+    if(!owner_) throw std::logic_error("XR frame is not active");
+    return Eye(*owner_,generation_,3);
+}
+bool XrRuntime::Frame::ShowSeatPanel(const XrPosef& pose,float width,float height) noexcept {
+    return owner_ && owner_->ShowSeat(generation_,pose,width,height);
+}
+bool XrRuntime::ShowSeat(uint64_t generation,const XrPosef& pose,float width,float height) noexcept {
+    if(!Current(generation) || !eyes_[3].completed || !math::Finite(pose.position) ||
+       !std::isfinite(width) || !std::isfinite(height) || width<=0 || height<=0 || width>2.f || height>2.f) return false;
+    try { seatPose_={math::Normalize(pose.orientation),pose.position}; } catch(...) { return false; }
+    seatSize_={width,height}; seatShown_=true;
+    return true;
 }
 bool XrRuntime::Frame::SubmitOverlay(float aspect,float distance,float width) noexcept {
     if(!owner_) return false;
