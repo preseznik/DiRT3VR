@@ -1,0 +1,1196 @@
+{
+ "source": "DiRT 3 Complete Edition (Steam) actionmap/*.xml, read leniently (two stock files are not well-formed XML); loaded = listed in actionMapPaths.xml (the game reads only those)",
+ "notes": {
+  "di_button": "zero-based: di_button_0 .. di_button_22 in the stock maps",
+  "vk_code": "Windows virtual-key code, e.g. vk_code_0x26 = Up arrow",
+  "defaults": "a CalibratorSimple without deadZone/saturation uses the map's stated defaults (0.2 / 0.8, threshold 0.5, per the map comments)"
+ },
+ "maps": {
+  "wm_keyboard.xml": [
+   {
+    "action": "Accelerate",
+    "axisName": "vk_code_0x26",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Accelerate",
+    "axisName": "vk_code_0x68",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Brake",
+    "axisName": "vk_code_0x28",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Brake",
+    "axisName": "vk_code_0x62",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Handbrake",
+    "axisName": "vk_code_0x51",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Steer Left",
+    "axisName": "vk_code_0x25",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Steer Left",
+    "axisName": "vk_code_0x64",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Steer Right",
+    "axisName": "vk_code_0x27",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Steer Right",
+    "axisName": "vk_code_0x66",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Change View",
+    "axisName": "vk_code_0x43",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Gear Up",
+    "axisName": "vk_code_0x53",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Gear Down",
+    "axisName": "vk_code_0x41",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Look Left",
+    "axisName": "vk_code_0x2E",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Look Right",
+    "axisName": "vk_code_0x23",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Look Up",
+    "axisName": "vk_code_0x21",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Look Down",
+    "axisName": "vk_code_0x22",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Look Back",
+    "axisName": "vk_code_0x57",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Pause",
+    "axisName": "vk_code_0x1B",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Instant Replay",
+    "axisName": "vk_code_0x70",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Horn",
+    "axisName": "vk_code_0x58",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Left",
+    "axisName": "vk_code_0x25",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Left",
+    "axisName": "vk_code_0x64",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Right",
+    "axisName": "vk_code_0x27",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Right",
+    "axisName": "vk_code_0x66",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Up",
+    "axisName": "vk_code_0x26",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Up",
+    "axisName": "vk_code_0x68",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Down",
+    "axisName": "vk_code_0x28",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Down",
+    "axisName": "vk_code_0x62",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Select",
+    "axisName": "vk_code_0x0D",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Back",
+    "axisName": "vk_code_0x1B",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Button3",
+    "axisName": "vk_code_0x70",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Button4",
+    "axisName": "vk_code_0x71",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Start Button",
+    "axisName": "vk_code_0x0D",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Fe View Tweak Left",
+    "axisName": "vk_code_0x41",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Fe View Tweak Right",
+    "axisName": "vk_code_0x44",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Fe View Tweak Up",
+    "axisName": "vk_code_0x57",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Fe View Tweak Down",
+    "axisName": "vk_code_0x53",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Fe View Tweak In",
+    "axisName": "vk_code_0x45",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Fe View Tweak Out",
+    "axisName": "vk_code_0x51",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay Rewind",
+    "axisName": "vk_code_0x71",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay Fast Forward",
+    "axisName": "vk_code_0x72",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay Pause",
+    "axisName": "vk_code_0x70",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay Next Camera",
+    "axisName": "vk_code_0x77",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay Prev Camera",
+    "axisName": "vk_code_0x76",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay Jump In",
+    "axisName": "vk_code_0x7B",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay Exit",
+    "axisName": "vk_code_0x1B",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay UI On Off",
+    "axisName": "vk_code_0x78",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay Youtube",
+    "axisName": "vk_code_0xA0",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Youtube Drag Left",
+    "axisName": "vk_code_0x76",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Youtube Drag Right",
+    "axisName": "vk_code_0x77",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Youtube Speed Up",
+    "axisName": "vk_code_0x26",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Youtube Speed Down",
+    "axisName": "vk_code_0x28",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Youtube Upload",
+    "axisName": "vk_code_0x7B",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Youtube Exit",
+    "axisName": "vk_code_0x1B",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Spectator Next Camera",
+    "axisName": "vk_code_0x77",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Spectator Previous Camera",
+    "axisName": "vk_code_0x76",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Spectator UI On Off",
+    "axisName": "vk_code_0x70",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Spectator List On Off",
+    "axisName": "vk_code_0xA0",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Cycle Forward On Board Cameras",
+    "axisName": "vk_code_0x77",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Activate Replay System",
+    "axisName": "vk_code_0x76",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "SeparationInc",
+    "axisName": "vk_code_0x32",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "SeparationDec",
+    "axisName": "vk_code_0x31",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "ViewPlaneInc",
+    "axisName": "vk_code_0x34",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "ViewPlaneDec",
+    "axisName": "vk_code_0x33",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Temp Left Shoulder",
+    "axisName": "vk_code_0x70",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Temp Right Shoulder",
+    "axisName": "vk_code_0x71",
+    "type": "uniDirectionalPositive"
+   }
+  ],
+  "xinput_pad.xml": [
+   {
+    "action": "Accelerate",
+    "axisName": "xinput_right_trigger",
+    "type": "uniDirectionalPositive",
+    "deadZone": 0.0,
+    "saturation": 1.0
+   },
+   {
+    "action": "Brake",
+    "axisName": "xinput_left_trigger",
+    "type": "uniDirectionalPositive",
+    "deadZone": 0.0,
+    "saturation": 1.0
+   },
+   {
+    "action": "Handbrake",
+    "axisName": "xinput_button_b",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Steer Left",
+    "axisName": "xinput_left_stick_x",
+    "type": "biDirectionalLower",
+    "deadZone": 0.2,
+    "saturation": 1.0
+   },
+   {
+    "action": "Steer Left",
+    "axisName": "xinput_dpad_left",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Steer Right",
+    "axisName": "xinput_left_stick_x",
+    "type": "biDirectionalUpper",
+    "deadZone": 0.2,
+    "saturation": 1.0
+   },
+   {
+    "action": "Steer Right",
+    "axisName": "xinput_dpad_right",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Change View",
+    "axisName": "xinput_button_right_shoulder",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Gear Up",
+    "axisName": "xinput_button_x",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Gear Down",
+    "axisName": "xinput_button_a",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Look Left",
+    "axisName": "xinput_right_stick_x",
+    "type": "biDirectionalLower",
+    "deadZone": 0.3,
+    "saturation": 0.8
+   },
+   {
+    "action": "Look Right",
+    "axisName": "xinput_right_stick_x",
+    "type": "biDirectionalUpper",
+    "deadZone": 0.3,
+    "saturation": 0.8
+   },
+   {
+    "action": "Look Up",
+    "axisName": "xinput_right_stick_y",
+    "type": "biDirectionalUpper",
+    "deadZone": 0.3,
+    "saturation": 0.8
+   },
+   {
+    "action": "Look Down",
+    "axisName": "xinput_right_stick_y",
+    "type": "biDirectionalLower",
+    "deadZone": 0.3,
+    "saturation": 0.8
+   },
+   {
+    "action": "Look Back",
+    "axisName": "xinput_button_y",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Pause",
+    "axisName": "xinput_button_start",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Instant Replay",
+    "axisName": "xinput_button_left_shoulder",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Instant Replay",
+    "axisName": "xinput_button_back",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Horn",
+    "axisName": "xinput_button_right_stick",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Left",
+    "axisName": "xinput_dpad_left",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Left",
+    "axisName": "xinput_left_stick_x",
+    "type": "biDirectionalLower",
+    "deadZone": 0.3,
+    "saturation": 1.0
+   },
+   {
+    "action": "Menu Right",
+    "axisName": "xinput_dpad_right",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Right",
+    "axisName": "xinput_left_stick_x",
+    "type": "biDirectionalUpper",
+    "deadZone": 0.3,
+    "saturation": 1.0
+   },
+   {
+    "action": "Menu Up",
+    "axisName": "xinput_dpad_up",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Up",
+    "axisName": "xinput_left_stick_y",
+    "type": "biDirectionalUpper",
+    "deadZone": 0.3,
+    "saturation": 1.0
+   },
+   {
+    "action": "Menu Down",
+    "axisName": "xinput_dpad_down",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Down",
+    "axisName": "xinput_left_stick_y",
+    "type": "biDirectionalLower",
+    "deadZone": 0.3,
+    "saturation": 1.0
+   },
+   {
+    "action": "Menu Select",
+    "axisName": "xinput_button_a",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Back",
+    "axisName": "xinput_button_b",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Button3",
+    "axisName": "xinput_button_x",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Button4",
+    "axisName": "xinput_button_y",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Start Button",
+    "axisName": "xinput_button_start",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Fe View Tweak Left",
+    "axisName": "xinput_right_stick_x",
+    "type": "biDirectionalLower"
+   },
+   {
+    "action": "Fe View Tweak Right",
+    "axisName": "xinput_right_stick_x",
+    "type": "biDirectionalUpper"
+   },
+   {
+    "action": "Fe View Tweak Up",
+    "axisName": "xinput_right_stick_y",
+    "type": "biDirectionalUpper"
+   },
+   {
+    "action": "Fe View Tweak Down",
+    "axisName": "xinput_right_stick_y",
+    "type": "biDirectionalLower"
+   },
+   {
+    "action": "Fe View Tweak In",
+    "axisName": "xinput_right_trigger",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Fe View Tweak Out",
+    "axisName": "xinput_left_trigger",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay Rewind",
+    "axisName": "xinput_left_trigger",
+    "type": "uniDirectionalPositive",
+    "deadZone": 0.0,
+    "saturation": 1.0
+   },
+   {
+    "action": "Replay Rewind",
+    "axisName": "xinput_left_stick_x",
+    "type": "biDirectionalLower",
+    "deadZone": 0.3,
+    "saturation": 1.0
+   },
+   {
+    "action": "Replay Fast Forward",
+    "axisName": "xinput_right_trigger",
+    "type": "uniDirectionalPositive",
+    "deadZone": 0.0,
+    "saturation": 1.0
+   },
+   {
+    "action": "Replay Fast Forward",
+    "axisName": "xinput_left_stick_x",
+    "type": "biDirectionalUpper",
+    "deadZone": 0.3,
+    "saturation": 1.0
+   },
+   {
+    "action": "Replay Pause",
+    "axisName": "xinput_button_a",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay Next Camera",
+    "axisName": "xinput_button_right_shoulder",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay Prev Camera",
+    "axisName": "xinput_button_left_shoulder",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay Jump In",
+    "axisName": "xinput_button_x",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay Exit",
+    "axisName": "xinput_button_b",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay UI On Off",
+    "axisName": "xinput_button_back",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay Youtube",
+    "axisName": "xinput_button_y",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Youtube Drag Left",
+    "axisName": "xinput_button_left_shoulder",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Youtube Drag Right",
+    "axisName": "xinput_button_right_shoulder",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Youtube Speed Up",
+    "axisName": "xinput_dpad_up",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Youtube Speed Down",
+    "axisName": "xinput_dpad_down",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Youtube Upload",
+    "axisName": "xinput_button_x",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Youtube Exit",
+    "axisName": "xinput_button_b",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Spectator Next Camera",
+    "axisName": "xinput_button_right_shoulder",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Spectator Previous Camera",
+    "axisName": "xinput_button_left_shoulder",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Spectator UI On Off",
+    "axisName": "xinput_button_back",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Spectator List On Off",
+    "axisName": "xinput_button_x",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Cycle Forward On Board Cameras",
+    "axisName": "xinput_button_right_shoulder",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Activate Replay System",
+    "axisName": "xinput_button_left_shoulder",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Temp Left Shoulder",
+    "axisName": "xinput_button_left_shoulder",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Temp Right Shoulder",
+    "axisName": "xinput_button_right_shoulder",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Temp Button Left Stick",
+    "axisName": "xinput_button_left_stick",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Temp Button Right Stick",
+    "axisName": "xinput_button_right_stick",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Temp A Button",
+    "axisName": "xinput_button_a",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Temp B Button",
+    "axisName": "xinput_button_b",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Temp Left Stick Up",
+    "axisName": "xinput_left_stick_y",
+    "type": "biDirectionalUpper",
+    "deadZone": 0.3,
+    "saturation": 0.8
+   },
+   {
+    "action": "Temp Left Stick Down",
+    "axisName": "xinput_left_stick_y",
+    "type": "biDirectionalLower",
+    "deadZone": 0.3,
+    "saturation": 0.8
+   }
+  ],
+  "dinput_default.xml": [
+   {
+    "action": "Accelerate",
+    "axisName": "di_y_axis_rotation",
+    "type": "uniDirectionalNegative",
+    "deadZone": 0.0,
+    "saturation": 1.0
+   },
+   {
+    "action": "Brake",
+    "axisName": "di_x_axis_rotation",
+    "type": "uniDirectionalNegative",
+    "deadZone": 0.0,
+    "saturation": 1.0
+   },
+   {
+    "action": "Handbrake",
+    "axisName": "di_button_1",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Steer Left",
+    "axisName": "di_dpad_0_left",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Steer Left",
+    "axisName": "di_x_axis",
+    "type": "biDirectionalLower",
+    "deadZone": 0.2,
+    "saturation": 1.0
+   },
+   {
+    "action": "Steer Left",
+    "axisName": "di_slider_0",
+    "type": "biDirectionalUpper",
+    "deadZone": 0.0,
+    "saturation": 1.0
+   },
+   {
+    "action": "Steer Right",
+    "axisName": "di_dpad_0_right",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Steer Right",
+    "axisName": "di_x_axis",
+    "type": "biDirectionalUpper",
+    "deadZone": 0.2,
+    "saturation": 1.0
+   },
+   {
+    "action": "Steer Right",
+    "axisName": "di_slider_0",
+    "type": "biDirectionalLower",
+    "deadZone": 0.0,
+    "saturation": 1.0
+   },
+   {
+    "action": "Change View",
+    "axisName": "di_button_4",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Gear Up",
+    "axisName": "di_button_2",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Gear Down",
+    "axisName": "di_button_0",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Look Left",
+    "axisName": "di_z_axis",
+    "type": "biDirectionalLower",
+    "deadZone": 0.3,
+    "saturation": 0.8
+   },
+   {
+    "action": "Look Right",
+    "axisName": "di_z_axis",
+    "type": "biDirectionalUpper",
+    "deadZone": 0.3,
+    "saturation": 0.8
+   },
+   {
+    "action": "Look Up",
+    "axisName": "di_z_axis_rotation",
+    "type": "biDirectionalLower",
+    "deadZone": 0.3,
+    "saturation": 0.8
+   },
+   {
+    "action": "Look Down",
+    "axisName": "di_z_axis_rotation",
+    "type": "biDirectionalUpper",
+    "deadZone": 0.3,
+    "saturation": 0.8
+   },
+   {
+    "action": "Look Back",
+    "axisName": "di_button_3",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Pause",
+    "axisName": "di_button_9",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Instant Replay",
+    "axisName": "di_button_8",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Instant Replay",
+    "axisName": "di_button_5",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Horn",
+    "axisName": "di_button_11",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Left",
+    "axisName": "di_dpad_0_left",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Left",
+    "axisName": "di_x_axis",
+    "type": "biDirectionalLower",
+    "deadZone": 0.3,
+    "saturation": 1.0
+   },
+   {
+    "action": "Menu Right",
+    "axisName": "di_dpad_0_right",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Right",
+    "axisName": "di_x_axis",
+    "type": "biDirectionalUpper",
+    "deadZone": 0.3,
+    "saturation": 1.0
+   },
+   {
+    "action": "Menu Up",
+    "axisName": "di_dpad_0_up",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Up",
+    "axisName": "di_y_axis",
+    "type": "biDirectionalUpper",
+    "deadZone": 0.3,
+    "saturation": 1.0
+   },
+   {
+    "action": "Menu Down",
+    "axisName": "di_dpad_0_down",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Down",
+    "axisName": "di_y_axis",
+    "type": "biDirectionalLower",
+    "deadZone": 0.3,
+    "saturation": 1.0
+   },
+   {
+    "action": "Menu Select",
+    "axisName": "di_button_1",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Back",
+    "axisName": "di_button_2",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Button3",
+    "axisName": "di_button_0",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Button4",
+    "axisName": "di_button_3",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Menu Start Button",
+    "axisName": "di_button_9",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Fe View Tweak Left",
+    "axisName": "di_z_axis",
+    "type": "biDirectionalLower"
+   },
+   {
+    "action": "Fe View Tweak Right",
+    "axisName": "di_z_axis",
+    "type": "biDirectionalUpper"
+   },
+   {
+    "action": "Fe View Tweak Up",
+    "axisName": "di_z_axis_rotation",
+    "type": "biDirectionalLower"
+   },
+   {
+    "action": "Fe View Tweak Down",
+    "axisName": "di_z_axis_rotation",
+    "type": "biDirectionalUpper"
+   },
+   {
+    "action": "Fe View Tweak In",
+    "axisName": "di_y_axis_rotation",
+    "type": "uniDirectionalNegative"
+   },
+   {
+    "action": "Fe View Tweak Out",
+    "axisName": "di_x_axis_rotation",
+    "type": "uniDirectionalNegative"
+   },
+   {
+    "action": "Replay Rewind",
+    "axisName": "di_x_axis_rotation",
+    "type": "uniDirectionalNegative",
+    "deadZone": 0.0,
+    "saturation": 1.0
+   },
+   {
+    "action": "Replay Rewind",
+    "axisName": "di_x_axis",
+    "type": "biDirectionalLower",
+    "deadZone": 0.3,
+    "saturation": 1.0
+   },
+   {
+    "action": "Replay Fast Forward",
+    "axisName": "di_y_axis_rotation",
+    "type": "uniDirectionalNegative",
+    "deadZone": 0.0,
+    "saturation": 1.0
+   },
+   {
+    "action": "Replay Fast Forward",
+    "axisName": "di_x_axis",
+    "type": "biDirectionalUpper",
+    "deadZone": 0.3,
+    "saturation": 1.0
+   },
+   {
+    "action": "Replay Pause",
+    "axisName": "di_button_1",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay Next Camera",
+    "axisName": "di_button_5",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay Prev Camera",
+    "axisName": "di_button_4",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay Jump In",
+    "axisName": "di_button_0",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay Exit",
+    "axisName": "di_button_3",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay Exit",
+    "axisName": "di_button_2",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay UI On Off",
+    "axisName": "di_button_8",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Replay Youtube",
+    "axisName": "di_button_6",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Youtube Drag Left",
+    "axisName": "di_button_4",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Youtube Drag Right",
+    "axisName": "di_button_5",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Youtube Speed Up",
+    "axisName": "di_dpad_0_up",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Youtube Speed Down",
+    "axisName": "di_dpad_0_down",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Youtube Upload",
+    "axisName": "di_button_0",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Youtube Exit",
+    "axisName": "di_button_3",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Youtube Exit",
+    "axisName": "di_button_2",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Spectator Next Camera",
+    "axisName": "di_button_5",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Spectator Previous Camera",
+    "axisName": "di_button_4",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Spectator UI On Off",
+    "axisName": "di_button_8",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Spectator List On Off",
+    "axisName": "di_button_0",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Cycle Forward On Board Cameras",
+    "axisName": "di_button_5",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Activate Replay System",
+    "axisName": "di_button_4",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Temp Left Shoulder",
+    "axisName": "di_button_4",
+    "type": "uniDirectionalPositive"
+   },
+   {
+    "action": "Temp Right Shoulder",
+    "axisName": "di_button_5",
+    "type": "uniDirectionalPositive"
+   }
+  ]
+ },
+ "axisNames": [
+  "di_button_0",
+  "di_button_1",
+  "di_button_10",
+  "di_button_11",
+  "di_button_12",
+  "di_button_13",
+  "di_button_14",
+  "di_button_15",
+  "di_button_16",
+  "di_button_17",
+  "di_button_18",
+  "di_button_19",
+  "di_button_2",
+  "di_button_20",
+  "di_button_21",
+  "di_button_22",
+  "di_button_3",
+  "di_button_4",
+  "di_button_5",
+  "di_button_6",
+  "di_button_7",
+  "di_button_8",
+  "di_button_9",
+  "di_dpad_0_down",
+  "di_dpad_0_left",
+  "di_dpad_0_right",
+  "di_dpad_0_up",
+  "di_slider_0",
+  "di_slider_1",
+  "di_x_axis",
+  "di_x_axis_rotation",
+  "di_y_axis",
+  "di_y_axis_rotation",
+  "di_z_axis",
+  "di_z_axis_rotation",
+  "vk_code_0x0D",
+  "vk_code_0x1B",
+  "vk_code_0x20",
+  "vk_code_0x21",
+  "vk_code_0x22",
+  "vk_code_0x23",
+  "vk_code_0x25",
+  "vk_code_0x26",
+  "vk_code_0x27",
+  "vk_code_0x28",
+  "vk_code_0x2E",
+  "vk_code_0x31",
+  "vk_code_0x32",
+  "vk_code_0x33",
+  "vk_code_0x34",
+  "vk_code_0x41",
+  "vk_code_0x43",
+  "vk_code_0x44",
+  "vk_code_0x45",
+  "vk_code_0x4C",
+  "vk_code_0x51",
+  "vk_code_0x53",
+  "vk_code_0x57",
+  "vk_code_0x58",
+  "vk_code_0x5A",
+  "vk_code_0x62",
+  "vk_code_0x64",
+  "vk_code_0x66",
+  "vk_code_0x68",
+  "vk_code_0x70",
+  "vk_code_0x71",
+  "vk_code_0x72",
+  "vk_code_0x74",
+  "vk_code_0x76",
+  "vk_code_0x77",
+  "vk_code_0x78",
+  "vk_code_0x7B",
+  "vk_code_0xA0",
+  "vk_code_0xA1",
+  "vk_code_0xBA",
+  "vk_code_0xDE",
+  "xinput_button_a",
+  "xinput_button_b",
+  "xinput_button_back",
+  "xinput_button_left_shoulder",
+  "xinput_button_left_stick",
+  "xinput_button_right_shoulder",
+  "xinput_button_right_stick",
+  "xinput_button_start",
+  "xinput_button_x",
+  "xinput_button_y",
+  "xinput_dpad_down",
+  "xinput_dpad_left",
+  "xinput_dpad_right",
+  "xinput_dpad_up",
+  "xinput_left_stick_x",
+  "xinput_left_stick_y",
+  "xinput_left_trigger",
+  "xinput_right_stick_x",
+  "xinput_right_stick_y",
+  "xinput_right_trigger"
+ ]
+}
