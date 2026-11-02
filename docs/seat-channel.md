@@ -60,12 +60,17 @@ Car entry (96 bytes): code (UTF-8, 16 bytes, NUL-padded) at +0, display name (UT
 position f32[3] at +64, **applied** f32[3] at +76 (what the session's camera file already holds), 8
 spare bytes.
 
+The launcher writes the car table, 188 and 192–215 **once, when it creates the mapping** at session
+start. After that only the renderer writes a position (the car's +64, or 192, on commit); the launcher
+only reads it back. The applied values never change during a session.
+
 Positions are metres in DiRT2VR's convention: **x right, y up, z back**, each within ±0.5. The
 launcher's seat offsets are centimetres with +left / up / forward, so `x = −Sideways/100`,
 `y = Up/100`, `z = −Forward/100`. The launcher saves commits rounded to whole centimetres.
 
-**The renderer applies `position − applied` live** (VR: added to the eye pose, as DiRT2VR's
-`SeatEyePose`; on the monitor: per the camera research, #88b7f778). The camera file edit stays the
+**The renderer applies `position − applied` live** (VR: added to `frame.RelativeEyePose()` before
+`cameras.Apply`, as DiRT2VR's `SeatEyePose` (Lens, 2026-11-02: EyeCamera uses 1 unit = 1 m on the car
+camera's right / up / back axes, so the convention matches); on the monitor: per the camera research, #88b7f778). The camera file edit stays the
 session's starting point, so a position is never applied twice and a session without the menu
 behaves as before.
 
