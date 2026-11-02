@@ -163,6 +163,18 @@ Public NotInheritable Class SeatChannel
         settings.Validate()
     End Sub
 
+    ' Reads a new commit and saves it into the launcher settings on disk; the commit, or Nothing.
+    Public Shared Function SaveCommit(context As InstallContext, channel As SeatChannel) As SeatCommit
+        If channel Is Nothing Then Return Nothing
+        channel.Heartbeat()
+        Dim commit = channel.ReadCommit()
+        If commit Is Nothing Then Return Nothing
+        Dim saved = LauncherSettings.Load(context)
+        Apply(saved, commit)
+        saved.Save(context)
+        Return commit
+    End Function
+
     Public Sub Dispose() Implements IDisposable.Dispose
         view.Dispose() : mapping.Dispose()
     End Sub

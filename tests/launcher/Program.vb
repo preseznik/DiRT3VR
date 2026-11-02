@@ -178,6 +178,9 @@ Module Program
         Dim start = InteractiveSession.StartInfo(one, runtimeInfo, Path.Combine(one.UserRoot, "logs", "fixture"), preferences, headset)
         Check(start.Environment("DIRT3VR_VR_RENDER_SCALE") = "75", "selected VR render scale reaches the VR child")
         Check(start.Environment("DIRT3VR_RECENTER_KEY") = "121 0", "default F10 recenter reaches the VR child")
+        Check(Not start.Environment.ContainsKey("DIRT3VR_SEAT_CHANNEL") AndAlso
+              InteractiveSession.StartInfo(one, runtimeInfo, Path.Combine(one.UserRoot, "logs", "fixture"), preferences, headset, seatChannelName:="Local\DiRT3VR.Seat.test").Environment("DIRT3VR_SEAT_CHANNEL") = "Local\DiRT3VR.Seat.test",
+              "the in-game seat menu's channel reaches the VR child only when the session has one")
         preferences.RecenterKey = 82 : preferences.RecenterModifiers = 5
         Check(InteractiveSession.StartInfo(one, runtimeInfo, Path.Combine(one.UserRoot, "logs", "fixture"), preferences, headset).Environment("DIRT3VR_RECENTER_KEY") = "82 5", "chosen recenter key and modifiers reach the VR child")
         preferences.RecenterKey = 9 : preferences.RecenterModifiers = 2

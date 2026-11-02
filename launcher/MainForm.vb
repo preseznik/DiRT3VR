@@ -242,7 +242,10 @@ Public Class MainForm
                                                      RefreshState()
                                                  End Sub
         AddHandler experimental.CheckedChanged, Sub() RefreshState()
-        AddHandler timer.Tick, Sub() RefreshState()
+        AddHandler timer.Tick, Sub()
+                                   RefreshState()
+                                   PollSeatMenu()
+                               End Sub
         AddHandler SizeChanged, Sub()
                                    FitStatusText()
                                    RefreshLabelWidths(Me)
@@ -827,6 +830,27 @@ Public Class MainForm
         refreshHeadset.Enabled = Not busy AndAlso Not running
     End Sub
 
+    ' Saves from the in-game seat menu go into Controls → Seat while the VR session runs (#bd820b32).
+    Private Sub PollSeatMenu()
+        Dim session = interactive
+        If session?.SeatMenu Is Nothing Then Return
+        Try
+            ShowSeatCommit(SeatChannel.SaveCommit(context, session.SeatMenu))
+        Catch ex As IOException
+            notice.Text = "The seat position from the in-game menu couldn't be saved: " & ex.Message
+        End Try
+    End Sub
+
+    ' Shows a seat position the in-game menu saved (already on disk) in Controls → Seat; public for the tests.
+    Public Sub ShowSeatCommit(commit As SeatCommit)
+        If commit Is Nothing Then Return
+        Dim clean = Not HasUnsavedSettings()
+        seatPicker.ApplyCommit(commit)
+        SeatChannel.Apply(settings, commit)
+        If clean Then RememberSavedSettings()
+        notice.Text = "Seat position " & If(commit.AllCars, "for every car", "for " & EventCatalog.Current.FindCar(commit.Car).Name) & " saved from the in-game menu: " & commit.Offset.Describe() & "."
+    End Sub
+
     Private Async Sub ObserveInteractive()
         Dim owned = interactive
         Dim failed = False
@@ -838,6 +862,7 @@ Public Class MainForm
         Finally
             recenterWatcher?.Dispose() : recenterWatcher = Nothing
             launchProgress?.Dispose() : launchProgress = Nothing
+            If Not IsDisposed AndAlso owned.FinalSeatCommit IsNot Nothing Then ShowSeatCommit(owned.FinalSeatCommit)
             interactive = Nothing
             RefreshState() : LoadDiagnostics() : UpdateLastSession()
         End Try

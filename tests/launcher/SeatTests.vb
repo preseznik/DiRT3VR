@@ -212,6 +212,10 @@ Module SeatTests
             check(Not onDesktop.Checked AndAlso Not form.CurrentSettings().SeatOnDesktop, "seat positions on the monitor are off by default")
             onDesktop.Checked = True : Application.DoEvents()
             check(form.CurrentSettings().SeatOnDesktop, "Also when playing on the monitor is a launcher setting")
+            ' A save from the in-game seat menu shows up in Controls → Seat (#bd820b32).
+            form.ShowSeatCommit(New SeatCommit With {.Car = "stx", .Offset = New SeatOffset With {.Up = 6, .Forward = 1}})
+            check(form.CurrentSettings().SeatOffsets("stx").Up = 6 AndAlso form.CurrentSettings().SeatOffsets("stx").Forward = 1 AndAlso
+                  find("Notice").Text.Contains("saved from the in-game menu", StringComparison.Ordinal), "a seat saved in the in-game menu shows in Controls → Seat (" & find("Notice").Text & ")")
             form.Close()
         End Using
     End Sub
