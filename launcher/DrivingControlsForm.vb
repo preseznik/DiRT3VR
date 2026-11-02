@@ -19,6 +19,13 @@ Public NotInheritable Class DrivingControlsForm
     Private ReadOnly calibrateButton As Button
     Private ReadOnly removeButton As Button
     Private ReadOnly resetButton As Button
+    ' Live highlight (#9ff647cf): bound rows light up while their input is pressed or moved.
+    Private ReadOnly pollTimer As New Timer With {.Interval = 50}
+    Private ReadOnly rests As New Dictionary(Of String, DrivingInput.Sample)(StringComparer.OrdinalIgnoreCase)
+    Private input As DrivingInput
+
+    <Runtime.InteropServices.DllImport("user32.dll")> Private Shared Function GetAsyncKeyState(key As Integer) As Short
+    End Function
 
     Public Sub New(context As InstallContext, Optional libraryPath As String = Nothing)
         Me.context = context
@@ -77,6 +84,66 @@ Public NotInheritable Class DrivingControlsForm
         footer.Controls.Add(presets.Item1) : footer.Controls.Add(dialogButtons) : layout.Controls.Add(footer, 0, 5)
         AddHandler rows.SelectedIndexChanged, Sub() UpdateSelection()
         Controls.Add(layout) : RefreshRows()
+        AddHandler Shown, Sub() StartHighlight()
+        AddHandler pollTimer.Tick, Sub() PollHighlight()
+    End Sub
+
+    Private Sub StartHighlight()
+        Try
+            input = New DrivingInput(libraryPath, Handle)
+            pollTimer.Start()
+        Catch ex As Exception When TypeOf ex Is IOException OrElse TypeOf ex Is DllNotFoundException OrElse TypeOf ex Is BadImageFormatException OrElse TypeOf ex Is EntryPointNotFoundException
+            ' No live highlight without the input library; binding still works through the wizard's own message.
+        End Try
+    End Sub
+
+    Private Sub PollHighlight()
+        If input Is Nothing Then Return
+        Dim samples As New Dictionary(Of String, DrivingInput.Sample)(StringComparer.OrdinalIgnoreCase)
+        For Each device In input.Devices
+            samples(device.Id) = input.Read(device)
+        Next
+        Dim focused = ContainsFocus
+        ShowActive(samples, Function(key) focused AndAlso GetAsyncKeyState(key) < 0)
+    End Sub
+
+    ' Colours each bound row whose input is pressed or moved now with the launcher's accent; also used by tests.
+    ' The first connected sample of each device is its rest.
+    Public Sub ShowActive(samples As IReadOnlyDictionary(Of String, DrivingInput.Sample), keyDown As Func(Of Integer, Boolean))
+        For Each pair In samples
+            If pair.Value.Connected <> 0UI AndAlso Not rests.ContainsKey(pair.Key) Then rests(pair.Key) = DrivingCapture.Clone(pair.Value)
+        Next
+        Dim accent = LauncherAppearance.Accent
+        Dim accentText = If(accent.GetBrightness() > 0.5F, Color.Black, Color.White)
+        rows.BeginUpdate()
+        For Each row As ListViewItem In rows.Items
+            Dim binding = TryCast(row.Tag, DrivingBinding)
+            Dim sample = DrivingInput.Sample.Empty(), rest = DrivingInput.Sample.Empty()
+            Dim active As Boolean
+            If binding Is Nothing Then
+                active = False
+            ElseIf binding.Keyboard Then
+                active = keyDown IsNot Nothing AndAlso keyDown(Convert.ToInt32(binding.Input.Substring(10), 16))
+            Else
+                active = samples.TryGetValue(binding.DeviceId, sample) AndAlso rests.TryGetValue(binding.DeviceId, rest) AndAlso DrivingCapture.Active(binding, sample, rest)
+            End If
+            Dim back = If(active, accent, rows.BackColor), fore = If(active, accentText, rows.ForeColor)
+            If row.BackColor <> back Then row.BackColor = back
+            If row.ForeColor <> fore Then row.ForeColor = fore
+        Next
+        rows.EndUpdate()
+    End Sub
+
+    ' Rows lit by the live highlight, for tests.
+    Public ReadOnly Property HighlightedActions As IReadOnlyList(Of String)
+        Get
+            Return rows.Items.Cast(Of ListViewItem)().Where(Function(r) r.BackColor = LauncherAppearance.Accent AndAlso r.Tag IsNot Nothing).Select(Function(r) r.Text).ToArray()
+        End Get
+    End Property
+
+    Protected Overrides Sub Dispose(disposing As Boolean)
+        If disposing Then pollTimer.Dispose() : input?.Dispose() : input = Nothing
+        MyBase.Dispose(disposing)
     End Sub
 
     ' The bindings as edited, for tests and the caller.

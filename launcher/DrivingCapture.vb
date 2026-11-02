@@ -113,6 +113,39 @@ Public NotInheritable Class DrivingCapture
         Return found
     End Function
 
+    ' Whether a bound device input is pressed or moved now (#9ff647cf, the live highlight in the controls list).
+    ' Axes count once they are a quarter of the way along the bound direction from rest; rest is the first
+    ' sample after the window opened. Keyboard bindings are checked by the window (GetAsyncKeyState).
+    Public Shared Function Active(binding As DrivingBinding, sample As DrivingInput.Sample, rest As DrivingInput.Sample) As Boolean
+        If binding Is Nothing OrElse binding.Keyboard OrElse sample.Connected = 0UI Then Return False
+        Dim xbox = binding.DeviceType = "xinput_pad"
+        Dim axis = Array.IndexOf(If(xbox, DrivingControls.XboxAxes, DrivingControls.DirectAxes), binding.Input)
+        If axis >= 0 Then
+            If (sample.Axes And (1UI << axis)) = 0UI Then Return False
+            Dim value = sample.Values(axis), start = If(rest.Values Is Nothing, 0.0F, rest.Values(axis))
+            If Not Single.IsFinite(value) OrElse Not Single.IsFinite(start) Then Return False
+            Select Case binding.Calibration
+                Case "biDirectionalLower" : Return value < -0.25F
+                Case "biDirectionalUpper" : Return value > 0.25F
+                Case "uniDirectionalNegative" : Return start - value > 0.25F
+                Case Else : Return value - start > 0.25F
+            End Select
+        End If
+        If xbox Then
+            Dim bit = Array.IndexOf(DrivingControls.XboxButtons, binding.Input)
+            Return bit >= 0 AndAlso sample.Buttons(bit) <> 0
+        End If
+        If binding.Input.StartsWith("di_button_", StringComparison.Ordinal) Then
+            Dim index = Integer.Parse(binding.Input.Substring(10), CultureInfo.InvariantCulture)
+            Return index < sample.Buttons.Length AndAlso sample.Buttons(index) <> 0
+        End If
+        If binding.Input.StartsWith("di_dpad_", StringComparison.Ordinal) Then
+            Dim hat = AscW(binding.Input(8)) - AscW("0"c)
+            Return RecenterDeviceBinding.PovDirection(sample.Pov(hat)) = Array.IndexOf(HatDirections, binding.Input.Substring(10))
+        End If
+        Return False
+    End Function
+
     Public Shared Function Description(binding As DrivingBinding) As String
         If binding Is Nothing Then Return "DiRT 3's binding"
         Return If(binding.Keyboard, InputDescription(binding), binding.Device & " · " & InputDescription(binding))

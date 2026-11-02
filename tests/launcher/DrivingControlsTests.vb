@@ -260,6 +260,33 @@ Module DrivingControlsTests
         check(lookUp?.Input = "xinput_right_stick_y" AndAlso lookUp.Calibration = "biDirectionalUpper", "stick up is biDirectionalUpper, as DiRT 3's Look Up")
         Dim steerPad = Copy(padRest) : steerPad.Values(4) = 0.9F
         check(DrivingCapture.Detect("Steer Left", xbox, padRest, steerPad) Is Nothing, "a trigger can't steer")
+        ' #b3f228d0: a wheel's d-pad is a hat; Menu directions bind to DiRT 3's di_dpad names (the G920's d-pad included).
+        For Each pair In {(Pov:=0UI, Action:="Menu Up", Name:="di_dpad_0_up"), (Pov:=9000UI, Action:="Menu Right", Name:="di_dpad_0_right"), (Pov:=18000UI, Action:="Menu Down", Name:="di_dpad_0_down"), (Pov:=27000UI, Action:="Menu Left", Name:="di_dpad_0_left")}
+            Dim pressedHat = Copy(rest) : pressedHat.Pov(0) = pair.Pov
+            check(DrivingCapture.Detect(pair.Action, wheel, rest, pressedHat)?.Input = pair.Name, pair.Action & " binds the wheel's d-pad as " & pair.Name)
+        Next
+        ' #e7547282: axes bound in the launcher start with no dead zone and full saturation.
+        Dim steerRight = Copy(rest) : steerRight.Values(0) = 0.5F
+        For Each bound In {DrivingCapture.Detect("Steer Right", wheel, rest, steerRight), DrivingCapture.Detect("Brake", wheel, rest, down), finite.Detected}
+            check(bound IsNot Nothing AndAlso bound.DeadZone = 0D AndAlso bound.Saturation = 1D, "a bound axis starts at 0% dead zone and 100% saturation (" & bound?.Input & ")")
+        Next
+        ' #9ff647cf: which bound inputs are pressed or moved now, for the live highlight.
+        Dim bindingFor = Function(action As String, input As String, calibration As String) New DrivingBinding With {.Action = action, .Device = "Wheel", .DeviceId = WheelId, .DeviceType = WheelProduct, .Input = input, .Calibration = calibration}
+        Dim live = Copy(rest) : live.Buttons(3) = 1 : live.Pov(0) = 0UI : live.Values(0) = -0.5F : live.Values(1) = -0.5F
+        check(DrivingCapture.Active(bindingFor("Gear Up", "di_button_3", "uniDirectionalPositive"), live, rest) AndAlso Not DrivingCapture.Active(bindingFor("Gear Down", "di_button_4", "uniDirectionalPositive"), live, rest),
+              "a held button is active, others aren't")
+        check(DrivingCapture.Active(bindingFor("Menu Up", "di_dpad_0_up", "uniDirectionalPositive"), live, rest) AndAlso Not DrivingCapture.Active(bindingFor("Menu Down", "di_dpad_0_down", "uniDirectionalPositive"), live, rest),
+              "a hat direction is active only in its own direction")
+        check(DrivingCapture.Active(bindingFor("Steer Left", "di_x_axis", "biDirectionalLower"), live, rest) AndAlso Not DrivingCapture.Active(bindingFor("Steer Right", "di_x_axis", "biDirectionalUpper"), live, rest),
+              "steering lights only the direction it's turned")
+        check(DrivingCapture.Active(bindingFor("Brake", "di_y_axis", "uniDirectionalNegative"), live, rest) AndAlso Not DrivingCapture.Active(bindingFor("Brake", "di_y_axis", "uniDirectionalNegative"), rest, rest),
+              "a pedal is active once pressed from its rest")
+        Dim padLive = Copy(padRest) : padLive.Values(5) = 0.6F : padLive.Buttons(12) = 1
+        check(DrivingCapture.Active(New DrivingBinding With {.DeviceType = "xinput_pad", .DeviceId = "xinput:0", .Input = "xinput_right_trigger", .Calibration = "uniDirectionalPositive"}, padLive, padRest) AndAlso
+              DrivingCapture.Active(New DrivingBinding With {.DeviceType = "xinput_pad", .DeviceId = "xinput:0", .Input = "xinput_button_a"}, padLive, padRest), "an Xbox trigger and button light up")
+        Dim gone = Copy(live) : gone.Connected = 0UI
+        check(Not DrivingCapture.Active(bindingFor("Gear Up", "di_button_3", "uniDirectionalPositive"), gone, rest) AndAlso
+              Not DrivingCapture.Active(New DrivingBinding With {.DeviceType = "keyboard", .DeviceId = "keyboard", .Input = "vk_code_0x41"}, live, rest), "a disconnected device or a key (checked by the window) isn't active here")
         check(DrivingCapture.InputDescription(New DrivingBinding With {.Device = "Wheel", .DeviceType = WheelProduct, .DeviceId = WheelId, .Input = "di_button_2", .Action = "Gear 1"}) = "button 2" AndAlso
               DrivingCapture.Description(lookUp) = "Xbox controller 1 · right stick y (+)" AndAlso DrivingCapture.Description(Nothing) = "DiRT 3's binding", "bindings are described plainly")
     End Sub
@@ -396,6 +423,20 @@ Module DrivingControlsTests
             check(Not form.Current.Bindings.Any(Function(b) b.Action = "Gear 1"), "Remove drops the binding")
             DirectCast(form.Controls.Find("DrivingSave", True).Single(), Button).PerformClick() : Application.DoEvents()
             check(File.Exists(DrivingControls.SettingsPath(ctx)) AndAlso DrivingControls.Load(ctx).Bindings.Count = DrivingControls.XboxPreset().Count, "Save writes the edited bindings")
+        End Using
+        ' The live highlight: rows light up while their input is held (devices) or their key is down.
+        Using form As New DrivingControlsForm(ctx, noInput)
+            form.UsePreset(New DrivingControls With {.Enabled = True, .Bindings = New List(Of DrivingBinding) From {
+                New DrivingBinding With {.Action = "Gear Up", .Device = "Wheel", .DeviceId = WheelId, .DeviceType = WheelProduct, .Input = "di_button_3"},
+                New DrivingBinding With {.Action = "Pause", .Device = "Keyboard", .DeviceId = "keyboard", .DeviceType = "keyboard", .Input = "vk_code_0x1B"}}})
+            Dim resting = DrivingInput.Sample.Empty() : resting.Connected = 1UI
+            Dim held = DrivingCapture.Clone(resting) : held.Buttons(3) = 1
+            form.ShowActive(New Dictionary(Of String, DrivingInput.Sample) From {{WheelId, resting}}, Function(key) False)
+            check(form.HighlightedActions.Count = 0, "nothing is lit at rest")
+            form.ShowActive(New Dictionary(Of String, DrivingInput.Sample) From {{WheelId.ToLowerInvariant(), held}}, Function(key) key = &H1B)
+            check(form.HighlightedActions.OrderBy(Function(a) a).SequenceEqual({"Gear Up", "Pause"}), "a held wheel button and a held key light their rows (" & String.Join(", ", form.HighlightedActions) & ")")
+            form.ShowActive(New Dictionary(Of String, DrivingInput.Sample) From {{WheelId, resting}}, Function(key) False)
+            check(form.HighlightedActions.Count = 0, "released inputs go back to normal")
         End Using
         Using form As New DrivingControlsForm(ctx, noInput)
             check(form.Current.Enabled AndAlso form.Current.Bindings.Count = DrivingControls.XboxPreset().Count, "the window reopens with the saved bindings")
