@@ -11,9 +11,9 @@ Public NotInheritable Class SeatPicker
     Private ReadOnly forward As New ValueSlider("SeatForward", -SeatOffset.Limit, SeatOffset.Limit, 0, valueLabels:=Labels("forward", "back"))
     Private ReadOnly reset As New Button With {.Name = "SeatReset", .Text = "Reset this car", .AutoSize = True}
     Private ReadOnly summary As New Label With {.Name = "SeatSummary", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 6, 0, 10)}
-    Private ReadOnly cockpitStart As New CheckBox With {.Name = "SeatStartInCockpit", .Text = "Start races in the cockpit view", .AutoSize = True}
+    Private ReadOnly cockpitStart As New CheckBox With {.Name = "SeatStartInCockpit", .Text = "Cockpit view only: start races in the cockpit", .AutoSize = True}
     Private ReadOnly cockpitNote As New Label With {.Name = "SeatStartInCockpitNote", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12),
-        .Text = "DiRT 3 starts a race with the first view in each car's camera list. This hides the views listed before the cockpit view for the session, so they can't be chosen while it's on; the other views still work. Launch VR only."}
+        .Text = "DiRT 3 starts a race with the first view in each car's camera list: chase close, chase far, bumper, bonnet, then cockpit. This hides those four for the VR session, so races start in the cockpit and Change View stays there. Launch VR only."}
     Private ReadOnly perCar As New Dictionary(Of String, SeatOffset)(StringComparer.Ordinal)
     Private everyCarOffset As New SeatOffset
     Private updating As Boolean

@@ -35,7 +35,7 @@ report is investigated.
    extract the portable ZIP to a writable folder.
 2. Open DiRT3VR and select your DiRT 3 Complete Edition folder if needed.
    For VR, **Controls → Seat (VR)** moves your eye point per car (or for all
-   cars) to match your seat and rig, and can start races in the cockpit view;
+   cars) to match your seat and rig, and can keep you in the cockpit view;
    Launch VR applies both for the session.
    The **Simple | Advanced** switch beside **?** picks the view: Advanced
    (the default) shows every tab; Simple shows one **Quick start** page with
