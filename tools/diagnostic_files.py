@@ -221,6 +221,46 @@ def profile_load_redirect(data: bytes) -> bytes:
     return seat_cameras.encode(seat_cameras.from_tree(root, document.strings))
 
 
+# Research: does DiRT 3 take a changed or an added action map in a direct start? Both bind
+# Pause to Space (vk 0x20), which the stock keyboard map leaves unbound; a tap of Space during
+# the race then opens the pause menu only if the change is used.
+KEYBOARD_NAME = "actionmap/wm_keyboard.xml"
+KEYBOARD_SHA256 = "6c2668962ae39244dc4664469fc6eb0d5b9afd9a854ad476449044a02a80da2b"
+PATHS_NAME = "actionmap/actionMapPaths.xml"
+PATHS_SHA256 = "e8f4432b219e17444ca07878906207aa4d7ac926a2dd583385a381c03b96c4ab"
+SESSION_MAP_NAME = "actionmap/dirt3vr-session.xml"
+SPACE_AXIS = (b'    <Axis axisName="vk_code_0x20">\r\n'
+              b'      <CalibratorSimple type="uniDirectionalPositive" />\r\n'
+              b'    </Axis>\r\n')
+SESSION_MAP = (b'<!-- DiRT3VR research: an added keyboard map binding Pause to Space -->\r\n'
+               b'<ActionMap actionMapName="dirt3vrSession" deviceName="keyboard" priority="100">\r\n'
+               b'  <Action actionName="Pause">\r\n' + SPACE_AXIS + b'  </Action>\r\n</ActionMap>\r\n')
+
+
+def _replace_once(data: bytes, old: bytes, new: bytes, what: str) -> bytes:
+    if data.count(old) != 1:
+        raise ValueError(f"Unexpected {what}")
+    return data.replace(old, new)
+
+
+def keyboard_pause_on_space(data: bytes) -> bytes:
+    """Research: the stock keyboard map with Space added to Pause (Esc stays)."""
+    if hashlib.sha256(data).hexdigest() != KEYBOARD_SHA256:
+        raise ValueError("Unexpected wm_keyboard.xml")
+    pause = (b'  <Action actionName="Pause">\r\n    <Axis axisName="vk_code_0x1B">\r\n'
+             b'      <CalibratorSimple type="uniDirectionalPositive" />\r\n    </Axis>\r\n')
+    return _replace_once(data, pause, pause + SPACE_AXIS, "keyboard Pause action")
+
+
+def paths_with_session_map(data: bytes) -> bytes:
+    """Research: actionMapPaths.xml also listing SESSION_MAP_NAME, right after the keyboard map."""
+    if hashlib.sha256(data).hexdigest() != PATHS_SHA256:
+        raise ValueError("Unexpected actionMapPaths.xml")
+    keyboard = b'<xmlreader processor="ActionMap2" filename="actionmap/wm_keyboard.xml" map="UPDATE" pool="UPDATE_TEMPORARY" />\r\n'
+    added = b'    <xmlreader processor="ActionMap2" filename="' + SESSION_MAP_NAME.encode() + b'" map="UPDATE" pool="UPDATE_TEMPORARY" />\r\n'
+    return _replace_once(data, keyboard, keyboard + added, "keyboard entry in actionMapPaths.xml")
+
+
 # Every replaceable original: its pinned hash (looked up when used, so tests can pin
 # fixtures), backup prefix and exact applied transform.
 REPLACEMENTS = {
@@ -228,6 +268,8 @@ REPLACEMENTS = {
     SPECTATOR_NAME: ("SPECTATOR_SHA256", "spectator-original", spectator_human_switch),
     SEAT_NAME: ("SEAT_SHA256", "seat-original", seat_test),
     FLOW_NAME: ("FLOW_SHA256", "flow-original", profile_load_redirect),
+    KEYBOARD_NAME: ("KEYBOARD_SHA256", "keyboard-original", keyboard_pause_on_space),
+    PATHS_NAME: ("PATHS_SHA256", "paths-original", paths_with_session_map),
 }
 
 
@@ -368,6 +410,8 @@ class DiagnosticFiles:
     def add(self, name: str, data: bytes) -> Path:
         if name not in self.names(self.run_id):
             raise ValueError("Unsupported diagnostic filename")
+        if name == SESSION_MAP_NAME and data != SESSION_MAP:
+            raise ValueError("Only the research session map may be added there")
         target = self.target(self.game, self.hardware, name)
         no_links(target)
         if target.exists():
@@ -388,7 +432,7 @@ class DiagnosticFiles:
 
     @staticmethod
     def names(run_id: str) -> set[str]:
-        return {"d3d11.dll", f"dirt3vr-benchmark-{run_id}.xml", f"dirt3vr-hardware-{run_id}.xml"}
+        return {"d3d11.dll", f"dirt3vr-benchmark-{run_id}.xml", f"dirt3vr-hardware-{run_id}.xml", SESSION_MAP_NAME}
 
     @staticmethod
     def target(game: Path, hardware: Path | None, name: str) -> Path:
@@ -414,7 +458,7 @@ class DiagnosticFiles:
                 raise ValueError("Diagnostic hardware-settings directory mismatch")
             no_links(hardware)
         entries = record.get("files")
-        if not isinstance(entries, list) or len(entries) > 3:
+        if not isinstance(entries, list) or len(entries) > len(DiagnosticFiles.names(run_id)):
             raise ValueError("Invalid diagnostic file list")
         names = set()
         conflicts = []
@@ -458,7 +502,8 @@ class DiagnosticFiles:
             name = entry.get("name", "")
             if (not isinstance(name, str) or name not in DiagnosticFiles.names(run_id) or name in names
                     or not isinstance(entry.get("sha256"), str)
-                    or not re.fullmatch(r"[a-f0-9]{64}", entry["sha256"])):
+                    or not re.fullmatch(r"[a-f0-9]{64}", entry["sha256"])
+                    or (name == SESSION_MAP_NAME and entry["sha256"] != hashlib.sha256(SESSION_MAP).hexdigest())):
                 raise ValueError("Invalid diagnostic file entry")
             names.add(name)
             target = DiagnosticFiles.target(game, hardware, name)
