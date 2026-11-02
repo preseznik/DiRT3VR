@@ -210,6 +210,7 @@ Public Class MainForm
                                                               notice.Text = "Starting experimental VR. Original files are restored when DiRT 3 closes, even if you close this window." &
                                                                   If(interactive.SeatsSkipped.Count > 0, " Seat position not applied for " & String.Join(", ", interactive.SeatsSkipped) & ": its camera file is missing or not in the expected format.", "") &
                                                                   If(interactive.MotionBlurNote <> "", " " & interactive.MotionBlurNote, "") &
+                                                                  If(interactive.TheaterNote <> "", " " & interactive.TheaterNote, "") &
                                                                   If(interactive.DrivingNote <> "", " " & interactive.DrivingNote, "")
                                                               launchProgress.Start()
                                                               ObserveInteractive()
@@ -929,10 +930,23 @@ Public Class MainForm
     Public Property GraphicsChoicePrompt As Func(Of GraphicsConflictKind, GraphicsRecoveryChoice) = AddressOf AskGraphicsChoice
 
     ' Restore original files: restores what it can, then lets the user decide about changed graphics settings.
+    ' SteamVR's desktop theater, if a session turned it off and couldn't put it back (#24867b69).
+    Private Function RestoreSteamVrTheater() As String
+        If Not SteamVrTheater.Pending(context) Then Return ""
+        Try
+            Dim steamVr = VrRuntime.Resolve("steamvr", settings.SteamRuntimeManifest, settings.VdxrRuntimeManifest)
+            Dim note = SteamVrTheater.RestorePending(context, Path.GetDirectoryName(steamVr.ManifestPath))
+            Return If(note = "", " SteamVR's desktop theater setting was put back.", " " & note)
+        Catch ex As IOException
+            Return " SteamVR's desktop theater setting is still off: " & ex.Message
+        End Try
+    End Function
+
     Private Async Function RestoreOriginalFilesAsync() As Task(Of String)
         Dim failure As IOException
+        Dim theater = RestoreSteamVrTheater()
         Try
-            Return If(Await RecoveryWorker.RecoverAsync(context), "Owned session files were restored.", "No launcher file recovery is pending. No game files were changed.")
+            Return If(Await RecoveryWorker.RecoverAsync(context), "Owned session files were restored.", "No launcher file recovery is pending. No game files were changed.") & theater
         Catch ex As IOException
             failure = ex
         End Try

@@ -15,6 +15,10 @@ Public Class InteractiveSession
     Public Property MotionBlurNote As String = ""
     ' Devices whose launcher driving bindings couldn't go into the session's action maps, or "".
     Public Property DrivingNote As String = ""
+    ' Why SteamVR's desktop theater stayed on, or "" (#24867b69).
+    Public Property TheaterNote As String = ""
+    ' The SteamVR folder whose theater setting this session turned off, or Nothing.
+    Private steamVrFolder As String
     Private stopRequested As Boolean
 
     Private Sub New(install As InstallContext, child As Process, folder As String, sessionLease As FileStream)
@@ -78,6 +82,7 @@ Public Class InteractiveSession
         Dim lease = AcquireLease(context), game As Process = Nothing
         Dim transaction As New OwnedFileTransaction(context)
         Dim directory As String = Nothing, failure As Exception = Nothing, staged As Boolean = False
+        Dim theaterNote As String = "", theaterFolder As String = Nothing
         Try
             context.RequireClosed() : context.ValidateGame()
             If transaction.Pending Then Throw New IOException("Restore pending session files before launching.")
@@ -119,9 +124,12 @@ Public Class InteractiveSession
             staged = True
             Await RecoveryWorker.ApplyAsync(context)
             context.RequireClosed()
+            ' SteamVR's automatic desktop theater off for the session (#24867b69); restored after exit.
+            theaterNote = SteamVrTheater.Suppress(context, runtime)
+            If SteamVrTheater.Pending(context) Then theaterFolder = Path.GetDirectoryName(runtime.ManifestPath)
             game = Process.Start(StartInfo(context, runtime, directory, settings, headset, preflight.Bypasses))
             If game Is Nothing Then Throw New IOException("DiRT 3 could not start.")
-            Dim result As New InteractiveSession(context, game, directory, lease) With {.SeatsSkipped = seats.Skipped, .MotionBlurNote = blurNote, .DrivingNote = actionMaps.Note}
+            Dim result As New InteractiveSession(context, game, directory, lease) With {.SeatsSkipped = seats.Skipped, .MotionBlurNote = blurNote, .DrivingNote = actionMaps.Note, .TheaterNote = theaterNote, .steamVrFolder = theaterFolder}
             SafeFiles.SaveJson(Path.Combine(directory, "session.json"), New With {.schema = 1, .mode = "experimental-interactive", .processId = game.Id, .startedUtc = result.StartedUtc, .runtime = runtime.Mode, .vrRenderScale = settings.VrRenderScale, .headsetWidth = headset.Width, .headsetHeight = headset.Height, .sceneWidth = scene.Width, .sceneHeight = scene.Height, .stereoVerified = False, .launchMode = settings.LaunchMode, .directRoute = If(settings.LaunchMode = "direct", settings.DirectRoute, 0), .directCar = If(settings.LaunchMode = "direct", settings.DirectCar, ""), .directLaps = If(settings.LaunchMode = "direct", DirectPractice.Laps(settings), 0), .directOpponents = If(settings.LaunchMode = "direct", DirectPractice.Opponents(settings), 0), .directOpponentCars = If(settings.LaunchMode = "direct", settings.DirectOpponentCars, ""), .directDifficulty = If(settings.LaunchMode = "direct", DirectPractice.Difficulty(settings), -1), .directAfterFinish = If(settings.LaunchMode = "direct", settings.DirectAfterFinish, ""), .directAssists = If(settings.LaunchMode = "direct", DirectPractice.Assists(settings), ""), .seatCars = seats.Offsets.Keys.ToArray(), .startInCockpit = settings.StartInCockpit, .seatSkipped = seats.Skipped.ToArray(), .motionBlurOff = effects IsNot Nothing, .motionBlurNote = blurNote, .drivingMaps = actionMaps.Devices.Select(Function(d) d.DeviceName & " (" & d.BaseFile & ")").ToArray(), .drivingSkipped = actionMaps.Skipped.ToArray(), .disabledApiLayers = preflight.Bypasses.Select(Function(layer) layer.LayerName).ToArray(), .layerWarning = preflight.Warning})
             Session.WriteLaunchStatus(context, "starting", "Waiting for the game window and native headset output.", game.Id, result.StartedUtc, mode:="experimental-interactive")
             Return result
@@ -129,7 +137,8 @@ Public Class InteractiveSession
             failure = ex
         End Try
         ' A post-start logging failure cannot abandon the owned process.
-        If game IsNot Nothing Then Return New InteractiveSession(context, game, directory, lease)
+        If game IsNot Nothing Then Return New InteractiveSession(context, game, directory, lease) With {.steamVrFolder = theaterFolder}
+        If theaterFolder IsNot Nothing Then SteamVrTheater.RestorePending(context, theaterFolder)
         Try
             If staged AndAlso transaction.Pending Then Await RecoveryWorker.RecoverAsync(context)
         Catch recoveryError As Exception
@@ -227,6 +236,10 @@ Public Class InteractiveSession
                 Throw
             End Try
             Dim message = If(restored, "DiRT 3 closed; original session files restored.", "DiRT 3 closed; no file recovery was pending.")
+            If steamVrFolder IsNot Nothing Then
+                Dim theater = SteamVrTheater.RestorePending(context, steamVrFolder)
+                If theater <> "" Then message &= " " & theater
+            End If
             If exitCode <> 0 Then message &= $" Exit code 0x{exitCode:X8}. Open logs for details."
             Session.WriteLaunchStatus(context, "closed", message, Game.Id, StartedUtc, exitCode, mode:="experimental-interactive")
             Return message
