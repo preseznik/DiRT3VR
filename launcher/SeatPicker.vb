@@ -145,6 +145,21 @@ Public NotInheritable Class SeatPicker
         ShowCurrent()
     End Sub
 
+    ' A position saved from the in-game seat menu (#bd820b32); it is already saved, so no Changed event.
+    Public Sub ApplyCommit(commit As SeatCommit)
+        Dim offset = commit.Offset.Copy()
+        offset.Cockpit = False
+        If commit.AllCars Then
+            everyCarOffset = offset
+        ElseIf offset.IsZero Then
+            perCar.Remove(commit.Car)
+        Else
+            perCar(commit.Car) = offset
+        End If
+        car.Invalidate()
+        ShowCurrent()
+    End Sub
+
     Private Function Current() As SeatOffset
         If everyCar.Checked Then Return everyCarOffset
         Dim offset As SeatOffset = Nothing

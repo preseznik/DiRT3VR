@@ -19,6 +19,10 @@ Public Class InteractiveSession
     Public Property TheaterNote As String = ""
     ' The SteamVR folder whose theater setting this session turned off, or Nothing.
     Private steamVrFolder As String
+    ' The in-game seat menu's shared memory for this session (#bd820b32), or Nothing without a menu key.
+    Public Property SeatMenu As SeatChannel
+    ' A seat position saved from the in-game menu just before DiRT 3 closed, for the window to show.
+    Public Property FinalSeatCommit As SeatCommit
     Private stopRequested As Boolean
 
     Private Sub New(install As InstallContext, child As Process, folder As String, sessionLease As FileStream)
@@ -33,7 +37,7 @@ Public Class InteractiveSession
         End Try
     End Sub
 
-    Public Shared Function StartInfo(context As InstallContext, runtime As RuntimeInfo, directory As String, settings As LauncherSettings, headset As HeadsetResolution, Optional layers As IReadOnlyList(Of VrLayerBypass) = Nothing) As ProcessStartInfo
+    Public Shared Function StartInfo(context As InstallContext, runtime As RuntimeInfo, directory As String, settings As LauncherSettings, headset As HeadsetResolution, Optional layers As IReadOnlyList(Of VrLayerBypass) = Nothing, Optional seatChannelName As String = Nothing) As ProcessStartInfo
         If Not Path.IsPathFullyQualified(directory) Then Throw New IOException("The session log path must be absolute.")
         settings.Validate()
         If headset Is Nothing OrElse headset.RuntimeMode <> runtime.Mode Then Throw New IOException("Query the selected headset before launching.")
@@ -59,6 +63,12 @@ Public Class InteractiveSession
             start.Environment.Remove("DIRT3VR_RECENTER_REQUEST_FILE")
         End If
         start.Environment("XR_RUNTIME_JSON") = runtime.ManifestPath
+        ' The in-game seat menu's shared memory (docs/seat-channel.md); without it the renderer shows no menu.
+        If String.IsNullOrEmpty(seatChannelName) Then
+            start.Environment.Remove(SeatChannel.EnvironmentName)
+        Else
+            start.Environment(SeatChannel.EnvironmentName) = seatChannelName
+        End If
         VrApiLayers.Configure(start, layers)
         If settings.LaunchMode = "direct" Then
             ' The renderer keeps the benchmark's car under the player's control (#a1d31909).
@@ -83,6 +93,7 @@ Public Class InteractiveSession
         Dim transaction As New OwnedFileTransaction(context)
         Dim directory As String = Nothing, failure As Exception = Nothing, staged As Boolean = False
         Dim theaterNote As String = "", theaterFolder As String = Nothing
+        Dim seatMenu As SeatChannel = Nothing
         Try
             context.RequireClosed() : context.ValidateGame()
             If transaction.Pending Then Throw New IOException("Restore pending session files before launching.")
@@ -127,9 +138,11 @@ Public Class InteractiveSession
             ' SteamVR's automatic desktop theater off for the session (#24867b69); restored after exit.
             theaterNote = SteamVrTheater.Suppress(context, runtime)
             If SteamVrTheater.Pending(context) Then theaterFolder = Path.GetDirectoryName(runtime.ManifestPath)
-            game = Process.Start(StartInfo(context, runtime, directory, settings, headset, preflight.Bypasses))
+            ' The in-game seat menu (#bd820b32): its shared memory lives as long as this session.
+            If settings.SeatMenuKey <> 0 Then seatMenu = New SeatChannel(settings, seats.Offsets)
+            game = Process.Start(StartInfo(context, runtime, directory, settings, headset, preflight.Bypasses, seatMenu?.Name))
             If game Is Nothing Then Throw New IOException("DiRT 3 could not start.")
-            Dim result As New InteractiveSession(context, game, directory, lease) With {.SeatsSkipped = seats.Skipped, .MotionBlurNote = blurNote, .DrivingNote = actionMaps.Note, .TheaterNote = theaterNote, .steamVrFolder = theaterFolder}
+            Dim result As New InteractiveSession(context, game, directory, lease) With {.SeatsSkipped = seats.Skipped, .MotionBlurNote = blurNote, .DrivingNote = actionMaps.Note, .TheaterNote = theaterNote, .steamVrFolder = theaterFolder, .SeatMenu = seatMenu}
             SafeFiles.SaveJson(Path.Combine(directory, "session.json"), New With {.schema = 1, .mode = "experimental-interactive", .processId = game.Id, .startedUtc = result.StartedUtc, .runtime = runtime.Mode, .vrRenderScale = settings.VrRenderScale, .headsetWidth = headset.Width, .headsetHeight = headset.Height, .sceneWidth = scene.Width, .sceneHeight = scene.Height, .stereoVerified = False, .launchMode = settings.LaunchMode, .directRoute = If(settings.LaunchMode = "direct", settings.DirectRoute, 0), .directCar = If(settings.LaunchMode = "direct", settings.DirectCar, ""), .directLaps = If(settings.LaunchMode = "direct", DirectPractice.Laps(settings), 0), .directOpponents = If(settings.LaunchMode = "direct", DirectPractice.Opponents(settings), 0), .directOpponentCars = If(settings.LaunchMode = "direct", settings.DirectOpponentCars, ""), .directDifficulty = If(settings.LaunchMode = "direct", DirectPractice.Difficulty(settings), -1), .directAfterFinish = If(settings.LaunchMode = "direct", settings.DirectAfterFinish, ""), .directAssists = If(settings.LaunchMode = "direct", DirectPractice.Assists(settings), ""), .seatCars = seats.Offsets.Keys.ToArray(), .startInCockpit = settings.StartInCockpit, .seatSkipped = seats.Skipped.ToArray(), .motionBlurOff = effects IsNot Nothing, .motionBlurNote = blurNote, .drivingMaps = actionMaps.Devices.Select(Function(d) d.DeviceName & " (" & d.BaseFile & ")").ToArray(), .drivingSkipped = actionMaps.Skipped.ToArray(), .disabledApiLayers = preflight.Bypasses.Select(Function(layer) layer.LayerName).ToArray(), .layerWarning = preflight.Warning})
             Session.WriteLaunchStatus(context, "starting", "Waiting for the game window and native headset output.", game.Id, result.StartedUtc, mode:="experimental-interactive")
             Return result
@@ -137,7 +150,8 @@ Public Class InteractiveSession
             failure = ex
         End Try
         ' A post-start logging failure cannot abandon the owned process.
-        If game IsNot Nothing Then Return New InteractiveSession(context, game, directory, lease) With {.steamVrFolder = theaterFolder}
+        If game IsNot Nothing Then Return New InteractiveSession(context, game, directory, lease) With {.steamVrFolder = theaterFolder, .SeatMenu = seatMenu}
+        seatMenu?.Dispose()
         If theaterFolder IsNot Nothing Then SteamVrTheater.RestorePending(context, theaterFolder)
         Try
             If staged AndAlso transaction.Pending Then Await RecoveryWorker.RecoverAsync(context)
@@ -227,6 +241,12 @@ Public Class InteractiveSession
         Try
             Await Game.WaitForExitAsync()
             Dim exitCode = Game.ExitCode
+            ' A seat position saved in the menu just before DiRT 3 closed is kept too.
+            Try
+                FinalSeatCommit = SeatChannel.SaveCommit(context, SeatMenu)
+            Catch ex As IOException
+            End Try
+            SeatMenu?.Dispose() : SeatMenu = Nothing
             Dim restored As Boolean
             DirectPractice.RemoveResults(context)
             Try

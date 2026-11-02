@@ -99,6 +99,22 @@ Module SeatChannelTests
             check(common.SeatAllCars.Forward = 8 AndAlso common.SeatAllCars.Sideways = -1, "and becomes the shared seat position")
         End Using
 
+        ' During a session the launcher saves each commit into the settings on disk.
+        Dim users = Path.Combine(root, "seat-channel-users")
+        Dim ctx As New InstallContext(Path.Combine(root, "seat-channel-game"), users, Path.Combine(root, "seat-channel-game", "graphics.xml"), root)
+        Directory.CreateDirectory(ctx.GameRoot)
+        Call New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = "", .SeatOffsets = New Dictionary(Of String, SeatOffset) From {{"frx", New SeatOffset With {.Up = 2}}}}.Save(ctx)
+        check(SeatChannel.SaveCommit(ctx, Nothing) Is Nothing, "no channel, nothing to save")
+        Dim sessionName = "Local\DiRT3VR.SeatTest." & Guid.NewGuid().ToString("N")
+        Using channel As New SeatChannel(LauncherSettings.Load(ctx), Nothing, sessionName), opened = MemoryMappedFile.OpenExisting(sessionName), renderer = opened.CreateViewAccessor()
+            check(SeatChannel.SaveCommit(ctx, channel) Is Nothing, "nothing saved before the menu commits")
+            Commit(renderer, frxIndex, -0.01F, 0.09F, 0)
+            Dim saved = SeatChannel.SaveCommit(ctx, channel)
+            check(saved IsNot Nothing AndAlso saved.Car = "frx" AndAlso LauncherSettings.Load(ctx).SeatOffsets("frx").Up = 9 AndAlso LauncherSettings.Load(ctx).SeatOffsets("frx").Sideways = 1,
+                  "a commit is saved into Controls → Seat on disk")
+            check(SeatChannel.SaveCommit(ctx, channel) Is Nothing AndAlso LauncherSettings.Load(ctx).SeatOffsets("frx").Up = 9, "and only once")
+        End Using
+
         ' The menu key: F11 by default, never the recenter key, the arrows or Enter.
         Dim keys As New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = ""}
         keys.Validate()
