@@ -193,9 +193,9 @@ def diagnostic_environment(directory: Path, *, scene_observer: bool = False, rep
                            xr_runtime: Path | None = None, background_play: bool = False) -> dict:
     env = dict(os.environ, DIRT3VR_DIAGNOSTICS="1", DIRT3VR_LOG_DIR=str(directory), SteamAppId="321040")
     for flag in ("DIRT3VR_ENABLE_VR", "DIRT3VR_SCENE_DIAGNOSTICS", "DIRT3VR_REPLAY_DIAGNOSTICS",
-                 "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH", "DIRT3VR_RESEARCH_FILE_TRACE", "DIRT3VR_DIRECT_PRACTICE", "DIRT3VR_DIRECT_LAPS", "DIRT3VR_DIRECT_RETURN", "DIRT3VR_DIRECT_DIFFICULTY", "DIRT3VR_RESEARCH_LAPS", "DIRT3VR_SCREENSHOT_SECONDS", "DIRT3VR_RESEARCH_SETTINGS_TRACE",
+                 "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH", "DIRT3VR_RESEARCH_FILE_TRACE", "DIRT3VR_DIRECT_PRACTICE", "DIRT3VR_DIRECT_LAPS", "DIRT3VR_DIRECT_RETURN", "DIRT3VR_DIRECT_DIFFICULTY", "DIRT3VR_DIRECT_ASSISTS", "DIRT3VR_RESEARCH_LAPS", "DIRT3VR_SCREENSHOT_SECONDS", "DIRT3VR_RESEARCH_SETTINGS_TRACE",
                 "DIRT3VR_RESEARCH_STACKS", "DIRT3VR_RESEARCH_COUNT", "DIRT3VR_RESEARCH_PRESS_START_USER",
-                "DIRT3VR_RESEARCH_AUTO_SAVE_CHOICE"):
+                "DIRT3VR_RESEARCH_AUTO_SAVE_CHOICE", "DIRT3VR_RESEARCH_STORE_TRACE"):
         env.pop(flag, None)
     if background_play:
         env["DIRT3VR_BACKGROUND_PLAY"] = "1"
@@ -524,6 +524,9 @@ def main() -> int:
                         help="number= on the first <car>: the player's car plus K-1 AI copies of it")
     parser.add_argument("--direct-difficulty", type=int, choices=range(0, 6), metavar="N",
                         help="AI difficulty level 0-5 for the benchmark start (renderer, DIRT3VR_DIRECT_DIFFICULTY)")
+    parser.add_argument("--direct-assists", metavar="NAME=VALUE,...",
+                        help="assists/gearbox for the benchmark start, e.g. assists_abs=0,transmission_type=1 "
+                             "(renderer, DIRT3VR_DIRECT_ASSISTS)")
     parser.add_argument("--direct-return", action="store_true",
                         help="The renderer's return-to-menus change (DIRT3VR_DIRECT_RETURN): after the finish DiRT 3 goes to its "
                              "menus instead of quitting; implies --stay-after-result")
@@ -545,6 +548,8 @@ def main() -> int:
     parser.add_argument("--stacks", metavar="SECONDS",
                         help="Research only: the research proxy logs every thread's call stack at these seconds, "
                              "e.g. 40,50")
+    parser.add_argument("--store-trace", action="store_true",
+                        help="Research only: log each value the game reads from its settings store (assists, difficulty)")
     parser.add_argument("--auto-save-choice", action="store_true",
                         help="Research only: when the profile load asks for a save to be chosen, choose the first one "
                              "as the save list's confirm would")
@@ -691,6 +696,8 @@ def main() -> int:
             env["DIRT3VR_RESEARCH_SETTINGS_TRACE"] = "1"
         if args.stacks:
             env["DIRT3VR_RESEARCH_STACKS"] = args.stacks
+        if args.store_trace:
+            env["DIRT3VR_RESEARCH_STORE_TRACE"] = "1"
         if args.auto_save_choice:
             env["DIRT3VR_RESEARCH_AUTO_SAVE_CHOICE"] = "1"
         elif args.log_profile_wait:
@@ -707,6 +714,8 @@ def main() -> int:
             env["DIRT3VR_DIRECT_RETURN"] = "1"
         if args.direct_difficulty is not None:
             env["DIRT3VR_DIRECT_DIFFICULTY"] = str(args.direct_difficulty)
+        if args.direct_assists:
+            env["DIRT3VR_DIRECT_ASSISTS"] = args.direct_assists
         if args.screenshots:
             env["DIRT3VR_SCREENSHOT_SECONDS"] = args.screenshots
         if args.research_laps:
@@ -777,6 +786,11 @@ def main() -> int:
             report["directDifficultyAnswers"] = [{"level": int(a), "profile": int(b)} for a, b in used]
             if not report["directDifficultyHooked"]:
                 report["errors"].append("AI difficulty was requested but the renderer did not hook it")
+        if args.direct_assists:
+            report["directAssistsHooked"] = "Direct practice assists: " in logs and "during the benchmark start" in logs
+            report["directAssistsAnswers"] = re.findall(r"Direct practice assists: (\w+) (\d) instead of (-?\d+)", logs)
+            if not report["directAssistsHooked"]:
+                report["errors"].append("Assists were requested but the renderer did not hook them")
         if args.direct_return:
             report["directReturnInstalled"] = "Direct practice return: the finish leads back to DiRT 3's menus" in logs
             report["directReturnBenchmarkEnded"] = "benchmark mode off, heading to DiRT 3's menus" in logs

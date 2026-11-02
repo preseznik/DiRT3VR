@@ -352,6 +352,40 @@ void InstallAutoSaveChoice(void (*log)(const char*,...)) {
     log("Research auto save choice: created=%d enabled=%d",created,enabled);
 }
 
+// Settings store trace: 0x9dfad0 looks a name up in a key/value store (0x158-byte entries,
+// value at +0x40 with its integer at +0x8) and returns the value or null; the assists and the
+// difficulty live there. DIRT3VR_RESEARCH_STORE_TRACE=1 logs each distinct store/name/value.
+using StoreGetFn=uint8_t*(__thiscall*)(void*,const char*);
+StoreGetFn realStoreGet{};
+std::string storeSeen;
+uint8_t* __fastcall StoreGet(void* store,void*,const char* name) {
+    uint8_t* value=realStoreGet(store,name);
+    if(name && traceLog) {
+        char entry[200];
+        const int number=value ? *reinterpret_cast<int*>(value+0x8) : -1;
+        std::snprintf(entry,sizeof(entry),"|%p %.64s=%d%s|",store,name,number,value ? "" : " (missing)");
+        std::lock_guard lock(settingsMutex);
+        if(storeSeen.size()<128*1024 && storeSeen.find(entry)==std::string::npos) {
+            storeSeen+=entry;
+            traceLog("Research store %p %.64s=%d%s",store,name,number,value ? "" : " (missing)");
+        }
+    }
+    return value;
+}
+void InstallStoreTrace(void (*log)(const char*,...)) {
+    wchar_t flag[8]{};
+    if(GetEnvironmentVariableW(L"DIRT3VR_RESEARCH_STORE_TRACE",flag,8)!=1 || flag[0]!=L'1') return;
+    static const uint8_t entry[]{0x55,0x8b,0xec,0x53,0x56,0x57,0x8b,0xf9,0x8b,0x77,0x7c,0x3b,0xb7,0x80,0x00,0x00};
+    auto* target=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr))+(0x9dfad0-0x400000);
+    if(std::memcmp(target,entry,sizeof(entry))!=0) { log("Research store trace refused: lookup instructions differ"); return; }
+    traceLog=log;
+    const auto initialized=MH_Initialize();
+    if(initialized!=MH_OK && initialized!=MH_ERROR_ALREADY_INITIALIZED) return;
+    const auto created=MH_CreateHook(target,reinterpret_cast<void*>(&StoreGet),reinterpret_cast<void**>(&realStoreGet));
+    const auto enabled=created==MH_OK ? MH_EnableHook(target) : created;
+    log("Research store trace: created=%d enabled=%d",created,enabled);
+}
+
 // Call counter: DIRT3VR_RESEARCH_COUNT lists up to 8 function addresses (hex, as in the
 // disassembly at the preferred base 0x400000). Each gets a thunk that counts calls and jumps on
 // unchanged; the counts are logged with every stack sample.
@@ -516,6 +550,7 @@ void Apply(void (*log)(const char*,...)) {
         InstallSettingsTrace(log);
         InstallPressStartUser(log);
         InstallAutoSaveChoice(log);
+        InstallStoreTrace(log);
         InstallCallCounter(log);
         InstallStackSampler(log);
         char text[513]{};

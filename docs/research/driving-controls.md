@@ -199,6 +199,21 @@ end (normal start, profile load answered automatically, then into the race), a m
 larger change. Every run restored its
 files; the saves were unchanged throughout.
 
+**Decision (iztok, 2026-11-02):** keep DiRT 3's defaults in direct launch; the launcher
+supplies what the profile would have (AI level, assists, controls).
+
+### Assists in direct launch
+
+A direct race reads its settings from one key/value store through `0x9dfad0` (entries of
+0x158 bytes, value at `+0x40`, its number at `+0x8`; run 90, `--store-trace`):
+`exp_level=1`, `difficulty=0`, `realistic_damage=0`, `assists_abs=1`, every other assist 0,
+`transmission_type=0`, `flashback_manager_maximum=0`, HUD switches. `0x5c0a00` turns the
+assists into the car's settings. Meanings from the menus in `states.bin`: on/off assists
+0/1; `assists_dyn_race_line` 0 off, 1 braking only, 2 full (`assists_race_line` 0/1 in
+challenges); `transmission_type` 0 automatic, 1 manual sequential, 2 manual H-pattern,
+3 H-pattern with clutch. `DIRT3VR_DIRECT_ASSISTS` (production renderer) answers these
+during the benchmark start from private copies (runs 91–92).
+
 The earlier plan: a profile load on the `skip_no_garage` route. The existing load nodes (`C` →
 `D` → `E` → `F` → `G`) are shared with the normal start and continue into the front end
 (garage, main menu), which this route never loads, so they can't simply be linked to.

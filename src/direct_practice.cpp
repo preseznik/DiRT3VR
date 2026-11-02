@@ -3,6 +3,7 @@
 #include <MinHook.h>
 #include <atomic>
 #include <mutex>
+#include <string>
 
 namespace dirt3vr::directpractice {
 namespace {
@@ -141,6 +142,68 @@ bool InstallDifficulty(void (*log)(const char*,...)) {
         GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,reinterpret_cast<LPCWSTR>(&Difficulty),&pinned);
         hooked.store(true,std::memory_order_release);
         log("Direct practice difficulty: AI level %d during the benchmark start",requestedDifficulty);
+    });
+    return hooked.load(std::memory_order_acquire);
+}
+
+namespace {
+bool ReadAssists(int (&values)[assistCount]) {
+    char text[256]{};
+    const auto length=GetEnvironmentVariableA("DIRT3VR_DIRECT_ASSISTS",text,sizeof(text));
+    return length && length<sizeof(text) && ParseAssists(text,values);
+}
+using SettingLookupFn=uint8_t* (__thiscall*)(void*,const char*);
+SettingLookupFn realSettingLookup{};
+void (*assistsLog)(const char*,...){};
+int requestedAssists[assistCount];
+// One private copy per setting: callers only read the value they are given.
+alignas(16) uint8_t assistValues[assistCount][settingValueBytes];
+std::atomic<unsigned> assistReports{};
+
+uint8_t* __fastcall SettingLookup(void* store,void*,const char* name) {
+    uint8_t* value=realSettingLookup(store,name);
+    if(!value) return value;
+    const int index=AssistIndex(name);
+    if(index<0 || requestedAssists[index]<0) return value;
+    const auto* image=reinterpret_cast<const uint8_t*>(GetModuleHandleW(nullptr));
+    const auto active=*reinterpret_cast<const volatile uint8_t*>(image+benchmarkFlagRva);
+    int original;
+    std::memcpy(&original,value+settingNumberOffset,sizeof(original));
+    const int answer=AssistAnswer(active,requestedAssists[index],original);
+    if(answer==original) return value;
+    uint8_t* copy=assistValues[index];
+    std::memcpy(copy,value,settingValueBytes);
+    std::memcpy(copy+settingNumberOffset,&answer,sizeof(answer));
+    if(assistReports.fetch_add(1)<16) assistsLog("Direct practice assists: %s %d instead of %d",assistSettings[index].name,answer,original);
+    return copy;
+}
+}
+
+bool AssistsRequested() {
+    int values[assistCount];
+    return ReadAssists(values);
+}
+
+bool InstallAssists(void (*log)(const char*,...)) {
+    static std::once_flag once;
+    static std::atomic<bool> hooked{};
+    std::call_once(once,[log] {
+        if(!ReadAssists(requestedAssists)) { log("Direct practice assists refused: DIRT3VR_DIRECT_ASSISTS is not a valid request"); return; }
+        auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+        if(!SettingLookupMatches(image)) { log("Direct practice assists refused: settings lookup instructions differ; the game's own assists apply"); return; }
+        const auto init=MH_Initialize();
+        if(init!=MH_OK && init!=MH_ERROR_ALREADY_INITIALIZED) { log("Direct practice assists refused: MinHook=%d",int(init)); return; }
+        assistsLog=log;
+        auto* target=image+settingLookupRva;
+        if(MH_CreateHook(target,reinterpret_cast<void*>(&SettingLookup),reinterpret_cast<void**>(&realSettingLookup))!=MH_OK) { log("Direct practice assists refused: hook not created"); return; }
+        if(MH_EnableHook(target)!=MH_OK) { MH_RemoveHook(target); log("Direct practice assists refused: hook not enabled"); return; }
+        HMODULE pinned{};
+        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,reinterpret_cast<LPCWSTR>(&SettingLookup),&pinned);
+        hooked.store(true,std::memory_order_release);
+        std::string requested;
+        for(size_t i=0;i<assistCount;++i)
+            if(requestedAssists[i]>=0) requested+=(requested.empty() ? "" : ", ")+std::string(assistSettings[i].name)+"="+std::to_string(requestedAssists[i]);
+        log("Direct practice assists: %s during the benchmark start",requested.c_str());
     });
     return hooked.load(std::memory_order_acquire);
 }
