@@ -22,7 +22,8 @@ import xml.etree.ElementTree as ET
 import zlib
 
 import diagnostic_files
-from diagnostic_files import (DiagnosticFiles, FLOW_NAME, RESTRICTIONS_NAME, SEAT_NAME, SPECTATOR_NAME, preflight_replacement, no_links,
+from diagnostic_files import (DiagnosticFiles, FLOW_NAME, KEYBOARD_NAME, PATHS_NAME, SESSION_MAP, SESSION_MAP_NAME,
+                              RESTRICTIONS_NAME, SEAT_NAME, SPECTATOR_NAME, preflight_replacement, no_links,
                               preflight_serial_render, replace_verified, restore_xml_formatting, save_json, sha256)
 
 EXPECTED_EXE = "c502b495bb34a097440756769c80dcb36a79b618943f739e20d591d54171ff98"
@@ -472,6 +473,7 @@ def restore_player_hardware(target: Path, backup: Path, original_hash: str, reta
 def protected_state(game: Path) -> dict[str, str]:
     paths = [game / "dirt3_game.exe", game / "steam_api.dll",
              game / RESTRICTIONS_NAME, game / SPECTATOR_NAME, game / SEAT_NAME, game / FLOW_NAME,
+             game / KEYBOARD_NAME, game / PATHS_NAME,
              game / "hardwaresettings/hardware_settings_config.xml",
              game / "hardwaresettings/hardware_settings_info.xml"]
     documents = documents_dir() / "My Games/DiRT3"
@@ -548,6 +550,9 @@ def main() -> int:
     parser.add_argument("--stacks", metavar="SECONDS",
                         help="Research only: the research proxy logs every thread's call stack at these seconds, "
                              "e.g. 40,50")
+    parser.add_argument("--actionmap-test", choices=("edit", "add"),
+                        help="Research: bind Pause to Space through a journaled change to the stock keyboard map "
+                             "(edit) or an added keyboard map listed in actionMapPaths.xml (add)")
     parser.add_argument("--store-trace", action="store_true",
                         help="Research only: log each value the game reads from its settings store (assists, difficulty)")
     parser.add_argument("--auto-save-choice", action="store_true",
@@ -624,6 +629,12 @@ def main() -> int:
     if args.load_profile:
         diagnostic_files.PROFILE_LOAD_STEPS = args.load_profile
     profile_flow = preflight_replacement(game, FLOW_NAME) if args.load_profile else None
+    keyboard_map = preflight_replacement(game, KEYBOARD_NAME) if args.actionmap_test == "edit" else None
+    map_paths = preflight_replacement(game, PATHS_NAME) if args.actionmap_test == "add" else None
+    if args.actionmap_test == "add":
+        no_links(game / SESSION_MAP_NAME)
+        if (game / SESSION_MAP_NAME).exists():
+            raise FileExistsError(f"{SESSION_MAP_NAME} already exists; nothing changed")
     preflight = {"gameSha256": EXPECTED_EXE, "proxySha256": hashlib.sha256(proxy_bytes).hexdigest(),
                  "mode": "headset-prototype" if xr_runtime else "desktop-eye-replay" if args.replay_pair else "desktop-observation",
                  "stereo": False, "sceneObserver": args.scene_observer,
@@ -671,6 +682,12 @@ def main() -> int:
             transaction.apply_replacement(SEAT_NAME, seat[0])
         if profile_flow:
             transaction.apply_replacement(FLOW_NAME, profile_flow[0])
+        if keyboard_map:
+            transaction.apply_replacement(KEYBOARD_NAME, keyboard_map[0])
+        if map_paths:
+            # The map file first, so the list never names a missing file.
+            transaction.add(SESSION_MAP_NAME, SESSION_MAP)
+            transaction.apply_replacement(PATHS_NAME, map_paths[0])
         if args.player_hardware_settings:
             # The game reads and rewrites this file; its original is in protected-originals.
             hardware_name = hardware_source.name
