@@ -72,6 +72,7 @@ Public Class OwnedFileTransaction
             Case "graphics" : Return context.GraphicsPath
             Case "restrictions" : Return Path.Combine(context.GameRoot, "system", "hardware_settings_restrictions.xml")
             Case "startup" : Return Path.Combine(context.GameRoot, "system", "states.bin")
+            Case MotionBlur.Target : Return MotionBlur.EffectsPath(context)
             Case Else : Throw New IOException("Unknown recovery target. The journal was preserved.")
         End Select
     End Function
@@ -95,11 +96,14 @@ Public Class OwnedFileTransaction
         For Each offset In If(seats?.Values, Array.Empty(Of SeatOffset)())
             offset.Validate()
         Next
-        Dim journal As New RecoveryJournal With {.Schema = If(hasSeats, 6, If(hasDirect, If(experimental, 4, 5), If(hasStartup, 3, If(experimental, 2, 1)))), .InstallId = context.Id, .GraphicsPath = context.GraphicsPath, .GraphicsQuality = If(quality.Count > 0, quality, Nothing),
+        ' Schema 7: a VR session that also switches motion blur off (postprocess\effects.xml), with or without seats.
+        Dim hasEffects = changes.ContainsKey(MotionBlur.Target)
+        If hasEffects AndAlso Not experimental Then Throw New IOException("Motion blur changes belong to a VR session.")
+        Dim journal As New RecoveryJournal With {.Schema = If(hasEffects, 7, If(hasSeats, 6, If(hasDirect, If(experimental, 4, 5), If(hasStartup, 3, If(experimental, 2, 1))))), .InstallId = context.Id, .GraphicsPath = context.GraphicsPath, .GraphicsQuality = If(quality.Count > 0, quality, Nothing),
                                                  .Seats = If(hasSeats, seats.ToDictionary(Function(pair) pair.Key, Function(pair) pair.Value.Copy(), StringComparer.Ordinal), Nothing)}
         Dim prepared = journal.Schema >= 2
         If experimental Then
-            Dim required = {"graphics", "proxy", "restrictions"}.Concat(If(hasStartup, {"startup"}, Array.Empty(Of String)())).Concat(If(hasDirect, {"direct"}, Array.Empty(Of String)())).Order().ToArray()
+            Dim required = {"graphics", "proxy", "restrictions"}.Concat(If(hasStartup, {"startup"}, Array.Empty(Of String)())).Concat(If(hasDirect, {"direct"}, Array.Empty(Of String)())).Concat(If(hasEffects, {MotionBlur.Target}, Array.Empty(Of String)())).Order().ToArray()
             If Not changes.Keys.Where(Function(key) Not SeatPositions.IsTarget(key)).Order().SequenceEqual(required) Then Throw New IOException("The experimental session requires its complete set of fixed targets.")
         ElseIf hasDirect Then
             Dim required = {"direct", "proxy"}.Concat(If(hasStartup, {"startup"}, Array.Empty(Of String)())).Order().ToArray()
@@ -178,6 +182,7 @@ Public Class OwnedFileTransaction
             Case "restrictions" : expected = ExperimentalFiles.Restrictions(original)
             Case "startup" : expected = StartupMovies.Patch(original)
             Case "direct" : DirectPractice.Validate(applied) : expected = applied
+            Case MotionBlur.Target : expected = MotionBlur.Disable(original)
             Case "proxy"
                 Dim payload = Path.Combine(context.PackageRoot, "payload", "d3d11.dll")
                 SafeFiles.NoLinks(payload) : expected = File.ReadAllBytes(payload)
@@ -188,7 +193,7 @@ Public Class OwnedFileTransaction
 
     Private Function LoadJournal() As RecoveryJournal
         Dim journal = SafeFiles.ReadJson(Of RecoveryJournal)(JournalPath)
-        If Not {1, 2, 3, 4, 5, 6}.Contains(journal.Schema) OrElse journal.InstallId <> context.Id OrElse journal.Entries Is Nothing OrElse journal.Entries.Count < 1 OrElse journal.Entries.Count > MaxEntries(journal.Schema) OrElse journal.Entries.Any(Function(entry) entry Is Nothing) OrElse journal.Entries.Select(Function(e) e.Target).Distinct().Count() <> journal.Entries.Count Then Throw New IOException("Invalid recovery journal. Backups were preserved.")
+        If Not {1, 2, 3, 4, 5, 6, 7}.Contains(journal.Schema) OrElse journal.InstallId <> context.Id OrElse journal.Entries Is Nothing OrElse journal.Entries.Count < 1 OrElse journal.Entries.Count > MaxEntries(journal.Schema) OrElse journal.Entries.Any(Function(entry) entry Is Nothing) OrElse journal.Entries.Select(Function(e) e.Target).Distinct().Count() <> journal.Entries.Count Then Throw New IOException("Invalid recovery journal. Backups were preserved.")
         If Not String.Equals(journal.GraphicsPath, context.GraphicsPath, StringComparison.OrdinalIgnoreCase) Then Throw New IOException("Graphics recovery belongs to the Windows account that started this session. The original backup was preserved.")
         Dim targets = journal.Entries.Select(Function(entry) entry.Target).Order().ToArray()
         Select Case journal.Schema
@@ -202,18 +207,26 @@ Public Class OwnedFileTransaction
                 If Not targets.SequenceEqual({"direct", "graphics", "proxy", "restrictions"}) AndAlso Not targets.SequenceEqual({"direct", "graphics", "proxy", "restrictions", "startup"}) Then Throw New IOException("Incomplete direct practice recovery journal.")
             Case 5
                 If Not targets.SequenceEqual({"direct", "proxy"}) AndAlso Not targets.SequenceEqual({"direct", "proxy", "startup"}) Then Throw New IOException("Incomplete desktop direct practice recovery journal.")
-            Case 6
-                ' A VR session (with or without startup and direct practice) plus one camera file per seat offset.
+            Case 6, 7
+                ' A VR session (with or without startup and direct practice) plus one camera file per seat offset
+                ' (schema 6), or plus the motion blur change and optional seat offsets (schema 7).
                 Dim fixedTargets = targets.Where(Function(target) Not SeatPositions.IsTarget(target)).ToArray()
                 Dim seatCodes = targets.Where(AddressOf SeatPositions.IsTarget).Select(AddressOf SeatPositions.CodeOf).OrderBy(Function(code) code, StringComparer.Ordinal).ToArray()
                 Dim sessions = New String()() {New String() {"graphics", "proxy", "restrictions"}, New String() {"graphics", "proxy", "restrictions", "startup"}, New String() {"direct", "graphics", "proxy", "restrictions"}, New String() {"direct", "graphics", "proxy", "restrictions", "startup"}}
-                If Not sessions.Any(Function(session) fixedTargets.SequenceEqual(session)) OrElse seatCodes.Length = 0 OrElse journal.Seats Is Nothing OrElse
-                   Not journal.Seats.Keys.OrderBy(Function(code) code, StringComparer.Ordinal).SequenceEqual(seatCodes) OrElse journal.Seats.Values.Any(Function(offset) offset Is Nothing OrElse offset.IsZero) Then Throw New IOException("Incomplete seat recovery journal.")
-                For Each offset In journal.Seats.Values
-                    offset.Validate()
-                Next
+                Dim expectedSets = If(journal.Schema = 7, sessions.Select(Function(session) session.Append(MotionBlur.Target).Order().ToArray()).ToArray(), sessions)
+                Dim seatsRequired = journal.Schema = 6 OrElse seatCodes.Length > 0
+                If Not expectedSets.Any(Function(session) fixedTargets.SequenceEqual(session)) Then Throw New IOException("Incomplete VR session recovery journal.")
+                If seatsRequired Then
+                    If seatCodes.Length = 0 OrElse journal.Seats Is Nothing OrElse
+                       Not journal.Seats.Keys.OrderBy(Function(code) code, StringComparer.Ordinal).SequenceEqual(seatCodes) OrElse journal.Seats.Values.Any(Function(offset) offset Is Nothing OrElse offset.IsZero) Then Throw New IOException("Incomplete seat recovery journal.")
+                    For Each offset In journal.Seats.Values
+                        offset.Validate()
+                    Next
+                ElseIf journal.Seats IsNot Nothing Then
+                    Throw New IOException("Invalid recovery journal. Backups were preserved.")
+                End If
         End Select
-        If journal.Schema <> 6 AndAlso journal.Seats IsNot Nothing Then Throw New IOException("Invalid recovery journal. Backups were preserved.")
+        If Not {6, 7}.Contains(journal.Schema) AndAlso journal.Seats IsNot Nothing Then Throw New IOException("Invalid recovery journal. Backups were preserved.")
         Return journal
     End Function
 
@@ -224,6 +237,7 @@ Public Class OwnedFileTransaction
             Case 3 : Return 4
             Case 4 : Return 5
             Case 6 : Return 5 + EventCatalog.Current.Cars.Count
+            Case 7 : Return 6 + EventCatalog.Current.Cars.Count
             Case Else : Return 3
         End Select
     End Function

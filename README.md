@@ -159,6 +159,8 @@ or a chosen level from 0 to 5. A direct start doesn't load your DiRT 3 profile
 yet, so it uses the game's default controls preset, assists and difficulty. After the finish DiRT 3 either closes by itself (launch again for another
 run) or, with **After the finish → Return to DiRT 3's menus**, goes to its main menu so you can play on. During the run, Esc opens DiRT 3's pause menu: Restart goes back
 to the start line, Retire ends the run. Normal launch stays the default.
+VR sessions switch DiRT 3's motion blur off (head movement would smear the
+nearest ground); desktop play keeps it.
 **Stop VR** turns the headset off and keeps DiRT 3 running on the monitor; it
 keeps the temporary VR graphics settings until it closes. **End session**
 closes DiRT 3. Either way the original files are restored once DiRT 3 closes.

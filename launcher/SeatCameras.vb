@@ -23,7 +23,7 @@ Public NotInheritable Class SeatCameras
     Private Sub New()
     End Sub
 
-    Private NotInheritable Class BinXml
+    Friend NotInheritable Class BinXml
         Public ReadOnly Strings As New List(Of String)
         ' name, value, attribute count, first attribute, child count, first child
         Public ReadOnly Elements As New List(Of Integer())
@@ -91,7 +91,7 @@ Public NotInheritable Class SeatCameras
         Return (cursor + 8, CInt(size), CInt(finish))
     End Function
 
-    Private Shared Function Decode(data As Byte()) As BinXml
+    Friend Shared Function Decode(data As Byte()) As BinXml
         If data Is Nothing OrElse data.Length < 24 OrElse data.Length > MaxBytes OrElse Not Matches(data, 0, Magic) OrElse UInt(data, 4) <> data.Length - 8 Then Throw New IOException("Not a supported camera file.")
         If Not Matches(data, 8, StringsContainer) Then Throw New IOException("The camera file has no string container.")
         Dim raw = Chunk(data, 16, StringsChunk)
@@ -137,7 +137,7 @@ Public NotInheritable Class SeatCameras
         Return document
     End Function
 
-    Private Shared Function Encode(document As BinXml) As Byte()
+    Friend Shared Function Encode(document As BinXml) As Byte()
         Dim raw As New List(Of Byte)
         Dim offsets As New List(Of Integer)
         For Each value In document.Strings
