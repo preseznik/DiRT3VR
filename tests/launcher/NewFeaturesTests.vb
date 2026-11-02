@@ -11,8 +11,9 @@ Module NewFeaturesTests
         check(Not NewFeatures.Shown("0.1.22-beta.1", True, "0.1.21") AndAlso Not NewFeatures.Shown("0.1.22", False, "0.1.21") AndAlso Not NewFeatures.Shown("0.2.0", True, "0.1.21"), "the next version drops them")
         check(Not NewFeatures.Shown("garbage", True, "0.1.21") AndAlso Not NewFeatures.Shown(Nothing, True, "0.1.21"), "an unreadable version shows nothing")
         check(NewFeatures.NamesFor("0.1.21", False).Count = 0 AndAlso NewFeatures.NamesFor("0.1.21-beta.1", True).Count = NewFeatures.Listed.Count, "a stable build marks nothing; the experimental build marks every listed feature")
-        ' After a release, NextVersion must move on (and the released entries go): this build must still show every mark.
-        check(NewFeatures.NamesFor(BuildInfo.Version, BuildInfo.Experimental).Count = NewFeatures.Listed.Count,
+        ' After a release, NextVersion must move on (and the released entries go): this build, or the release's
+        ' Experimental-ring package of it (plain version, package.ps1 -Channel Experimental), must still show every mark.
+        check(NewFeatures.NamesFor(BuildInfo.Version, True).Count = NewFeatures.Listed.Count,
               "this build (" & BuildInfo.Version & ") is before " & NewFeatures.NextVersion & " or its experimental build; update NewFeatures after a release")
     End Sub
 
@@ -38,6 +39,25 @@ Module NewFeaturesTests
         Directory.CreateDirectory(game)
         Dim ctx As New InstallContext(game, Path.Combine(root, "new-marks-users"), Path.Combine(game, "graphics.xml"), root)
         Call New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = ""}.Save(ctx)
+        ' The launcher as the release's Experimental-ring package runs it; test builds are Stable.
+        Dim experimentalBuild = NewFeatures.ExperimentalBuild
+        NewFeatures.ExperimentalBuild = True
+        Try
+            RunMarkedForm(ctx, check)
+        Finally
+            NewFeatures.ExperimentalBuild = experimentalBuild
+        End Try
+
+        ' A stable build marks nothing.
+        Using panel As New Panel()
+            Dim header As New SectionHeader("Launch mode")
+            panel.Controls.Add(header)
+            check(NewFeatures.Apply(panel, "0.1.21", False).Count = 0 AndAlso Not header.IsNew, "a stable release leaves every control unmarked")
+            check(NewFeatures.Apply(panel, "0.1.21-beta.1", True).Count = 1 AndAlso header.IsNew, "its experimental build marks them")
+        End Using
+    End Sub
+
+    Private Sub RunMarkedForm(ctx As InstallContext, check As Action(Of Boolean, String))
         Using form As New MainForm(ctx)
             form.ShowInTaskbar = False : form.StartPosition = FormStartPosition.Manual : form.Location = New Point(-30000, -30000)
             form.Show() : Application.DoEvents()
@@ -80,14 +100,6 @@ Module NewFeaturesTests
                 check(AccentPixels(marked, keepLevel.Right) > 10, "the option's mark is drawn beside it")
             End Using
             form.Close()
-        End Using
-
-        ' A stable build marks nothing.
-        Using panel As New Panel()
-            Dim header As New SectionHeader("Launch mode")
-            panel.Controls.Add(header)
-            check(NewFeatures.Apply(panel, "0.1.21", False).Count = 0 AndAlso Not header.IsNew, "a stable release leaves every control unmarked")
-            check(NewFeatures.Apply(panel, "0.1.21-beta.1", True).Count = 1 AndAlso header.IsNew, "its experimental build marks them")
         End Using
     End Sub
 End Module
