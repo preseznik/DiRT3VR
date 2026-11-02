@@ -31,7 +31,7 @@ def verify(folder):
     capabilities = json.loads(files['runtime-capabilities.json'].read_text(encoding='utf-8'))
     assert capabilities['stereoVerified'] is False
     assert capabilities['experimentalInteractive'] is True
-    assert capabilities['runtimes'] == ['vdxr']
+    assert capabilities['runtimes'] == ['vdxr', 'steamvr']
     assert all('test' not in name.lower() and not name.endswith(('.cpp', '.vb', '.pdb')) for name in files)
     archive = root.parent / f"DiRT3VR-{manifest['version']}.zip"
     with zipfile.ZipFile(archive) as zipped:
