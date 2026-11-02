@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased — clearer profile saving and a sturdier profile test
+## Unreleased
+
+## 0.1.21 — direct practice, driving controls and seat positions (Experimental)
 
 - In-game seat menu groundwork, launcher side (#bd820b32 / #c137c681, iztok: the same in-game seat menu as DiRT2VR, for VR and the monitor): `docs/seat-channel.md` is the launcher ↔ renderer contract, DiRT2VR's seat channel with an **applied** offset per car (what the session's camera file already holds), so the renderer applies only the difference live and never twice. `SeatChannel` creates the shared memory (`DIRT3VR_SEAT_CHANNEL`), writes the car table, the menu key and the hint text, publishes controller input in a sequence lock, and reads the renderer's commits back into Controls → Seat (whole centimetres; one car's or the every-car position). New setting: the seat menu key, F11 by default (free in DiRT 3's keyboard map), never the recenter key, the arrows or Enter; settings profiles keep this PC's choice. Not wired into sessions yet: that follows the renderer's menu (#35826889) and the runtime camera research (#88b7f778). Tests: 33 new checks under Wine.
 - Seat positions on the monitor too (#b330cc4f, iztok's idea): **Controls → Seat** (was Seat (VR)) gets **Also when playing on the monitor (Launch)**, off by default. With it, Launch (normal or direct practice) writes each adjusted car's camera file for the session, exactly as Launch VR does, through the managed desktop session that restores it after exit; the cockpit-only start stays a VR option. Recovery journal schema 9 (a desktop session with seat offsets, alone or with the startup change or direct practice and its action maps; older launchers refuse it). A car whose camera file isn't usable is named in the launch notice. Kept with the other seat settings (settings profiles keep the local choice). FOV in the same tool comes once the camera files' field of view is researched. Tests: 13 new checks under Wine.
