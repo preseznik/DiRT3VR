@@ -182,6 +182,18 @@ Module DirectPracticeTests
               DesktopStartupSession.StartInfo(opponentsCtx, race, Path.Combine(opponentsCtx.UserRoot, "logs", "session-fixture")).Environment("DIRT3VR_DIRECT_RETURN") = "1", "Return to DiRT 3's menus reaches the renderer with Launch VR and Launch")
         check(Refused(Sub() Call New LauncherSettings With {.DirectAfterFinish = "results"}.Validate()), "after the finish is Quit to desktop or Return to DiRT 3's menus")
 
+        ' Assists and gearbox (Wrench's ac09f6f): only changes from DiRT 3's defaults reach the renderer.
+        Dim assisted As New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = "", .LaunchMode = "direct", .DirectRoute = Aspen().Id, .DirectCar = "frx"}
+        check(DirectPractice.Assists(assisted) = "" AndAlso Not InteractiveSession.StartInfo(ctx, runtime, logs, assisted, headset).Environment.ContainsKey("DIRT3VR_DIRECT_ASSISTS"), "DiRT 3's default assists (ABS on, automatic) send nothing")
+        assisted.DirectAbs = False : assisted.DirectGearbox = "clutch" : assisted.DirectStability = True : assisted.DirectCornerBraking = True : assisted.DirectThrottle = True : assisted.DirectSteering = True
+        Dim everything = "assists_abs=0,assists_stability=1,assists_corner_braking=1,assists_throttle_mngt=1,assists_auto_steer=1,transmission_type=3"
+        check(DirectPractice.Assists(assisted) = everything AndAlso InteractiveSession.StartInfo(ctx, runtime, logs, assisted, headset).Environment("DIRT3VR_DIRECT_ASSISTS") = everything AndAlso
+              DesktopStartupSession.StartInfo(opponentsCtx, assisted, Path.Combine(opponentsCtx.UserRoot, "logs", "session-fixture")).Environment("DIRT3VR_DIRECT_ASSISTS") = everything,
+              "every changed assist and the gearbox reach the renderer, with Launch VR and Launch (" & DirectPractice.Assists(assisted) & ")")
+        check(DirectPractice.Assists(New LauncherSettings With {.DirectGearbox = "sequential"}) = "transmission_type=1" AndAlso DirectPractice.Assists(New LauncherSettings With {.DirectGearbox = "hpattern"}) = "transmission_type=2",
+              "the gearbox maps to DiRT 3's transmission types")
+        check(Refused(Sub() Call New LauncherSettings With {.DirectGearbox = "paddles"}.Validate()), "an unknown gearbox is refused")
+
         ' DiRT 3's result file for the session is removed; other benchmark results stay.
         Dim results = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(ctx.GraphicsPath)), "benchmarks")
         Directory.CreateDirectory(results)
@@ -199,9 +211,11 @@ Module DirectPracticeTests
         check(Refused(Sub() Call New SettingsProfile With {.Kind = "DiRT3VR.SettingsProfile", .Schema = 3, .Name = "Old", .Settings = profile}.Validate()), "a schema 3 profile can't carry direct practice")
         loaded.DirectOpponents = 4 : loaded.DirectOpponentCars = "mixed"
         Dim raceProfile = ProfileValues.Capture(loaded).ApplyTo(New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = ""})
-        loaded.DirectDifficulty = 5 : loaded.DirectAfterFinish = "menus"
+        loaded.DirectDifficulty = 5 : loaded.DirectAfterFinish = "menus" : loaded.DirectGearbox = "hpattern" : loaded.DirectAbs = False : loaded.DirectThrottle = True
         raceProfile = ProfileValues.Capture(loaded).ApplyTo(New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = ""})
-        check(raceProfile.DirectOpponents = 4 AndAlso raceProfile.DirectOpponentCars = "mixed" AndAlso raceProfile.DirectDifficulty = 5 AndAlso raceProfile.DirectAfterFinish = "menus", "settings profiles carry the opponents, their AI level and what happens after the finish")
+        check(raceProfile.DirectOpponents = 4 AndAlso raceProfile.DirectOpponentCars = "mixed" AndAlso raceProfile.DirectDifficulty = 5 AndAlso raceProfile.DirectAfterFinish = "menus" AndAlso raceProfile.DirectGearbox = "hpattern" AndAlso Not raceProfile.DirectAbs AndAlso raceProfile.DirectThrottle,
+              "settings profiles carry the opponents, their AI level, what happens after the finish, the gearbox and the assists")
+        check(Refused(Sub() Call New SettingsProfile With {.Kind = "DiRT3VR.SettingsProfile", .Schema = 3, .Name = "Old", .Settings = New ProfileValues With {.DirectAbs = False}}.Validate()), "a schema 3 profile can't carry assists")
         check(Refused(Sub() Call New SettingsProfile With {.Kind = "DiRT3VR.SettingsProfile", .Schema = 3, .Name = "Old", .Settings = New ProfileValues With {.DirectAfterFinish = "menus"}}.Validate()), "a schema 3 profile can't return to the menus")
         check(Refused(Sub() Call New SettingsProfile With {.Kind = "DiRT3VR.SettingsProfile", .Schema = 3, .Name = "Old", .Settings = New ProfileValues With {.DirectDifficulty = 1}}.Validate()), "a schema 3 profile can't carry an AI level")
         check(Refused(Sub() Call New SettingsProfile With {.Kind = "DiRT3VR.SettingsProfile", .Schema = 3, .Name = "Old", .Settings = New ProfileValues With {.DirectOpponents = 2}}.Validate()), "a schema 3 profile can't carry opponents")
@@ -251,6 +265,11 @@ Module DirectPracticeTests
             check(afterFinish.Enabled AndAlso afterFinish.SelectedIndex = 0 AndAlso find("DirectSummary").Text.EndsWith("DiRT 3 closes by itself after the finish.", StringComparison.Ordinal), "after the finish starts on Quit to desktop")
             afterFinish.SelectedIndex = 1 : Application.DoEvents()
             check(form.CurrentSettings().DirectAfterFinish = "menus" AndAlso find("DirectSummary").Text.EndsWith("After the finish DiRT 3 returns to its menus.", StringComparison.Ordinal), "Return to DiRT 3's menus shows in the settings and the summary")
+            Dim gearboxBox = DirectCast(find("DirectGearbox"), ComboBox), absBox = DirectCast(find("DirectAbs"), CheckBox)
+            check(gearboxBox.Enabled AndAlso gearboxBox.SelectedIndex = 0 AndAlso absBox.Enabled AndAlso absBox.Checked AndAlso Not DirectCast(find("DirectStability"), CheckBox).Checked, "gearbox and assists start on DiRT 3's defaults")
+            gearboxBox.SelectedIndex = 3 : absBox.Checked = False : Application.DoEvents()
+            check(form.CurrentSettings().DirectGearbox = "clutch" AndAlso Not form.CurrentSettings().DirectAbs AndAlso find("DirectSummary").Text.Contains("· H-pattern gears with clutch."),
+                  "the gearbox and assists show in the settings and the gearbox in the summary (" & find("DirectSummary").Text & ")")
             check(rivalCars.Enabled AndAlso find("DirectSummary").Text.Contains("· 3 opponents (mixed cars, AI level 3) ·") AndAlso form.CurrentSettings().DirectOpponents = 3 AndAlso form.CurrentSettings().DirectOpponentCars = "mixed",
                   "opponents show in the summary and the settings (" & find("DirectSummary").Text & ")")
             Dim summary = find("DirectSummary").Text

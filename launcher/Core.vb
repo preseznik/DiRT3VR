@@ -180,6 +180,14 @@ Public Class LauncherSettings
     Public Property DirectDifficulty As Integer = -1
     ' After the finish: "quit" (DiRT 3 closes, as its benchmark start does) or "menus" (DiRT 3's main menu).
     Public Property DirectAfterFinish As String = "quit"
+    ' Direct practice assists and gearbox (a direct start doesn't load the player's profile, so these
+    ' start from DiRT 3's defaults: ABS on, the others off, automatic gears).
+    Public Property DirectGearbox As String = "automatic"
+    Public Property DirectAbs As Boolean = True
+    Public Property DirectStability As Boolean
+    Public Property DirectCornerBraking As Boolean
+    Public Property DirectThrottle As Boolean
+    Public Property DirectSteering As Boolean
     ' VR seat positions per catalog car (SeatPositions), or one for every car; they belong to the
     ' player's body and rig, so settings profiles and Restore launcher defaults keep them.
     Public Property SeatOffsets As New Dictionary(Of String, SeatOffset)
@@ -211,6 +219,7 @@ Public Class LauncherSettings
         If Not DirectPractice.OpponentCarChoices.Contains(DirectOpponentCars) Then Throw New IOException("Choose which cars the opponents drive.")
         If DirectDifficulty < -1 OrElse DirectDifficulty > DirectPractice.MaxDifficulty Then Throw New IOException("Choose the AI difficulty for direct practice.")
         If Not DirectPractice.AfterFinishChoices.Contains(DirectAfterFinish) Then Throw New IOException("Choose what happens after the finish.")
+        If Not DirectPractice.GearboxChoices.Contains(DirectGearbox) Then Throw New IOException("Choose the gearbox for direct practice.")
         SeatAllCars = If(SeatAllCars, New SeatOffset) : SeatAllCars.Validate() : SeatAllCars.Cockpit = False
         Dim seats As New Dictionary(Of String, SeatOffset)(StringComparer.Ordinal)
         For Each pair In If(SeatOffsets, New Dictionary(Of String, SeatOffset)).OrderBy(Function(item) item.Key, StringComparer.Ordinal)

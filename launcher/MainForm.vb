@@ -675,6 +675,7 @@ Public Class MainForm
         applyingPreset = True
         desktopQuality.Values = settings.GraphicsQuality : vrQuality.Values = settings.VrGraphicsQuality
         seatPicker.Apply(settings.SeatOffsets, settings.SeatSameForAll, settings.SeatAllCars, settings.DirectCar, settings.StartInCockpit)
+        directPicker.ApplyAssists(settings.DirectGearbox, settings.DirectAbs, settings.DirectStability, settings.DirectCornerBraking, settings.DirectThrottle, settings.DirectSteering)
         directPicker.Apply(settings.LaunchMode, settings.DirectRoute, settings.DirectCar, settings.DirectLaps, settings.DirectOpponents, settings.DirectOpponentCars, settings.DirectDifficulty, settings.DirectAfterFinish)
         applyingPreset = False
         ClearPresetUndo()
@@ -700,6 +701,8 @@ Public Class MainForm
             .GraphicsQuality = desktopQuality.Values, .VrGraphicsQuality = vrQuality.Values,
             .LaunchMode = directPicker.Mode, .DirectRoute = directPicker.RouteId, .DirectCar = directPicker.CarCode, .DirectLaps = directPicker.LapCount,
             .DirectOpponents = directPicker.OpponentCount, .DirectOpponentCars = directPicker.OpponentCars, .DirectDifficulty = directPicker.DifficultyLevel, .DirectAfterFinish = directPicker.AfterFinish,
+            .DirectGearbox = directPicker.Gearbox, .DirectAbs = directPicker.AssistStates.Abs, .DirectStability = directPicker.AssistStates.Stability,
+            .DirectCornerBraking = directPicker.AssistStates.CornerBraking, .DirectThrottle = directPicker.AssistStates.Throttle, .DirectSteering = directPicker.AssistStates.Steering,
             .SeatOffsets = seatPicker.Offsets, .SeatSameForAll = seatPicker.SameForAll, .SeatAllCars = seatPicker.AllCars, .StartInCockpit = seatPicker.StartInCockpit}
     End Function
 
@@ -1019,7 +1022,7 @@ Public Class MainForm
                 "Choose the discipline (rally, rallycross, trailblazer or Land Rush), the location and route, and the car. Cars are those of the route's discipline; Show cars from other disciplines lists the rest, which are untested. Search finds cars by name, code or class, and Class narrows the list." & vbCrLf & vbCrLf &
                 "Laps (1 to 5) apply to circuits (rallycross and Land Rush); point-to-point stages are one run. Direct practice works with Launch (on the monitor) and Launch VR." & vbCrLf & vbCrLf &
                 "On circuits you can add up to 7 AI opponents; you start from the back of the grid. Opponent cars: Same class as my car (the default), Mixed (any car of the route's discipline) or My car's model; opponents avoid your own model unless nothing else fits (Land Rush has one truck and one buggy, so there Same class races your own model and Mixed the other vehicle). Difficulty: DiRT 3's default, or Level 0 (easiest) to Level 5 (hardest) for this session; DiRT 3 shows these levels as stars. Stages are driven alone." & vbCrLf & vbCrLf &
-                "A direct start doesn't load your DiRT 3 profile yet, so the game uses its own defaults there: the controls preset for your wheel or pad, default assists and default difficulty, not what you set in its menus. Loading the profile is being worked on." & vbCrLf & vbCrLf &
+                "A direct start doesn't load your DiRT 3 profile, so the game uses its own defaults there, not what you set in its menus: the controls preset for your wheel or pad, default difficulty and default assists. Gearbox and Assists in the picker set those for direct practice (DiRT 3's defaults: automatic gears, ABS on, the other assists off); the racing line can't be shown in a direct start. Launcher controls for your wheel are being worked on." & vbCrLf & vbCrLf &
                 "After the finish line DiRT 3 shows the finish camera and your time for a few seconds. Then, with After the finish on Quit to desktop (the default), it closes by itself, so launch again for another run; on Return to DiRT 3's menus it goes to its main menu and you play on as in a normal launch (careers, events, another race), until you quit DiRT 3. There is no results screen. During the run, Esc opens DiRT 3's pause menu as in any race: Restart (then confirm) puts you back on the start line, and Retire (then confirm) ends the run and DiRT 3 closes. End session (Launch VR) also stops it. The short config file it writes into the game folder, dirt3vr-direct.xml, is removed with DiRT3VR's other temporary changes, and DiRT 3's benchmark result file is deleted afterwards." & vbCrLf & vbCrLf &
                 "Normal launch keeps DiRT 3's menus for careers, events and multiplayer."),
             New HelpTopic(HelpStartup,
