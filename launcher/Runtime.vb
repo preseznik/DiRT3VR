@@ -17,14 +17,18 @@ Public Class RuntimeCapabilities
     ' A manifest cannot turn an unimplemented native launch path into a VR feature.
     Public Const StereoLaunchImplemented As Boolean = False
     Public Const UnavailableReason As String = "VR driving is not available in this build. Use Launch for normal desktop play. Checking a runtime does not enable VR."
-    Public Const SteamVrExperimentalReason As String = "SteamVR interactive VR is unavailable while its orientation is being validated. Choose VDXR for experimental play; SteamVR runtime checks remain available."
+    ' SteamVR is allowed for Launch VR again (#da2bcde1): the 2026-10-28 upside-down report came from a run with
+    ' GRID2VR open at the same time and was never retested alone; the renderer logs the runtime pose, recenter
+    ' reference, eye FOV and camera basis to locate any inversion.
+    Public Const SteamVrNote As String = "SteamVR is new in DiRT3VR: if the picture is upside down, tilted or mirrored, end the session and report it with Open logs."
 
     Public Shared Function ExperimentalReason(context As InstallContext, settings As LauncherSettings) As String
         If Not settings.ExperimentalVrEnabled Then Return "Enable Experimental VR in Advanced to use Launch VR."
-        If settings.RuntimeMode <> "vdxr" Then Return SteamVrExperimentalReason
         Try
             Dim capability = Read(context)
-            If Not capability.ExperimentalInteractive OrElse Not capability.Runtimes.Contains("vdxr") Then Return "This package does not include interactive experimental VR. Desktop launch and runtime checks remain available."
+            If Not capability.ExperimentalInteractive OrElse Not capability.Runtimes.Contains(settings.RuntimeMode) Then
+                Return "This package does not include interactive experimental VR for " & If(settings.RuntimeMode = "steamvr", "SteamVR", "VDXR") & ". Desktop launch and runtime checks remain available."
+            End If
         Catch ex As Exception When TypeOf ex Is IOException OrElse TypeOf ex Is JsonException OrElse TypeOf ex Is UnauthorizedAccessException
             Return ex.Message
         End Try

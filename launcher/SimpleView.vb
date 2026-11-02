@@ -62,7 +62,7 @@ Partial Public Class MainForm
         Dim headset = Section(columns.Second, "VR headset")
         Borrow(experimental, headset)
         Borrow(runtime.Parent, headset)
-        headset.Controls.Add(Info("Connect the headset through Virtual Desktop and choose VDXR. Runtime locations, the runtime check and OpenXR add-ons are under Advanced → Settings."))
+        headset.Controls.Add(Info("Choose VDXR (connect through Virtual Desktop) or SteamVR (start SteamVR with the headset connected). Runtime locations, the runtime check and OpenXR add-ons are under Advanced → Settings."))
         Dim performance = Section(columns.Second, "Performance")
         Borrow(PresetRow("QualityPreset"), performance, "Desktop quality")
         Borrow(PresetRow("VrQualityPreset"), performance, "VR quality")

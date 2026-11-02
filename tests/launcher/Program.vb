@@ -162,8 +162,15 @@ Module Program
         Next
         SafeFiles.WriteAtomic(capabilityPath, utf8Bom.Concat(capabilityBytes).ToArray())
         preferences.RuntimeMode = "steamvr"
-        Check(RuntimeCapabilities.ExperimentalReason(ctx, preferences).Contains("orientation"), "SteamVR interactive has a clear orientation-validation gate")
-        Reject(Sub() RuntimeCapabilities.RequireExperimental(ctx, preferences), "SteamVR cannot bypass gate through edited preferences")
+        ' SteamVR for Launch VR (#da2bcde1): allowed when the package lists it, as VDXR.
+        Check(RuntimeCapabilities.ExperimentalReason(ctx, preferences) = "", "SteamVR is allowed for Launch VR when the package lists it")
+        RuntimeCapabilities.RequireExperimental(ctx, preferences)
+        Dim vdxrOnlyRoot = Path.Combine(root, "vdxr-only-package")
+        Directory.CreateDirectory(vdxrOnlyRoot)
+        Dim vdxrOnly As New InstallContext(ctx.GameRoot, Path.Combine(root, "users"), ctx.GraphicsPath, vdxrOnlyRoot)
+        SafeFiles.SaveJson(Path.Combine(vdxrOnlyRoot, "runtime-capabilities.json"), New With {.schema = 1, .supportedExeSha256 = InstallContext.SupportedHash, .experimentalInteractive = True, .stereoVerified = False, .runtimes = {"vdxr"}})
+        Check(RuntimeCapabilities.ExperimentalReason(vdxrOnly, preferences).Contains("for SteamVR"), "a package without SteamVR names it")
+        Reject(Sub() RuntimeCapabilities.RequireExperimental(vdxrOnly, preferences), "SteamVR cannot bypass a package without it through edited preferences")
         Dim headset As New HeadsetResolution("vdxr", "Test headset", 2400, 2600)
         Dim runtimeInfo As New RuntimeInfo With {.Mode = "vdxr", .ManifestPath = "C:\runtime\virtualdesktop-openxr-32.json"}
         preferences.VrRenderScale = 75
@@ -625,7 +632,7 @@ Module Program
             experimental.Checked = True
             Check(form.Controls.Find("LaunchVR", True).Single().Enabled, "explicit UI opt-in and VDXR package allow experimental button")
             choice.SelectedIndex = 1
-            Check(Not form.Controls.Find("LaunchVR", True).Single().Enabled AndAlso form.Controls.Find("SessionStatus", True).Single().Text.Contains("orientation"), "SteamVR selection disables interactive launch with a reason")
+            Check(form.Controls.Find("LaunchVR", True).Single().Enabled = RuntimeCapabilities.Read(install).Runtimes.Contains("steamvr"), "SteamVR selection allows Launch VR when the package lists SteamVR")
             experimental.Checked = False
             form.Size = New Size(1000, 740)
             Dim closingSize = form.Size

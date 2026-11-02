@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- SteamVR works with Launch VR again (#da2bcde1). It was switched off after one upside-down report from a session with another VR game open; it is new and still being checked, so please report any upside-down, tilted or mirrored picture with the session logs.
+
 ## 0.1.21 — direct practice, driving controls and seat positions (Experimental)
 
 - In-game seat menu groundwork, launcher side (#bd820b32 / #c137c681, iztok: the same in-game seat menu as DiRT2VR, for VR and the monitor): `docs/seat-channel.md` is the launcher ↔ renderer contract, DiRT2VR's seat channel with an **applied** offset per car (what the session's camera file already holds), so the renderer applies only the difference live and never twice. `SeatChannel` creates the shared memory (`DIRT3VR_SEAT_CHANNEL`), writes the car table, the menu key and the hint text, publishes controller input in a sequence lock, and reads the renderer's commits back into Controls → Seat (whole centimetres; one car's or the every-car position). New setting: the seat menu key, F11 by default (free in DiRT 3's keyboard map), never the recenter key, the arrows or Enter; settings profiles keep this PC's choice. Not wired into sessions yet: that follows the renderer's menu (#35826889) and the runtime camera research (#88b7f778). Tests: 33 new checks under Wine.

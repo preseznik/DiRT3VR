@@ -333,8 +333,8 @@ Public Class MainForm
         startup.Controls.Add(Info("Applies to Launch and Launch VR. Copyright and Press Start remain. DiRT3VR restores the original startup file when the game closes, also when you close this window (it stays in the notification area until then). Leave this option off for multiplayer until compatibility is checked."))
         startup.Controls.Add(TopicLink(HelpStartup))
         Dim availability = Section(columns.Second, "VR availability")
-        availability.Controls.Add(Info("Experimental VR is available with VDXR when enabled in Advanced. All rendered 3D camera views use stereo and headset tracking, including cockpit, bonnet, bumper, chase and replay. Loading screens and movies use a virtual screen."))
-        availability.Controls.Add(Info("Interactive play and camera transitions are still being validated. SteamVR interactive launch is unavailable pending orientation validation."))
+        availability.Controls.Add(Info("Experimental VR is available with VDXR or SteamVR when enabled in Advanced. All rendered 3D camera views use stereo and headset tracking, including cockpit, bonnet, bumper, chase and replay. Loading screens and movies use a virtual screen."))
+        availability.Controls.Add(Info("Interactive play and camera transitions are still being validated. " & RuntimeCapabilities.SteamVrNote))
         content.Controls.Add(TopicLink(HelpStart))
     End Sub
 
@@ -656,7 +656,7 @@ Public Class MainForm
                                                 End If
                                             End Using
                                         End Sub
-        runtimes.Controls.Add(Info("For VDXR, connect through Virtual Desktop. SteamVR runtime checks remain available, but interactive SteamVR launch is awaiting orientation validation. The selected 32-bit runtime is used only by the launched process; your system OpenXR default stays unchanged."))
+        runtimes.Controls.Add(Info("For VDXR, connect through Virtual Desktop; for SteamVR, start SteamVR with your headset connected. The selected 32-bit runtime is used only by the launched process; your system OpenXR default stays unchanged."))
         runtimes.Controls.Add(probe) : runtimes.Controls.Add(probeStatus)
         Dim addOns As New Button With {.Name = "VrCompatibility", .Text = "OpenXR add-ons…", .AutoSize = True}
         runtimes.Controls.Add(addOns) : runtimes.Controls.Add(layerSummary)
@@ -1064,7 +1064,7 @@ Public Class MainForm
                 "The original startup file is backed up first and restored when the game exits, also when you close this window during the session (DiRT3VR then waits in the notification area)." & vbCrLf & vbCrLf &
                 "Leave skipping off for multiplayer until compatibility is checked."),
             New HelpTopic(HelpVr,
-                "Advanced → Enable experimental VR turns on the VDXR session when this package supports it. Connect the headset through Virtual Desktop and choose VDXR under Settings → VR runtime. Interactive SteamVR launch stays unavailable until its orientation is validated. Close other VR games first." & vbCrLf & vbCrLf &
+                "Advanced → Enable experimental VR turns on the VR session when this package supports it. Choose VDXR (through Virtual Desktop) or SteamVR under Settings → VR runtime. " & RuntimeCapabilities.SteamVrNote & " Close other VR games first." & vbCrLf & vbCrLf &
                 "All rendered 3D camera views use stereo and headset tracking, including cockpit, bonnet, bumper, chase and replay. Loading screens, movies and frames without a 3D scene use a virtual screen, and recognized HUD and menu draws use a transparent panel 2 metres away. Camera transitions are still experimental." & vbCrLf & vbCrLf &
                 "DiRT 3's motion blur is switched off for VR sessions: in the headset every head movement counts as camera movement, so it smeared the nearest ground and objects. DiRT3VR writes the game's postprocess\effects.xml with the blur lengths at zero for the session and restores it after exit; desktop play keeps the game's motion blur." & vbCrLf & vbCrLf &
                 ExperimentalFiles.ProfileDescription & vbCrLf & vbCrLf &
@@ -1116,7 +1116,7 @@ Public Class MainForm
                 "Settings → Diagnostics → Diagnostic logging adds a presentation trace to the next VR session's log (metadata only, at most 180 seconds or 512 records). Leave it off unless you are asked for diagnostics." & vbCrLf & vbCrLf &
                 "The status line and messages above the buttons can be selected and copied (Ctrl+A, Ctrl+C or right-click) to paste into a report."),
             New HelpTopic(HelpAbout,
-                "DiRT3VR " & BuildVersion & " adds VR to Steam DiRT 3 Complete Edition. It is a research build: interactive VR works with VDXR, and broader visual and gameplay validation is ongoing." & vbCrLf & vbCrLf &
+                "DiRT3VR " & BuildVersion & " adds VR to Steam DiRT 3 Complete Edition. It is a research build: interactive VR works with VDXR and, new and still being checked, SteamVR; broader visual and gameplay validation is ongoing." & vbCrLf & vbCrLf &
                 "Source and releases: https://github.com/preseznik/DiRT3VR" & vbCrLf & vbCrLf &
                 "The native WinForms layout and appearance are adapted from DiRT2VR, with yellow DiRT3VR accents. Instructions as topics, recentering with a controller, live input, update checks and the notification-area session follow DiRT2VR and GRID2VR.")}
     End Function
