@@ -1,12 +1,15 @@
 ' Desktop launches with temporary game-folder changes need a process-lifetime owner: startup logo
-' skipping, and direct practice, which installs DiRT3VR's renderer (as a plain pass-through, no VR) for
-' its player-control fix. Ordinary desktop launching remains unchanged and never installs the renderer.
+' skipping, seat positions on the monitor, and direct practice, which installs DiRT3VR's renderer (as a
+' plain pass-through, no VR) for its player-control fix. Ordinary desktop launching remains unchanged and
+' never installs the renderer.
 Public NotInheritable Class DesktopStartupSession
     Private ReadOnly context As InstallContext
     Private ReadOnly lease As FileStream
     Public ReadOnly Game As Process
     ' Devices whose launcher driving bindings couldn't go into the session's action maps, or "".
     Public Property DrivingNote As String = ""
+    ' Cars whose seat position couldn't be applied (camera file missing or not the expected format).
+    Public Property SeatsSkipped As New List(Of String)
 
     Private Sub New(install As InstallContext, child As Process, sessionLease As FileStream)
         context = install : Game = child : lease = sessionLease
@@ -16,16 +19,17 @@ Public NotInheritable Class DesktopStartupSession
     Public Const DirectMode As String = "desktop-direct-practice"
 
     Public Shared Function NeedsSession(settings As LauncherSettings) As Boolean
-        Return settings.SkipStartupMovies OrElse settings.LaunchMode = "direct"
+        Return settings.SkipStartupMovies OrElse settings.LaunchMode = "direct" OrElse SeatPositions.OnDesktop(settings)
     End Function
 
     ' The temporary changes: the startup definitions and/or the direct practice config plus the renderer,
-    ' and the launcher's driving bindings as session action maps (#8121970e).
+    ' the launcher's driving bindings as session action maps (#8121970e), and the seat positions' camera
+    ' files when they apply on the monitor (#b330cc4f).
     Public Shared Function Changes(context As InstallContext, settings As LauncherSettings) As Dictionary(Of String, Byte())
-        Return Changes(context, settings, Nothing)
+        Return Changes(context, settings, Nothing, Nothing)
     End Function
 
-    Public Shared Function Changes(context As InstallContext, settings As LauncherSettings, actionMaps As SessionActionMaps.SessionChanges) As Dictionary(Of String, Byte())
+    Public Shared Function Changes(context As InstallContext, settings As LauncherSettings, actionMaps As SessionActionMaps.SessionChanges, seatFiles As IReadOnlyDictionary(Of String, Byte())) As Dictionary(Of String, Byte())
         Dim result As New Dictionary(Of String, Byte())
         If settings.SkipStartupMovies Then result.Add("startup", StartupMovies.ReadPatch(context))
         If settings.LaunchMode = "direct" Then
@@ -39,6 +43,9 @@ Public NotInheritable Class DesktopStartupSession
                 result.Add(pair.Key, pair.Value)
             Next
         End If
+        For Each pair In If(seatFiles, SeatPositions.Changes(context, settings, vr:=False).Files)
+            result.Add(pair.Key, pair.Value)
+        Next
         Return result
     End Function
 
@@ -68,7 +75,8 @@ Public NotInheritable Class DesktopStartupSession
                 If blocked <> "" Then Throw New IOException(blocked)
             End If
             Dim actionMaps = If(settings.LaunchMode = "direct", SessionActionMaps.Changes(context, DrivingControls.Load(context)), New SessionActionMaps.SessionChanges())
-            Dim changes = DesktopStartupSession.Changes(context, settings, actionMaps)
+            Dim seats = SeatPositions.Changes(context, settings, vr:=False)
+            Dim changes = DesktopStartupSession.Changes(context, settings, actionMaps, seats.Files)
             Dim logs = Path.Combine(context.UserRoot, "logs", "session-" & Guid.NewGuid().ToString("N"))
             If settings.LaunchMode = "direct" Then
                 SafeFiles.NoLinks(logs) : Directory.CreateDirectory(logs)
@@ -78,13 +86,16 @@ Public NotInheritable Class DesktopStartupSession
             settings.Save(context)
             DesktopGraphics.Apply(context, settings, monitor)
             preparing = True
-            transaction.Prepare(changes, apply:=False)
-            Await RecoveryWorker.ApplyAsync(context)
+            ' Seat positions alone may come to nothing (every adjusted car's camera file unusable).
+            If changes.Count > 0 Then
+                transaction.Prepare(changes, apply:=False, seats:=If(seats.Offsets.Count > 0, seats.Offsets, Nothing))
+                Await RecoveryWorker.ApplyAsync(context)
+            End If
             context.RequireClosed()
             game = Process.Start(StartInfo(context, settings, logs))
             If game Is Nothing Then Throw New IOException("DiRT 3 could not start.")
             Session.WriteLaunchStatus(context, "starting", "Waiting for the game window. DiRT3VR's temporary files are removed after exit.", game.Id, DateTime.UtcNow, mode:=If(settings.LaunchMode = "direct", "direct-practice", "desktop"))
-            Return New DesktopStartupSession(context, game, lease) With {.DrivingNote = actionMaps.Note}
+            Return New DesktopStartupSession(context, game, lease) With {.DrivingNote = actionMaps.Note, .SeatsSkipped = seats.Skipped}
         Catch ex As Exception
             failure = ex
         End Try

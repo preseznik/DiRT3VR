@@ -1,8 +1,9 @@
 Imports System.Windows.Forms
 
-' Controls → Seat (VR): per-car seat offsets in centimetres (#2fdaf181; adapted from GRID2VR's per-car
+' Controls → Seat: per-car seat offsets in centimetres (#2fdaf181; adapted from GRID2VR's per-car
 ' seat alignment and DiRT2VR's "same seat for every car"). Pick a car, move the eye point sideways, up
-' or forward, reset it, or use one position for every car. Launch VR applies it (SeatPositions).
+' or forward, reset it, or use one position for every car. Launch VR applies it (SeatPositions), and Launch
+' too with "Also when playing on the monitor" (#b330cc4f).
 Public NotInheritable Class SeatPicker
     Private ReadOnly car As New ComboBox With {.Name = "SeatCar", .DropDownStyle = ComboBoxStyle.DropDownList}
     Private ReadOnly everyCar As New CheckBox With {.Name = "SeatSameForAll", .Text = "Same position for all cars", .AutoSize = True}
@@ -11,6 +12,9 @@ Public NotInheritable Class SeatPicker
     Private ReadOnly forward As New ValueSlider("SeatForward", -SeatOffset.Limit, SeatOffset.Limit, 0, valueLabels:=Labels("forward", "back"))
     Private ReadOnly reset As New Button With {.Name = "SeatReset", .Text = "Reset this car", .AutoSize = True}
     Private ReadOnly summary As New Label With {.Name = "SeatSummary", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 6, 0, 10)}
+    Private ReadOnly desktopSeat As New CheckBox With {.Name = "SeatOnDesktop", .Text = "Also when playing on the monitor (Launch)", .AutoSize = True}
+    Private ReadOnly desktopNote As New Label With {.Name = "SeatOnDesktopNote", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12),
+        .Text = "Launch then writes the same camera files for the session and restores them after exit, as Launch VR does. Off: desktop play keeps DiRT 3's own seat."}
     Private ReadOnly cockpitStart As New CheckBox With {.Name = "SeatStartInCockpit", .Text = "Cockpit view only: start races in the cockpit", .AutoSize = True}
     Private ReadOnly cockpitNote As New Label With {.Name = "SeatStartInCockpitNote", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12),
         .Text = "DiRT 3 starts a race with the first view in each car's camera list: chase close, chase far, bumper, bonnet, then cockpit. This hides those four for the VR session, so races start in the cockpit and Change View stays there. Launch VR only."}
@@ -43,6 +47,9 @@ Public NotInheritable Class SeatPicker
         Field(parent, "Forward", forward)
         parent.Controls.Add(reset)
         parent.Controls.Add(summary)
+        parent.Controls.Add(desktopSeat)
+        parent.Controls.Add(desktopNote)
+        AddHandler desktopSeat.CheckedChanged, Sub() If Not updating Then RaiseEvent Changed()
         parent.Controls.Add(cockpitStart)
         parent.Controls.Add(cockpitNote)
         AddHandler cockpitStart.CheckedChanged, Sub() If Not updating Then RaiseEvent Changed()
@@ -63,7 +70,7 @@ Public NotInheritable Class SeatPicker
                                     End Try
                                     Store()
                                 End Sub
-        Apply(Nothing, False, Nothing, "", False)
+        Apply(Nothing, False, Nothing, "", False, False)
     End Sub
 
     ' "12 cm left" … "0 cm" … "12 cm right" for -50..50.
@@ -102,6 +109,12 @@ Public NotInheritable Class SeatPicker
         End Get
     End Property
 
+    Public ReadOnly Property OnDesktop As Boolean
+        Get
+            Return desktopSeat.Checked
+        End Get
+    End Property
+
     Public ReadOnly Property SummaryText As String
         Get
             Return summary.Text
@@ -109,10 +122,11 @@ Public NotInheritable Class SeatPicker
     End Property
 
     ' Shows saved positions; the list opens on preferredCar (for example the direct practice car).
-    Public Sub Apply(offsets As IDictionary(Of String, SeatOffset), sameForAll As Boolean, allCarsOffset As SeatOffset, preferredCar As String, cockpit As Boolean)
+    Public Sub Apply(offsets As IDictionary(Of String, SeatOffset), sameForAll As Boolean, allCarsOffset As SeatOffset, preferredCar As String, cockpit As Boolean, desktop As Boolean)
         updating = True
         Try
             cockpitStart.Checked = cockpit
+            desktopSeat.Checked = desktop
             perCar.Clear()
             For Each pair In If(offsets, New Dictionary(Of String, SeatOffset))
                 If pair.Value IsNot Nothing AndAlso Not pair.Value.IsZero Then perCar(pair.Key) = pair.Value.Copy()
