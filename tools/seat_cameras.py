@@ -141,6 +141,61 @@ def encode(document: BinXml) -> bytes:
     return MAGIC + struct.pack("<I", len(body)) + body
 
 
+@dataclass
+class Node:
+    """An element as a tree, for edits that add or move elements."""
+    name: str
+    value: str | None
+    attributes: list[tuple[str, str]]
+    children: list["Node"]
+
+    def get(self, key: str) -> str | None:
+        return next((v for k, v in self.attributes if k == key), None)
+
+
+def to_tree(document: BinXml) -> Node:
+    def build(element: int, depth: int) -> Node:
+        if depth > 256:
+            raise ValueError("BinXml tree too deep")
+        name, value, _, _, _, _ = document.elements[element]
+        attributes = [(document.string(document.attributes[slot][0]), document.string(document.attributes[slot][1]))
+                      for slot in document.attribute_slots(element).values()]
+        return Node(document.string(name), document.string(value) if value > 0 else None, attributes,
+                    [build(child, depth + 1) for child in document.children(element)])
+    return build(0, 0)
+
+
+def from_tree(root: Node, strings: list[str]) -> BinXml:
+    """Lay the tree out as the game's files do: depth-first, each element's children in one
+    block allocated when the element is visited; attributes in visiting order; empty attribute
+    ranges start at 0 and leaf child ranges at the next free element. Existing strings keep
+    their indices; new ones are appended."""
+    table = list(strings)
+    index = {value: i for i, value in reversed(list(enumerate(table)))}
+
+    def string(value: str) -> int:
+        if value not in index:
+            index[value] = len(table)
+            table.append(value)
+        return index[value]
+
+    elements: list[list[int] | None] = [None]
+    attributes: list[list[int]] = []
+
+    def place(position: int, node: Node) -> None:
+        first_attribute = len(attributes) if node.attributes else 0
+        attributes.extend([string(k), string(v)] for k, v in node.attributes)
+        first_child = len(elements)
+        elements.extend([None] * len(node.children))
+        elements[position] = [string(node.name), string(node.value) if node.value is not None else 0,
+                              len(node.attributes), first_attribute, len(node.children), first_child]
+        for offset, child in enumerate(node.children):
+            place(first_child + offset, child)
+
+    place(0, root)
+    return BinXml(table, elements, attributes)
+
+
 def views(document: BinXml) -> list[int]:
     """The View elements of the single ViewManager, in file order."""
     if document.name(0) != "VehicleViewDefinition" or len(document.children(0)) != 1:
