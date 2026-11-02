@@ -22,8 +22,8 @@ $capabilities = @{
     supportedExeSha256 = 'c502b495bb34a097440756769c80dcb36a79b618943f739e20d591d54171ff98'
     stereoVerified = $false
     experimentalInteractive = $true
-    runtimes = @('vdxr')
-    milestone = 'Experimental VDXR stereo for all rendered 3D cameras; interactive acceptance pending'
+    runtimes = @('vdxr', 'steamvr')
+    milestone = 'Experimental VDXR and SteamVR stereo for all rendered 3D cameras; interactive acceptance pending'
 }
 $jsonEncoding = New-Object System.Text.UTF8Encoding($false)
 [IO.File]::WriteAllText("$stage/runtime-capabilities.json", ($capabilities | ConvertTo-Json -Depth 3), $jsonEncoding)

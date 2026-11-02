@@ -22,8 +22,8 @@ Stereo follows **every valid rendered 3D camera view**, including cockpit,
 bonnet, bumper, chase, reverse and replay. The user confirmed basic VDXR driving
 with version 0.1.5, native headset resolution in 0.1.8, and the corrected intro,
 HUD and menu presentation in 0.1.14. Broader visual coverage remains open.
-SteamVR interactive launch remains disabled while an upside-down presentation
-report is investigated.
+SteamVR can be used for Launch VR again; it is new and still being checked
+(an earlier upside-down report came from a run with another VR game open).
 
 ## Use the launcher
 
