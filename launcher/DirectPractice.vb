@@ -23,6 +23,8 @@ Public NotInheritable Class DirectPractice
     ' After the finish DiRT 3 quits (its benchmark start) or, with the renderer's DIRT3VR_DIRECT_RETURN,
     ' goes to its main menu as a normal session (Wrench's 05e63da).
     Public Shared ReadOnly AfterFinishChoices As String() = {"quit", "menus"}
+    ' Gearbox choices, in DiRT 3's transmission_type order (Wrench's ac09f6f).
+    Public Shared ReadOnly GearboxChoices As String() = {"automatic", "sequential", "hpattern", "clutch"}
 
     Private Sub New()
     End Sub
@@ -70,8 +72,24 @@ Public NotInheritable Class DirectPractice
         If lapCount > 0 Then start.Environment("DIRT3VR_DIRECT_LAPS") = Number(lapCount)
         If level >= 0 Then start.Environment("DIRT3VR_DIRECT_DIFFICULTY") = Number(level)
         If settings.DirectAfterFinish = "menus" Then start.Environment("DIRT3VR_DIRECT_RETURN") = "1"
+        Dim chosen = Assists(settings)
+        If chosen <> "" Then start.Environment("DIRT3VR_DIRECT_ASSISTS") = chosen
         start.ArgumentList.Add("-benchmark") : start.ArgumentList.Add(FileName)
     End Sub
+
+    ' The renderer's DIRT3VR_DIRECT_ASSISTS: only what differs from DiRT 3's defaults (ABS on, the other
+    ' assists off, automatic gears), as name=value pairs in a fixed order; "" when nothing changes.
+    Public Shared Function Assists(settings As LauncherSettings) As String
+        Dim pairs As New List(Of String)
+        If Not settings.DirectAbs Then pairs.Add("assists_abs=0")
+        If settings.DirectStability Then pairs.Add("assists_stability=1")
+        If settings.DirectCornerBraking Then pairs.Add("assists_corner_braking=1")
+        If settings.DirectThrottle Then pairs.Add("assists_throttle_mngt=1")
+        If settings.DirectSteering Then pairs.Add("assists_auto_steer=1")
+        Dim gearbox = Array.IndexOf(GearboxChoices, settings.DirectGearbox)
+        If gearbox > 0 Then pairs.Add("transmission_type=" & Number(gearbox))
+        Return String.Join(",", pairs)
+    End Function
 
     Public Shared Function ConfigPath(context As InstallContext) As String
         Return Path.Combine(context.GameRoot, FileName)
