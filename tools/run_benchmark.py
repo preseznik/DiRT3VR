@@ -197,7 +197,7 @@ def diagnostic_environment(directory: Path, *, scene_observer: bool = False, rep
                  "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH", "DIRT3VR_RESEARCH_FILE_TRACE", "DIRT3VR_DIRECT_PRACTICE", "DIRT3VR_DIRECT_LAPS", "DIRT3VR_DIRECT_RETURN", "DIRT3VR_DIRECT_DIFFICULTY", "DIRT3VR_DIRECT_ASSISTS", "DIRT3VR_RESEARCH_LAPS", "DIRT3VR_SCREENSHOT_SECONDS", "DIRT3VR_RESEARCH_SETTINGS_TRACE",
                 "DIRT3VR_RESEARCH_STACKS", "DIRT3VR_RESEARCH_COUNT", "DIRT3VR_RESEARCH_PRESS_START_USER",
                 "DIRT3VR_RESEARCH_AUTO_SAVE_CHOICE", "DIRT3VR_RESEARCH_STORE_TRACE",
-                "DIRT3VR_RESEARCH_DATA_WATCH"):
+                "DIRT3VR_RESEARCH_DATA_WATCH", "DIRT3VR_RESEARCH_GAME_LOG"):
         env.pop(flag, None)
     if background_play:
         env["DIRT3VR_BACKGROUND_PLAY"] = "1"
@@ -573,6 +573,8 @@ def main() -> int:
                         help="Research only: the research proxy logs each profile setting the game looks up (name=value)")
     parser.add_argument("--file-trace", action="store_true",
                         help="Research only: the research proxy logs every file the game opens after device creation")
+    parser.add_argument("--game-log", action="store_true",
+                        help="Research only: the research proxy logs the game's own log (e.g. the race load's vehicle list)")
     parser.add_argument("--recover", type=Path, metavar="JOURNAL")
     args = parser.parse_args()
     if args.replay_pair and not (args.serial_render and args.scene_observer):
@@ -712,6 +714,8 @@ def main() -> int:
             env["DIRT3VR_RESEARCH_PATCH"] = args.research_patch
         if args.file_trace:
             env["DIRT3VR_RESEARCH_FILE_TRACE"] = "1"
+        if args.game_log:
+            env["DIRT3VR_RESEARCH_GAME_LOG"] = "1"
         if args.settings_trace:
             env["DIRT3VR_RESEARCH_SETTINGS_TRACE"] = "1"
         if args.stacks:
