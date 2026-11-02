@@ -179,12 +179,24 @@ Runs 65–83 (research hooks; all in the background unless noted):
   (`0xb2ef00`, vtable `0xf29278`) allocates fine, but a section decoder fails: **section
   `career manager sdu name`, error `0x37`** (run 83).
 
+Runs 84–89 followed the failure down (register capture at chosen addresses): the sixth
+section decoded is the career manager's (`0x5f3a60`, vtable `0xeb6840`); its main career
+(`+0x78`) decodes fine, `+0x80` is absent, and the object at `+0x94` fails in its decoder
+`0x6f4000` (interface vtable `0xec5898`; the `track_model` table is present), whose first
+entry (`0x6f1530`) gets `0x37` from the reader `0x9d5320` = **read past the end of the
+chunk**, on the entry's first field. So on the race route the career manager holds a
+different object in that slot than the one that wrote the data, and misreads it.
+
 So the profile files are fine (the normal start loads them) but the career manager
 cannot take its data in a direct start, presumably because it is only set up with the
 front end (garage / events database), which the race route never loads. Skipping that
 section is not safe: the career would not be loaded, and a later profile save would
-write a profile without it. Next: what the career manager needs before loading, and
-whether the direct route can provide it without the front end. Every run restored its
+write a profile without it. Making the race route build the career manager as the front
+end does is deep and risky work; the practical options are (a) keep DiRT 3's defaults in
+direct launch and let the launcher apply what matters itself (difficulty already; controls
+through per-session action maps, step 2 below), or (b) a direct launch through the front
+end (normal start, profile load answered automatically, then into the race), a much
+larger change. Every run restored its
 files; the saves were unchanged throughout.
 
 The earlier plan: a profile load on the `skip_no_garage` route. The existing load nodes (`C` →
