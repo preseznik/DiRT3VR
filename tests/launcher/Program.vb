@@ -39,6 +39,7 @@ Module Program
             MotionBlurTests.Run(root, AddressOf Check)
             DrivingControlsTests.Run(root, AddressOf Check)
             SessionActionMapsTests.Run(root, AddressOf Check)
+            SeatChannelTests.Run(root, AddressOf Check)
             StartupTests.Run(root, AddressOf Check)
             InstallerTests.Run(root, AddressOf Check)
             TestHeadsetResolution(root)
