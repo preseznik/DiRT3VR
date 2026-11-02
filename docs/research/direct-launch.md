@@ -147,6 +147,17 @@ as a normal session. Run 20 (the jump alone) and run 21 (`--direct-return`, real
 renderer, AI driving) went from the finish camera to DiRT 3's main menu and stayed there.
 That the menus then behave normally (starting another event, Exit) still needs real input.
 
+**Saving after a return (#f2d0f352).** A direct start never loads the player's profile
+(docs/research/driving-controls.md), so the menus after a return run on DiRT 3's default
+profile. Every profile save in `flow.bin` (pause-menu options, front-end options, unlocks,
+event results) passes `auto_save_check`, a `StateDecisionBool` on the data flag
+`auto_save` (store `0x10da300`); the profile setting `auto_save` defaults to 0
+(`0x59f3cc`). Run 96 (`--direct-return --data-watch`, research renderer reading the flags
+through the game's own lookup `0xd04300`): `auto_save=0`, `hasEverSaved=0` in the race and
+in the main menu after the return; the Steam Cloud saves were unchanged (runs 95–96). So
+the menus after a return should not save over the player's profile. Positive control (a
+normal start reading `auto_save=1` after its profile load) still to do.
+
 Pause is blocked deliberately: the race's next-state check (`0x51f3f0`) returns "pause"
 when a pause is requested, except while the benchmark flag is set (`0x51f456`). Direct
 practice now makes that `je` unconditional too (byte-checked with the relocated flag
