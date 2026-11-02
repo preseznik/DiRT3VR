@@ -58,6 +58,9 @@ def main() -> None:
     (HERE / "cameras.bin").write_bytes(original)
     for name, offsets in {"left-up-forward": (0.1, 0.05, 0.3), "limits": (-0.5, 0.5, -0.5), "centimetre": (0.01, -0.02, 0.07)}.items():
         (HERE / f"cameras-{name}.bin").write_bytes(sc.offset_seat(original, *offsets))
+    # Start in the cockpit view: after the seat offset (zero offset re-encodes the original unchanged).
+    (HERE / "cameras-cockpit.bin").write_bytes(sc.start_in_cockpit(sc.offset_seat(original, 0, 0, 0)))
+    (HERE / "cameras-left-up-forward-cockpit.bin").write_bytes(sc.start_in_cockpit(sc.offset_seat(original, 0.1, 0.05, 0.3)))
     print("wrote", sorted(p.name for p in HERE.glob("*.bin")))
 
 

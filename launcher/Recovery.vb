@@ -92,7 +92,7 @@ Public Class OwnedFileTransaction
         Dim seatCodes = changes.Keys.Where(AddressOf SeatPositions.IsTarget).Select(AddressOf SeatPositions.CodeOf).OrderBy(Function(code) code, StringComparer.Ordinal).ToArray()
         Dim hasSeats = seatCodes.Length > 0
         If hasSeats AndAlso Not experimental Then Throw New IOException("Seat positions belong to a VR session.")
-        If Not If(seats?.Keys.OrderBy(Function(code) code, StringComparer.Ordinal).SequenceEqual(seatCodes), Not hasSeats) OrElse (seats IsNot Nothing AndAlso seats.Values.Any(Function(offset) offset Is Nothing OrElse offset.IsZero)) Then Throw New IOException("Every seat change needs its own offset.")
+        If Not If(seats?.Keys.OrderBy(Function(code) code, StringComparer.Ordinal).SequenceEqual(seatCodes), Not hasSeats) OrElse (seats IsNot Nothing AndAlso seats.Values.Any(Function(offset) offset Is Nothing OrElse offset.IsUnchanged)) Then Throw New IOException("Every seat change needs its own offset.")
         For Each offset In If(seats?.Values, Array.Empty(Of SeatOffset)())
             offset.Validate()
         Next
@@ -218,7 +218,7 @@ Public Class OwnedFileTransaction
                 If Not expectedSets.Any(Function(session) fixedTargets.SequenceEqual(session)) Then Throw New IOException("Incomplete VR session recovery journal.")
                 If seatsRequired Then
                     If seatCodes.Length = 0 OrElse journal.Seats Is Nothing OrElse
-                       Not journal.Seats.Keys.OrderBy(Function(code) code, StringComparer.Ordinal).SequenceEqual(seatCodes) OrElse journal.Seats.Values.Any(Function(offset) offset Is Nothing OrElse offset.IsZero) Then Throw New IOException("Incomplete seat recovery journal.")
+                       Not journal.Seats.Keys.OrderBy(Function(code) code, StringComparer.Ordinal).SequenceEqual(seatCodes) OrElse journal.Seats.Values.Any(Function(offset) offset Is Nothing OrElse offset.IsUnchanged) Then Throw New IOException("Incomplete seat recovery journal.")
                     For Each offset In journal.Seats.Values
                         offset.Validate()
                     Next

@@ -7,6 +7,9 @@ Public Class SeatOffset
     Public Property Sideways As Integer
     Public Property Up As Integer
     Public Property Forward As Integer
+    ' Session journal only: the car also starts in the cockpit view (LauncherSettings.StartInCockpit).
+    <JsonIgnore(Condition:=JsonIgnoreCondition.WhenWritingDefault)>
+    Public Property Cockpit As Boolean
 
     <JsonIgnore>
     Public ReadOnly Property IsZero As Boolean
@@ -15,12 +18,20 @@ Public Class SeatOffset
         End Get
     End Property
 
+    ' Leaves the camera file as it is (no offset, no cockpit start).
+    <JsonIgnore>
+    Public ReadOnly Property IsUnchanged As Boolean
+        Get
+            Return IsZero AndAlso Not Cockpit
+        End Get
+    End Property
+
     Public Sub Validate()
         If {Sideways, Up, Forward}.Any(Function(value) Math.Abs(value) > Limit) Then Throw New IOException("Seat offsets are at most " & Limit & " cm in each direction.")
     End Sub
 
     Public Function Copy() As SeatOffset
-        Return New SeatOffset With {.Sideways = Sideways, .Up = Up, .Forward = Forward}
+        Return New SeatOffset With {.Sideways = Sideways, .Up = Up, .Forward = Forward, .Cockpit = Cockpit}
     End Function
 
     Public Function SameAs(other As SeatOffset) As Boolean
@@ -66,9 +77,11 @@ Public NotInheritable Class SeatPositions
         Return Path.Combine(context.GameRoot, "cars", "models", code, "cameras.xml")
     End Function
 
+    ' The seat offset, then (when asked) the cockpit start: start_in_cockpit(offset_seat(data, …)).
     Public Shared Function Apply(original As Byte(), offset As SeatOffset) As Byte()
         offset.Validate()
-        Return SeatCameras.Offset(original, offset.Sideways / 100.0, offset.Up / 100.0, offset.Forward / 100.0)
+        Dim moved = SeatCameras.Offset(original, offset.Sideways / 100.0, offset.Up / 100.0, offset.Forward / 100.0)
+        Return If(offset.Cockpit, SeatCameras.StartInCockpit(moved), moved)
     End Function
 
     ' The offset each car gets in a session: the shared one for every catalog car, or each car's own;
@@ -86,6 +99,15 @@ Public NotInheritable Class SeatPositions
                 result(pair.Key) = pair.Value.Copy()
             Next
         End If
+        For Each item In result.Values
+            item.Cockpit = False
+        Next
+        If settings.StartInCockpit Then
+            For Each car In EventCatalog.Current.Cars
+                If Not result.ContainsKey(car.Code) Then result(car.Code) = New SeatOffset
+                result(car.Code).Cockpit = True
+            Next
+        End If
         Return result
     End Function
 
@@ -100,8 +122,8 @@ Public NotInheritable Class SeatPositions
             Try
                 SafeFiles.NoLinks(target)
                 If Not File.Exists(target) Then
-                    ' Cars that aren't installed simply have nothing to adjust.
-                    If settings.SeatSameForAll Then Continue For
+                    ' Cars that aren't installed have nothing to adjust; only a car given its own position is named.
+                    If settings.SeatSameForAll OrElse settings.SeatOffsets Is Nothing OrElse Not settings.SeatOffsets.ContainsKey(pair.Key) Then Continue For
                     Throw New IOException("missing")
                 End If
                 If New FileInfo(target).Length > 1024 * 1024 Then Throw New IOException("too large")

@@ -231,6 +231,18 @@ Public NotInheritable Class SeatCameras
         Return value
     End Function
 
+    ' Wrench's start_in_cockpit: DiRT 3 starts a race with the first visible view, so hiding the visible
+    ' views listed before head-cam starts it in the cockpit (they can't be chosen while hidden).
+    Public Shared Function StartInCockpit(data As Byte()) As Byte()
+        Dim document = Decode(data)
+        Dim cockpit = HeadCam(document)
+        For Each view In Views(document)
+            If view = cockpit Then Exit For
+            If GetValue(document.AttributesOf(view), "hidden") = "false" Then document.SetAttribute(view, "hidden", "true")
+        Next
+        Return Encode(document)
+    End Function
+
     ' The cockpit eye point of a camera file, in metres (x left, y up, z forward).
     Public Shared Function Eye(data As Byte()) As (X As Double, Y As Double, Z As Double)
         Dim position = HeadPosition(Decode(data))
