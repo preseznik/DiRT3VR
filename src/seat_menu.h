@@ -5,7 +5,9 @@
 #include <cstdint>
 #include <cstring>
 #include <functional>
+#include <mutex>
 #include <string>
+#include <vector>
 
 namespace dirt3vr::seat {
 // The in-game seat menu's state, game independent: the launcher's seat channel
@@ -131,16 +133,20 @@ private:
 // it, arrows / D-pad move the seat (Shift / sideways modifier: left and right move
 // sideways), Enter saves, Esc cancels. Bound direction keys also move the seat while
 // it's closed; such a change is committed 300 ms after the last movement.
+// Thread safe: the input filters call BlocksKey and Filter* from the game's input threads.
 class Menu {
 public:
     using KeyDown=std::function<bool(unsigned)>;
     Menu(Channel channel,bool inputReady,KeyDown keyDown) : channel_(channel),inputReady_(inputReady),keyDown_(std::move(keyDown)) {
         for(unsigned key=0;key<256;++key) armed_[key]=!Key(key);
     }
+    Menu(const Menu&)=delete;
+    Menu& operator=(const Menu&)=delete;
     // The identified car's table index, or -1 when it isn't known.
-    void Select(int index) { selected_=index>=0 && unsigned(index)<channel_.Cars() ? index : -1; }
+    void Select(int index) { Lock lock(mutex_); selected_=index>=0 && unsigned(index)<channel_.Cars() ? index : -1; }
     // One rendered frame. now: milliseconds; tick: GetTickCount() for the launcher's heartbeat.
     void Update(uint64_t now,uint32_t tick,bool foreground) {
+        Lock lock(mutex_);
         eligible_=inputReady_;
         const double seconds=lastUpdate_ ? double(now-lastUpdate_)/1000 : 0; lastUpdate_=now;
         if(selected_!=active_) {
@@ -169,24 +175,27 @@ public:
             if(held&NavLeft) directions|=sideways_ ? Left : Back;
             if(held&NavRight) directions|=sideways_ ? Right : Forward;
         }
-        if(inputReady_ && CanAdjust() && movement_.Update(current_,directions,seconds)) { dirty_=!panel_; lastChange_=now; }
+        if(inputReady_ && CanAdjustLocked() && movement_.Update(current_,directions,seconds)) { dirty_=!panel_; lastChange_=now; }
         if(dirty_ && !directions && now-lastChange_>=300) Commit();
         Publish();
     }
     // Not a cockpit frame, or the session pauses VR: close without saving, keep a pending move.
     void Inactive() {
+        Lock lock(mutex_);
         eligible_=false; CancelPanel(); if(dirty_) Commit();
         previousHeld_=~0u; lastUpdate_=0; Publish();
         for(unsigned key=0;key<256;++key) armed_[key]=!Key(key);
     }
     // Added to the eye pose: the camera files already hold the applied position.
     Position Offset() const {
-        if(!CanAdjust()) return {};
+        Lock lock(mutex_);
+        if(!CanAdjustLocked()) return {};
         const auto applied=channel_.Applied(Universal() ? AllCars : active_);
         return Valid(current_) && Valid(applied) ? Difference(current_,applied) : Position{};
     }
-    // Whether the game must not see this key now (for the input filters).
+    // Whether the game must not see this key (a virtual-key code) now.
     bool BlocksKey(unsigned key) {
+        Lock lock(mutex_);
         if(key>255) return false;
         bool block=blocked_[key];
         if(eligible_) for(unsigned k=0;k<7;++k) {
@@ -197,20 +206,61 @@ public:
         if(!Key(key)) blocked_[key]=false;
         return block;
     }
-    bool PanelOpen() const { return panel_; }
-    bool SidewaysHeld() const { return sideways_; }
-    bool CanAdjust() const { return Universal() || active_>=0; }
+    // The menu's buttons on the launcher's held device (channel 36–76) are kept from the game while
+    // the menu is open; one pressed then stays kept until it's released, as in DiRT2VR.
+    // XInput: clears them from a pad's wButtons.
+    void FilterXbox(unsigned slot,WORD& buttons) {
+        Lock lock(mutex_);
+        if(slot>3) return;
+        auto mask=WORD(panel_ && input_.source==1 && input_.slot==slot ? input_.buttons[0] : 0u);
+        mask=WORD(mask|xboxHeld_[slot]);
+        xboxHeld_[slot]=WORD(mask&buttons);
+        buttons=WORD(buttons&~mask);
+    }
+    // DirectInput button 0–127 of a device: true when the game must see it released.
+    bool BlocksButton(const GUID& device,unsigned button,bool pressed) {
+        Lock lock(mutex_);
+        if(button>=128) return false;
+        auto& held=Held(device).buttons[button/32];
+        const uint32_t bit=1u<<(button%32);
+        const bool reserved=panel_ && input_.source==2 && input_.guid==device && (input_.buttons[button/32]&bit);
+        if(!reserved && !(held&bit)) return false;
+        held=pressed ? held|bit : held&~bit;
+        return true;
+    }
+    // DirectInput hat (POV) 0–3 of a device: true when the game must see it centred. The menu uses hat 0.
+    bool BlocksHat(const GUID& device,unsigned hat,bool centred) {
+        Lock lock(mutex_);
+        if(hat>=4) return false;
+        auto& held=Held(device).hats;
+        const uint32_t bit=1u<<hat;
+        const bool reserved=panel_ && input_.source==2 && input_.guid==device && input_.pov && hat==0;
+        if(!reserved && !(held&bit)) return false;
+        held=centred ? held&~bit : held|bit;
+        return true;
+    }
+    bool PanelOpen() const { Lock lock(mutex_); return panel_; }
+    bool SidewaysHeld() const { Lock lock(mutex_); return sideways_; }
+    bool CanAdjust() const { Lock lock(mutex_); return CanAdjustLocked(); }
     bool InputReady() const { return inputReady_; }
-    unsigned Openings() const { return openings_; }
-    int Active() const { return active_; }
-    Position Current() const { return current_; }
-    const Channel::Input& LauncherInput() const { return input_; }
+    unsigned Openings() const { Lock lock(mutex_); return openings_; }
+    int Active() const { Lock lock(mutex_); return active_; }
+    Position Current() const { Lock lock(mutex_); return current_; }
     const Channel& View() const { return channel_; }
 private:
+    // Recursive: a key read inside Update may reach a hooked API that asks BlocksKey.
+    using Lock=std::lock_guard<std::recursive_mutex>;
+    struct DeviceHeld { GUID device{}; uint32_t buttons[4]{},hats{}; };
     static constexpr unsigned Navigation[]={VK_SHIFT,VK_UP,VK_DOWN,VK_LEFT,VK_RIGHT,VK_RETURN,VK_ESCAPE};
+    DeviceHeld& Held(const GUID& device) {
+        for(auto& entry:deviceHeld_) if(entry.device==device) return entry;
+        deviceHeld_.push_back({device});
+        return deviceHeld_.back();
+    }
+    bool CanAdjustLocked() const { return Universal() || active_>=0; }
     bool Universal() const { return channel_.Universal(); }
     Position Saved() const {
-        if(!CanAdjust()) return {};
+        if(!CanAdjustLocked()) return {};
         const int index=Universal() ? AllCars : active_;
         const auto saved=channel_.Saved(index);
         return Valid(saved) ? saved : channel_.Applied(index);
@@ -233,12 +283,12 @@ private:
         return held;
     }
     void Publish(bool commit=false) {
-        const unsigned status=!inputReady_ ? InputUnavailable : !CanAdjust() ? CarUnknown : Ready;
+        const unsigned status=!inputReady_ ? InputUnavailable : !CanAdjustLocked() ? CarUnknown : Ready;
         const int index=Universal() ? AllCars : active_;
         channel_.Publish(panel_,status,active_,current_,commit ? &index : nullptr);
     }
     void Commit() {
-        if(CanAdjust() && current_!=saved_) { saved_=current_; Publish(true); }
+        if(CanAdjustLocked() && current_!=saved_) { saved_=current_; Publish(true); }
         dirty_=false;
     }
     void CancelPanel() { if(panel_) current_=opening_; panel_=false; movement_.Reset(); }
@@ -254,5 +304,8 @@ private:
     bool armed_[256]{},blocked_[256]{};
     unsigned previousHeld_=~0u,openings_{};
     uint64_t lastUpdate_{},lastChange_{};
+    mutable std::recursive_mutex mutex_;
+    WORD xboxHeld_[4]{};
+    std::vector<DeviceHeld> deviceHeld_;
 };
 }
