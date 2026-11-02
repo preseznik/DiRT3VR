@@ -60,6 +60,10 @@ Module UpdateTests
     End Function
 
     Public Sub Run(root As String, check As Action(Of Boolean, String))
+        ' The release channel: an Experimental-ring build keeps a plain version (tools/package.ps1 -Channel).
+        check(BuildInfo.IsExperimental("Experimental", "0.1.21") AndAlso Not BuildInfo.IsExperimental("Stable", "0.1.21") AndAlso Not BuildInfo.IsExperimental(Nothing, "0.1.21") AndAlso
+              BuildInfo.IsExperimental("Stable", "0.2.0-beta.1") AndAlso BuildInfo.IsExperimental(Nothing, "0.2.0-beta.1"), "a build is experimental by its channel or a prerelease version")
+        check(BuildInfo.ReleaseChannel = "Stable" AndAlso Not BuildInfo.Experimental, "development and test builds are Stable unless packaged as Experimental (" & BuildInfo.ReleaseChannel & ")")
         ' Version order follows SemVer, including numeric prerelease parts.
         Dim order = {"0.1.9", "0.1.20", "0.2.0-alpha.2", "0.2.0-alpha.10", "0.2.0-beta", "0.2.0", "v1.0.0"}
         For i = 1 To order.Length - 1
