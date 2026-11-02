@@ -79,6 +79,9 @@ Partial Public Class MainForm
         Dim seats As New Button With {.Name = "SimpleSeats", .Text = "Seat positions…", .AutoSize = True}
         comfort.Controls.Add(seats)
         AddHandler seats.Click, Sub() ShowAdvancedTab("Controls")
+        Dim drivingShortcut As New Button With {.Name = "SimpleDrivingControls", .Text = "Driving controls…", .AutoSize = True}
+        comfort.Controls.Add(drivingShortcut)
+        AddHandler drivingShortcut.Click, Sub() OpenDrivingControls()
         Dim profiles As New Button With {.Name = "SimpleProfiles", .Text = "Settings profiles…", .AutoSize = True}
         comfort.Controls.Add(profiles)
         AddHandler profiles.Click, Sub() ShowAdvancedTab("Settings")
