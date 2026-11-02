@@ -324,6 +324,7 @@ Public NotInheritable Class DrivingBindingForm
     Private releaseAt As Long = -1
     Private pendingKey As DrivingBinding
     Private updating As Boolean
+    Private inputFailure As String
 
     <DllImport("user32.dll")> Private Shared Function GetAsyncKeyState(key As Integer) As Short
     End Function
@@ -403,6 +404,7 @@ Public NotInheritable Class DrivingBindingForm
         pollTimer.Stop() : input?.Dispose() : input = Nothing : updating = True
         devices.Items.Clear() : devices.Items.Add("All connected devices")
         Dim failure As String = Nothing
+        inputFailure = Nothing
         Try
             input = New DrivingInput(libraryPath, Handle)
             For Each device In input.Devices
@@ -414,7 +416,7 @@ Public NotInheritable Class DrivingBindingForm
             devices.SelectedIndex = If(Not allDevices.Checked AndAlso devices.Items.Count > 1, 1, 0)
             updating = False : BeginStep() : pollTimer.Start()
         End Try
-        If failure IsNot Nothing Then status.Text = failure
+        If failure IsNot Nothing Then inputFailure = failure : status.Text = failure
     End Sub
 
     Private Sub BeginStep()
@@ -485,7 +487,7 @@ Public NotInheritable Class DrivingBindingForm
             If now - releaseAt >= 160 Then NextStep(pendingKey)
             Return
         End If
-        If input Is Nothing OrElse input.Devices.Count = 0 Then status.Text = "Connect a device and Refresh, or choose Keyboard." : Return
+        If input Is Nothing OrElse input.Devices.Count = 0 Then status.Text = If(inputFailure, "Connect a device and Refresh, or choose Keyboard.") : Return
         Dim chosen = If(allDevices.Checked, Nothing, TryCast(devices.SelectedItem, DrivingInput.Device))
         If Not allDevices.Checked AndAlso chosen Is Nothing Then status.Text = "Select a device, or detect inputs from all devices." : Return
         Dim ready = 0, axesReady = 0, connected = 0

@@ -70,6 +70,16 @@ report is investigated.
    shifter and controllers as Windows reports them and tests rumble or force
    feedback on each one. It reads devices without taking them over and changes
    no game or Windows setting; close DiRT 3 before testing force feedback.
+   **Controls → Driving controls** binds your wheel, pedals, shifter, controller
+   and keys for direct practice: a binding wizard (essentials first, then the
+   H-pattern shifter, flashback and replays, menus, and look and horn, each
+   optional), one action at a time, calibration, an Xbox preset from DiRT 3's
+   own layout, and saved presets. A direct start doesn't load your DiRT 3
+   profile, so without these DiRT 3 uses its default preset for each device.
+   Each bound device gets a complete action map for the session (DiRT 3's own
+   map for that device with your bindings in place), removed after exit;
+   actions you don't bind keep DiRT 3's binding. Normal launches keep your
+   profile's controls.
    **Settings** provides Modern/Classic appearance and runtime selection.
    **Settings profiles** saves named copies of the current controls per installation.
    Enter a name and choose **Save as new profile**, or explicitly **Overwrite profile**.
@@ -159,7 +169,7 @@ opponents (same class, mixed, or your car's model) at DiRT 3's default difficult
 or a chosen level from 0 to 5. A direct start doesn't load your DiRT 3 profile,
 so it uses the game's default controls preset and difficulty; choose the
 gearbox and assists (ABS, stability, corner braking, throttle, steering) in the
-picker. After the finish DiRT 3 either closes by itself (launch again for another
+picker, and your bindings under **Controls → Driving controls**. After the finish DiRT 3 either closes by itself (launch again for another
 run) or, with **After the finish → Return to DiRT 3's menus**, goes to its main menu so you can play on. During the run, Esc opens DiRT 3's pause menu: Restart goes back
 to the start line, Retire ends the run. Normal launch stays the default.
 VR sessions switch DiRT 3's motion blur off (head movement would smear the

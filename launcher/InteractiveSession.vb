@@ -13,6 +13,8 @@ Public Class InteractiveSession
     Public Property SeatsSkipped As IReadOnlyList(Of String) = Array.Empty(Of String)()
     ' Why motion blur stayed on for this session, or "" when it was switched off (or already off).
     Public Property MotionBlurNote As String = ""
+    ' Devices whose launcher driving bindings couldn't go into the session's action maps, or "".
+    Public Property DrivingNote As String = ""
     Private stopRequested As Boolean
 
     Private Sub New(install As InstallContext, child As Process, folder As String, sessionLease As FileStream)
@@ -105,6 +107,11 @@ Public Class InteractiveSession
             Dim blurNote As String = ""
             Dim effects = MotionBlur.SessionChange(context, blurNote)
             If effects IsNot Nothing Then changes.Add(MotionBlur.Target, effects)
+            ' Driving controls: the launcher's bindings as session action maps, direct practice only (#8121970e).
+            Dim actionMaps = If(settings.LaunchMode = "direct", SessionActionMaps.Changes(context, DrivingControls.Load(context)), New SessionActionMaps.SessionChanges())
+            For Each pair In actionMaps.Files
+                changes.Add(pair.Key, pair.Value)
+            Next
             directory = Path.Combine(context.UserRoot, "logs", "session-" & Guid.NewGuid().ToString("N"))
             SafeFiles.NoLinks(directory) : IO.Directory.CreateDirectory(directory)
             settings.Save(context)
@@ -114,8 +121,8 @@ Public Class InteractiveSession
             context.RequireClosed()
             game = Process.Start(StartInfo(context, runtime, directory, settings, headset, preflight.Bypasses))
             If game Is Nothing Then Throw New IOException("DiRT 3 could not start.")
-            Dim result As New InteractiveSession(context, game, directory, lease) With {.SeatsSkipped = seats.Skipped, .MotionBlurNote = blurNote}
-            SafeFiles.SaveJson(Path.Combine(directory, "session.json"), New With {.schema = 1, .mode = "experimental-interactive", .processId = game.Id, .startedUtc = result.StartedUtc, .runtime = runtime.Mode, .vrRenderScale = settings.VrRenderScale, .headsetWidth = headset.Width, .headsetHeight = headset.Height, .sceneWidth = scene.Width, .sceneHeight = scene.Height, .stereoVerified = False, .launchMode = settings.LaunchMode, .directRoute = If(settings.LaunchMode = "direct", settings.DirectRoute, 0), .directCar = If(settings.LaunchMode = "direct", settings.DirectCar, ""), .directLaps = If(settings.LaunchMode = "direct", DirectPractice.Laps(settings), 0), .directOpponents = If(settings.LaunchMode = "direct", DirectPractice.Opponents(settings), 0), .directOpponentCars = If(settings.LaunchMode = "direct", settings.DirectOpponentCars, ""), .directDifficulty = If(settings.LaunchMode = "direct", DirectPractice.Difficulty(settings), -1), .directAfterFinish = If(settings.LaunchMode = "direct", settings.DirectAfterFinish, ""), .directAssists = If(settings.LaunchMode = "direct", DirectPractice.Assists(settings), ""), .seatCars = seats.Offsets.Keys.ToArray(), .startInCockpit = settings.StartInCockpit, .seatSkipped = seats.Skipped.ToArray(), .motionBlurOff = effects IsNot Nothing, .motionBlurNote = blurNote, .disabledApiLayers = preflight.Bypasses.Select(Function(layer) layer.LayerName).ToArray(), .layerWarning = preflight.Warning})
+            Dim result As New InteractiveSession(context, game, directory, lease) With {.SeatsSkipped = seats.Skipped, .MotionBlurNote = blurNote, .DrivingNote = actionMaps.Note}
+            SafeFiles.SaveJson(Path.Combine(directory, "session.json"), New With {.schema = 1, .mode = "experimental-interactive", .processId = game.Id, .startedUtc = result.StartedUtc, .runtime = runtime.Mode, .vrRenderScale = settings.VrRenderScale, .headsetWidth = headset.Width, .headsetHeight = headset.Height, .sceneWidth = scene.Width, .sceneHeight = scene.Height, .stereoVerified = False, .launchMode = settings.LaunchMode, .directRoute = If(settings.LaunchMode = "direct", settings.DirectRoute, 0), .directCar = If(settings.LaunchMode = "direct", settings.DirectCar, ""), .directLaps = If(settings.LaunchMode = "direct", DirectPractice.Laps(settings), 0), .directOpponents = If(settings.LaunchMode = "direct", DirectPractice.Opponents(settings), 0), .directOpponentCars = If(settings.LaunchMode = "direct", settings.DirectOpponentCars, ""), .directDifficulty = If(settings.LaunchMode = "direct", DirectPractice.Difficulty(settings), -1), .directAfterFinish = If(settings.LaunchMode = "direct", settings.DirectAfterFinish, ""), .directAssists = If(settings.LaunchMode = "direct", DirectPractice.Assists(settings), ""), .seatCars = seats.Offsets.Keys.ToArray(), .startInCockpit = settings.StartInCockpit, .seatSkipped = seats.Skipped.ToArray(), .motionBlurOff = effects IsNot Nothing, .motionBlurNote = blurNote, .drivingMaps = actionMaps.Devices.Select(Function(d) d.DeviceName & " (" & d.BaseFile & ")").ToArray(), .drivingSkipped = actionMaps.Skipped.ToArray(), .disabledApiLayers = preflight.Bypasses.Select(Function(layer) layer.LayerName).ToArray(), .layerWarning = preflight.Warning})
             Session.WriteLaunchStatus(context, "starting", "Waiting for the game window and native headset output.", game.Id, result.StartedUtc, mode:="experimental-interactive")
             Return result
         Catch ex As Exception

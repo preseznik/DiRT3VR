@@ -402,6 +402,22 @@ Module DrivingControlsTests
             form.UsePreset(New DrivingControls With {.Bindings = New List(Of DrivingBinding) From {Pad("Pause", "xinput_button_back")}})
             check(Not form.Current.Enabled AndAlso form.Current.Bindings.Count = 1 AndAlso DrivingControls.Load(ctx).Bindings.Count = DrivingControls.XboxPreset().Count, "a loaded preset replaces the edits, not the saved file")
         End Using
+        ' Controls → Driving controls in the main window: off until bindings are saved, then a one-line summary.
+        Dim mainCtx = Context(root, "driving-controls-main")
+        Call New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = ""}.Save(mainCtx)
+        Using form As New MainForm(mainCtx)
+            form.ShowInTaskbar = False : form.StartPosition = FormStartPosition.Manual : form.Location = New Drawing.Point(-30000, -30000)
+            form.Show() : Application.DoEvents()
+            Dim find = Function(name As String) form.Controls.Find(name, True).Single()
+            check(find("DrivingControls").Text = "Driving controls…" AndAlso find("DrivingSummary").Text.StartsWith("Off:", StringComparison.Ordinal) AndAlso find("SectionDrivingcontrols") IsNot Nothing,
+                  "Controls has a Driving controls section, off by default (" & find("DrivingSummary").Text & ")")
+        End Using
+        Call New DrivingControls With {.Enabled = True, .Bindings = DrivingControls.XboxPreset()}.Save(mainCtx)
+        Using form As New MainForm(mainCtx)
+            form.ShowInTaskbar = False : form.StartPosition = FormStartPosition.Manual : form.Location = New Drawing.Point(-30000, -30000)
+            form.Show() : Application.DoEvents()
+            check(form.Controls.Find("DrivingSummary", True).Single().Text = "On for direct practice: " & DrivingControls.XboxPreset().Count & " bindings on Xbox controller 1.", "the summary counts the saved bindings and names the devices")
+        End Using
         Using calibration As New DrivingCalibrationForm(New DrivingBinding With {.Action = "Brake", .Device = "Wheel", .DeviceId = WheelId, .DeviceType = WheelProduct, .Input = "di_y_axis", .Calibration = "uniDirectionalNegative", .DeadZone = 0.05D, .Saturation = 0.9D})
             check(Field(Of ComboBox)(calibration, "direction").SelectedIndex = 1 AndAlso calibration.Binding.DeadZone = 0.05D AndAlso calibration.Binding.Saturation = 0.9D, "calibration starts from the binding")
             Field(Of NumericUpDown)(calibration, "dead").Value = 10 : Field(Of NumericUpDown)(calibration, "saturationBox").Value = 80

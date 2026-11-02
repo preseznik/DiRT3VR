@@ -21,6 +21,9 @@ Public Class RecoveryJournal
     ' Schema 6: the seat offset each car's camera file was prepared with (approved transform).
     <System.Text.Json.Serialization.JsonIgnore(Condition:=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)>
     Public Property Seats As Dictionary(Of String, SeatOffset)
+    ' Schema 8: how many session action maps actionMapPaths.xml lists (approved transform).
+    <System.Text.Json.Serialization.JsonIgnore(Condition:=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)>
+    Public Property ActionMaps As Integer?
 End Class
 
 ' What to do with a graphics file that changed during the session beyond DiRT3VR's own values.
@@ -66,6 +69,7 @@ Public Class OwnedFileTransaction
 
     Private Function TargetPath(target As String) As String
         If SeatPositions.IsTarget(target) Then Return SeatPositions.CameraPath(context, SeatPositions.CodeOf(target))
+        If SessionActionMaps.IsMapTarget(target) Then Return SessionActionMaps.MapPath(context, SessionActionMaps.MapIndex(target))
         Select Case target
             Case "proxy" : Return Path.Combine(context.GameRoot, "d3d11.dll")
             Case "direct" : Return DirectPractice.ConfigPath(context)
@@ -73,6 +77,7 @@ Public Class OwnedFileTransaction
             Case "restrictions" : Return Path.Combine(context.GameRoot, "system", "hardware_settings_restrictions.xml")
             Case "startup" : Return Path.Combine(context.GameRoot, "system", "states.bin")
             Case MotionBlur.Target : Return MotionBlur.EffectsPath(context)
+            Case SessionActionMaps.PathsTarget : Return SessionActionMaps.PathsPath(context)
             Case Else : Throw New IOException("Unknown recovery target. The journal was preserved.")
         End Select
     End Function
@@ -99,15 +104,23 @@ Public Class OwnedFileTransaction
         ' Schema 7: a VR session that also switches motion blur off (postprocess\effects.xml), with or without seats.
         Dim hasEffects = changes.ContainsKey(MotionBlur.Target)
         If hasEffects AndAlso Not experimental Then Throw New IOException("Motion blur changes belong to a VR session.")
-        Dim journal As New RecoveryJournal With {.Schema = If(hasEffects, 7, If(hasSeats, 6, If(hasDirect, If(experimental, 4, 5), If(hasStartup, 3, If(experimental, 2, 1))))), .InstallId = context.Id, .GraphicsPath = context.GraphicsPath, .GraphicsQuality = If(quality.Count > 0, quality, Nothing),
-                                                 .Seats = If(hasSeats, seats.ToDictionary(Function(pair) pair.Key, Function(pair) pair.Value.Copy(), StringComparer.Ordinal), Nothing)}
+        ' Schema 8: a direct practice session (VR or desktop) with the launcher's driving bindings: the session
+        ' action maps 1..N it creates and actionMapPaths.xml listing them.
+        Dim mapCount = changes.Keys.Count(AddressOf SessionActionMaps.IsMapTarget)
+        Dim hasMaps = mapCount > 0 OrElse changes.ContainsKey(SessionActionMaps.PathsTarget)
+        If hasMaps AndAlso Not hasDirect Then Throw New IOException("Session action maps belong to a direct practice session.")
+        If hasMaps AndAlso (Not changes.ContainsKey(SessionActionMaps.PathsTarget) OrElse Not Enumerable.Range(1, mapCount).All(Function(index) changes.ContainsKey(SessionActionMaps.MapTarget(index)))) Then Throw New IOException("Session action maps need their list and consecutive numbers.")
+        Dim fixedChanges = changes.Keys.Where(Function(key) Not SeatPositions.IsTarget(key) AndAlso Not SessionActionMaps.IsMapTarget(key) AndAlso key <> SessionActionMaps.PathsTarget)
+        Dim journal As New RecoveryJournal With {.Schema = If(hasMaps, 8, If(hasEffects, 7, If(hasSeats, 6, If(hasDirect, If(experimental, 4, 5), If(hasStartup, 3, If(experimental, 2, 1)))))), .InstallId = context.Id, .GraphicsPath = context.GraphicsPath, .GraphicsQuality = If(quality.Count > 0, quality, Nothing),
+                                                 .Seats = If(hasSeats, seats.ToDictionary(Function(pair) pair.Key, Function(pair) pair.Value.Copy(), StringComparer.Ordinal), Nothing),
+                                                 .ActionMaps = If(hasMaps, mapCount, CType(Nothing, Integer?))}
         Dim prepared = journal.Schema >= 2
         If experimental Then
             Dim required = {"graphics", "proxy", "restrictions"}.Concat(If(hasStartup, {"startup"}, Array.Empty(Of String)())).Concat(If(hasDirect, {"direct"}, Array.Empty(Of String)())).Concat(If(hasEffects, {MotionBlur.Target}, Array.Empty(Of String)())).Order().ToArray()
-            If Not changes.Keys.Where(Function(key) Not SeatPositions.IsTarget(key)).Order().SequenceEqual(required) Then Throw New IOException("The experimental session requires its complete set of fixed targets.")
+            If Not fixedChanges.Order().SequenceEqual(required) Then Throw New IOException("The experimental session requires its complete set of fixed targets.")
         ElseIf hasDirect Then
             Dim required = {"direct", "proxy"}.Concat(If(hasStartup, {"startup"}, Array.Empty(Of String)())).Order().ToArray()
-            If Not changes.Keys.Order().SequenceEqual(required) Then Throw New IOException("A desktop direct practice session changes only its config, DiRT3VR's renderer and optionally the startup movie definitions.")
+            If Not fixedChanges.Order().SequenceEqual(required) Then Throw New IOException("A desktop direct practice session changes only its config, DiRT3VR's renderer, optionally the startup movie definitions and the session action maps.")
         ElseIf hasStartup AndAlso Not changes.Keys.SequenceEqual({"startup"}) Then
             Throw New IOException("A desktop startup session may change only the startup movie definitions.")
         End If
@@ -118,6 +131,7 @@ Public Class OwnedFileTransaction
             If pair.Key = "restrictions" AndAlso Not experimental Then Throw New IOException("Restrictions require an experimental session journal.")
             If pair.Key = "proxy" AndAlso File.Exists(target) Then Throw New IOException("An existing d3d11.dll was preserved. Another graphics mod must be removed using its own instructions.")
             If pair.Key = "direct" AndAlso File.Exists(target) Then Throw New IOException("A " & DirectPractice.FileName & " already exists in the game folder; it was preserved. Remove it if it isn't needed, then launch again.")
+            If SessionActionMaps.IsMapTarget(pair.Key) AndAlso File.Exists(target) Then Throw New IOException("A " & Path.GetFileName(target) & " already exists in DiRT 3's actionmap folder; it was preserved. Remove it if it isn't needed, then launch again.")
             If prepared AndAlso Not Created(pair.Key) AndAlso Not File.Exists(target) Then Throw New IOException("The original settings file is missing: " & target)
             If prepared Then ValidateApplied(pair.Key, If(File.Exists(target), File.ReadAllBytes(target), Array.Empty(Of Byte)()), pair.Value, journal)
         Next
@@ -126,6 +140,7 @@ Public Class OwnedFileTransaction
             SafeFiles.NoLinks(target)
             If pair.Key = "proxy" AndAlso File.Exists(target) Then Throw New IOException("An existing d3d11.dll was preserved. Another graphics mod must be removed using its own instructions.")
             If pair.Key = "direct" AndAlso File.Exists(target) Then Throw New IOException("A " & DirectPractice.FileName & " already exists in the game folder; it was preserved.")
+            If SessionActionMaps.IsMapTarget(pair.Key) AndAlso File.Exists(target) Then Throw New IOException("A " & Path.GetFileName(target) & " already exists in DiRT 3's actionmap folder; it was preserved.")
             Dim entry As New RecoveryEntry With {.Target = pair.Key, .OriginalExists = File.Exists(target), .AppliedHash = SafeFiles.HashBytes(pair.Value), .Backup = Guid.NewGuid().ToString("N") & ".bin"}
             If entry.OriginalExists Then
                 ' Read-only files stay read-only while applied (WriteAtomic keeps attributes); recovery puts the recorded flag back.
@@ -175,6 +190,10 @@ Public Class OwnedFileTransaction
             If Not expected.SequenceEqual(applied) Then Throw New IOException("Prepared session data does not match its approved transformation: " & target)
             Return
         End If
+        If SessionActionMaps.IsMapTarget(target) Then
+            SessionActionMaps.Validate(applied, SessionActionMaps.MapIndex(target))
+            Return
+        End If
         Select Case target
             Case "graphics"
                 Dim size = ExperimentalFiles.AppliedGraphicsSize(applied)
@@ -183,6 +202,9 @@ Public Class OwnedFileTransaction
             Case "startup" : expected = StartupMovies.Patch(original)
             Case "direct" : DirectPractice.Validate(applied) : expected = applied
             Case MotionBlur.Target : expected = MotionBlur.Disable(original)
+            Case SessionActionMaps.PathsTarget
+                If journal.ActionMaps Is Nothing Then Throw New IOException("Unknown prepared session target.")
+                expected = SessionActionMaps.ListMaps(original, journal.ActionMaps.Value)
             Case "proxy"
                 Dim payload = Path.Combine(context.PackageRoot, "payload", "d3d11.dll")
                 SafeFiles.NoLinks(payload) : expected = File.ReadAllBytes(payload)
@@ -193,7 +215,7 @@ Public Class OwnedFileTransaction
 
     Private Function LoadJournal() As RecoveryJournal
         Dim journal = SafeFiles.ReadJson(Of RecoveryJournal)(JournalPath)
-        If Not {1, 2, 3, 4, 5, 6, 7}.Contains(journal.Schema) OrElse journal.InstallId <> context.Id OrElse journal.Entries Is Nothing OrElse journal.Entries.Count < 1 OrElse journal.Entries.Count > MaxEntries(journal.Schema) OrElse journal.Entries.Any(Function(entry) entry Is Nothing) OrElse journal.Entries.Select(Function(e) e.Target).Distinct().Count() <> journal.Entries.Count Then Throw New IOException("Invalid recovery journal. Backups were preserved.")
+        If Not {1, 2, 3, 4, 5, 6, 7, 8}.Contains(journal.Schema) OrElse journal.InstallId <> context.Id OrElse journal.Entries Is Nothing OrElse journal.Entries.Count < 1 OrElse journal.Entries.Count > MaxEntries(journal.Schema) OrElse journal.Entries.Any(Function(entry) entry Is Nothing) OrElse journal.Entries.Select(Function(e) e.Target).Distinct().Count() <> journal.Entries.Count Then Throw New IOException("Invalid recovery journal. Backups were preserved.")
         If Not String.Equals(journal.GraphicsPath, context.GraphicsPath, StringComparison.OrdinalIgnoreCase) Then Throw New IOException("Graphics recovery belongs to the Windows account that started this session. The original backup was preserved.")
         Dim targets = journal.Entries.Select(Function(entry) entry.Target).Order().ToArray()
         Select Case journal.Schema
@@ -225,8 +247,31 @@ Public Class OwnedFileTransaction
                 ElseIf journal.Seats IsNot Nothing Then
                     Throw New IOException("Invalid recovery journal. Backups were preserved.")
                 End If
+            Case 8
+                ' A direct practice session, desktop or VR (with or without startup, motion blur and seats), plus
+                ' its action map list and the session action maps 1..N.
+                Dim mapIndexes = targets.Where(AddressOf SessionActionMaps.IsMapTarget).Select(AddressOf SessionActionMaps.MapIndex).Order().ToArray()
+                If mapIndexes.Length = 0 OrElse journal.ActionMaps Is Nothing OrElse journal.ActionMaps.Value <> mapIndexes.Length OrElse Not mapIndexes.SequenceEqual(Enumerable.Range(1, mapIndexes.Length)) OrElse
+                   Not targets.Contains(SessionActionMaps.PathsTarget) Then Throw New IOException("Incomplete action map recovery journal.")
+                Dim fixedTargets = targets.Where(Function(target) Not SeatPositions.IsTarget(target) AndAlso Not SessionActionMaps.IsMapTarget(target) AndAlso target <> SessionActionMaps.PathsTarget).ToArray()
+                Dim seatCodes = targets.Where(AddressOf SeatPositions.IsTarget).Select(AddressOf SeatPositions.CodeOf).OrderBy(Function(code) code, StringComparer.Ordinal).ToArray()
+                Dim desktop = New String()() {New String() {"direct", "proxy"}, New String() {"direct", "proxy", "startup"}}
+                Dim vr = New String()() {New String() {"direct", "graphics", "proxy", "restrictions"}, New String() {"direct", "graphics", "proxy", "restrictions", "startup"}}
+                Dim vrSets = vr.Concat(vr.Select(Function(session) session.Append(MotionBlur.Target).Order().ToArray())).ToArray()
+                Dim isVr = vrSets.Any(Function(session) fixedTargets.SequenceEqual(session))
+                If Not isVr AndAlso Not desktop.Any(Function(session) fixedTargets.SequenceEqual(session)) Then Throw New IOException("Incomplete action map recovery journal.")
+                If seatCodes.Length > 0 Then
+                    If Not isVr OrElse journal.Seats Is Nothing OrElse Not journal.Seats.Keys.OrderBy(Function(code) code, StringComparer.Ordinal).SequenceEqual(seatCodes) OrElse
+                       journal.Seats.Values.Any(Function(offset) offset Is Nothing OrElse offset.IsUnchanged) Then Throw New IOException("Incomplete seat recovery journal.")
+                    For Each offset In journal.Seats.Values
+                        offset.Validate()
+                    Next
+                ElseIf journal.Seats IsNot Nothing Then
+                    Throw New IOException("Invalid recovery journal. Backups were preserved.")
+                End If
         End Select
-        If Not {6, 7}.Contains(journal.Schema) AndAlso journal.Seats IsNot Nothing Then Throw New IOException("Invalid recovery journal. Backups were preserved.")
+        If Not {6, 7, 8}.Contains(journal.Schema) AndAlso journal.Seats IsNot Nothing Then Throw New IOException("Invalid recovery journal. Backups were preserved.")
+        If journal.Schema <> 8 AndAlso journal.ActionMaps IsNot Nothing Then Throw New IOException("Invalid recovery journal. Backups were preserved.")
         Return journal
     End Function
 
@@ -238,13 +283,14 @@ Public Class OwnedFileTransaction
             Case 4 : Return 5
             Case 6 : Return 5 + EventCatalog.Current.Cars.Count
             Case 7 : Return 6 + EventCatalog.Current.Cars.Count
+            Case 8 : Return 7 + 1 + SessionActionMaps.MaxMaps + EventCatalog.Current.Cars.Count
             Case Else : Return 3
         End Select
     End Function
 
     ' Targets DiRT3VR creates for a session (no original to back up; recovery deletes them).
     Private Shared Function Created(target As String) As Boolean
-        Return target = "proxy" OrElse target = "direct"
+        Return target = "proxy" OrElse target = "direct" OrElse SessionActionMaps.IsMapTarget(target)
     End Function
 
     Private Shared Function ValidBackup(name As String) As Boolean
