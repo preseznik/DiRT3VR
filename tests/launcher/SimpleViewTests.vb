@@ -92,6 +92,7 @@ Module SimpleViewTests
             Dim tabs = DirectCast(reopened.Controls.Find("LauncherTabs", True).Single(), TabControl)
             check(reopened.SimpleViewShown AndAlso DirectCast(reopened.Controls.Find("SimpleView", True).Single(), RadioButton).Checked, "the launcher reopens in Simple")
             check(reopened.CurrentSettings().VrRenderScale = 120 AndAlso reopened.CurrentSettings().LaunchMode = "normal", "closing saved the view, not the unsaved edits")
+            check(reopened.Controls.Find("SimpleDrivingControls", True).Single().Text = "Driving controls…", "Simple's Controls & comfort opens the driving controls too")
             Dim asked = 0
             reopened.ConfirmAdvancedView = Function()
                                                asked += 1

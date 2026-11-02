@@ -478,6 +478,18 @@ Public Class MainForm
                           End Function)
     End Function
 
+    ' The driving bindings window (Controls → Driving controls, and the Simple view's shortcut).
+    Private Sub OpenDrivingControls()
+        Try
+            Using dialog As New DrivingControlsForm(context)
+                dialog.ShowDialog(Me)
+            End Using
+        Catch ex As IOException
+            notice.Text = ex.Message
+        End Try
+        UpdateDrivingSummary()
+    End Sub
+
     ' One line on the launcher's driving bindings, under Controls → Driving controls.
     Private Sub UpdateDrivingSummary()
         Try
@@ -507,16 +519,7 @@ Public Class MainForm
         Dim drivingButton As New Button With {.Name = "DrivingControls", .Text = "Driving controls…", .AutoSize = True}
         driving.Controls.Add(drivingButton)
         driving.Controls.Add(drivingSummary)
-        AddHandler drivingButton.Click, Sub()
-                                            Try
-                                                Using dialog As New DrivingControlsForm(context)
-                                                    dialog.ShowDialog(Me)
-                                                End Using
-                                            Catch ex As IOException
-                                                notice.Text = ex.Message
-                                            End Try
-                                            UpdateDrivingSummary()
-                                        End Sub
+        AddHandler drivingButton.Click, Sub() OpenDrivingControls()
         UpdateDrivingSummary()
         Dim vrControls = Section(content, "VR and seat controls")
         Field(vrControls, "Recenter key", recenterButton)
