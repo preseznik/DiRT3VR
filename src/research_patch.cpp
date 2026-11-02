@@ -360,11 +360,18 @@ volatile long callCounts[CountSlots]{};
 void* countTrampolines[CountSlots]{};
 unsigned countAddresses[CountSlots]{};
 unsigned countInstalled{};
-constexpr unsigned CapturedCalls=2,CapturedFrames=14;
+constexpr unsigned CapturedCalls=16,CapturedFrames=14;
 void* capturedStacks[CountSlots][CapturedCalls][CapturedFrames]{};
 // Keeps the call stacks of each function's first calls (logged with the counts).
-// ecx, edx and [ecx] (a vtable, when ecx is an object) at each captured call.
-uintptr_t capturedRegisters[CountSlots][CapturedCalls][3]{};
+// ecx, edx, [ecx], edi and [edi] ([reg] is a vtable when reg is an object) at each captured call.
+uintptr_t capturedRegisters[CountSlots][CapturedCalls][7]{};
+uintptr_t FirstWord(uintptr_t address) {
+    MEMORY_BASIC_INFORMATION info{};
+    if(!address || !VirtualQuery(reinterpret_cast<void*>(address),&info,sizeof(info)) || info.State!=MEM_COMMIT ||
+       (info.Protect&(PAGE_GUARD|PAGE_NOACCESS)))
+        return 0;
+    return *reinterpret_cast<const uintptr_t*>(address);
+}
 // Frame 0 is the target's return address; the rest come from the caller's EBP chain.
 // saved points at the pushfd/pushad block: flags, edi, esi, ebp, esp, ebx, edx, ecx, eax.
 void __cdecl CaptureCall(unsigned slot,void* returnAddress,const uintptr_t* saved) {
@@ -375,10 +382,11 @@ void __cdecl CaptureCall(unsigned slot,void* returnAddress,const uintptr_t* save
     const auto ecx=saved[7];
     capturedRegisters[slot][call][0]=ecx;
     capturedRegisters[slot][call][1]=saved[6];
-    MEMORY_BASIC_INFORMATION info{};
-    if(ecx && VirtualQuery(reinterpret_cast<void*>(ecx),&info,sizeof(info)) && info.State==MEM_COMMIT &&
-       !(info.Protect&(PAGE_GUARD|PAGE_NOACCESS)))
-        capturedRegisters[slot][call][2]=*reinterpret_cast<const uintptr_t*>(ecx);
+    capturedRegisters[slot][call][2]=FirstWord(ecx);
+    capturedRegisters[slot][call][3]=saved[1];
+    capturedRegisters[slot][call][4]=FirstWord(saved[1]);
+    capturedRegisters[slot][call][5]=saved[2];
+    capturedRegisters[slot][call][6]=saved[8];
     // At the serialiser's section-error exit (0xb2f10e): eax is the section decoder's error and
     // [[esi+0x210]+8] the section's name.
     if(countAddresses[slot]==0xb2f10e && traceLog) {
@@ -446,11 +454,15 @@ void LogCallCounts(void (*log)(const char*,...),unsigned second) {
                 stack+=f ? " < " : "";
                 stack+=frame;
             }
-            char registers[160];
+            char registers[320];
             Describe(capturedRegisters[i][call][1],frame,sizeof(frame));
-            char table[96];
+            char table[96],ediTable[96];
             Describe(capturedRegisters[i][call][2],table,sizeof(table));
-            std::snprintf(registers,sizeof(registers),"ecx=0x%x [ecx]=%s edx=%s",static_cast<unsigned>(capturedRegisters[i][call][0]),table,frame);
+            Describe(capturedRegisters[i][call][4],ediTable,sizeof(ediTable));
+            std::snprintf(registers,sizeof(registers),"ecx=0x%x [ecx]=%s edx=%s edi=0x%x [edi]=%s esi=0x%x eax=0x%x",
+                          static_cast<unsigned>(capturedRegisters[i][call][0]),table,frame,
+                          static_cast<unsigned>(capturedRegisters[i][call][3]),ediTable,
+                          static_cast<unsigned>(capturedRegisters[i][call][5]),static_cast<unsigned>(capturedRegisters[i][call][6]));
             log("Research call 0x%x #%u (%s) from %s",countAddresses[i],call+1,registers,stack.c_str());
         }
 }
