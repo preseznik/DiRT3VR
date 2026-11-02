@@ -121,29 +121,80 @@ def seat_test(data: bytes) -> bytes:
     return seat_cameras.offset_seat(seat_cameras.start_in_cockpit(data), *SEAT_TEST_OFFSET)
 
 
+# Research bisection of the profile load: "signin" (d3s only), "dataset" (through d3d) or "full".
+PROFILE_LOAD_STEPS = "full"
 FLOW_NAME = "system/flow.bin"
 FLOW_SHA256 = "270e958a75df8845e5d22560cb5a436fd1ea8e589ebfcbfa13f1a76205526f20"
 
 
 def profile_load_redirect(data: bytes) -> bytes:
-    """Research: send a skipfe start through the normal profile load.
+    """Research: load the player's profile in a benchmark (direct launch) start.
 
-    The skipfe-only node 32e (profile_reset_p2) links next to 10 (clear_pchange_select),
-    skipping C (create_protected_data_context) -> load_profile_dataset_to_ep ->
-    begin_load_profile -> wait_for_load_profile, which the normal start runs and which
-    leads back to 10. Only that one link target changes."""
+    The benchmark start takes skip_no_garage: 32o (start_dlc_timer) -> DLC -> 32t
+    (wait_dlc_timer_for_popup_time) -> 32u (shutters_slide_off) -> 2Q -> race, with no
+    profile load. The normal start's load nodes (C..G) are shared and lead into the front
+    end, so this adds copies with new ids under the same parent as 32u ("global"):
+      d3s press_start_handle_signin -> d3c create_protected_data_context ->
+      d3d load_profile_dataset_to_ep -> [d3w cleanup_profile_operation:
+      d3e begin_load_profile -> d3f wait_for_load_profile -> d3g check_loaded_profile] -> 32u
+    and points 32t's next at d3s. Failed or cancelled loads also continue to 32u."""
     if hashlib.sha256(data).hexdigest() != FLOW_SHA256:
         raise ValueError("Unexpected flow.bin")
+    Node = seat_cameras.Node
     document = seat_cameras.decode(data, max_bytes=4 * 1024 * 1024)
-    nodes = {document.attributes_of(i).get("id"): i for i in range(len(document.elements)) if document.name(i) == "node"}
-    if (document.attributes_of(nodes["32e"]).get("state") != "profile_reset_p2"
-            or document.attributes_of(nodes["C"]).get("state") != "create_protected_data_context"):
-        raise ValueError("Unexpected flow.bin profile nodes")
-    links = [c for c in document.children(nodes["32e"]) if document.name(c) == "link"]
-    if len(links) != 1 or document.attributes_of(links[0]) != {"id": "next", "target": "10", "type": "exit_cross_fade"}:
-        raise ValueError("Unexpected skipfe profile link")
-    document.set_attribute(links[0], "target", "C")
-    return seat_cameras.encode(document)
+    root = seat_cameras.to_tree(document)
+    found: dict[str, tuple[Node, Node]] = {}
+
+    def walk(node: Node) -> None:
+        for child in node.children:
+            if child.name == "node" and child.get("id") in ("32t", "32u"):
+                found[child.get("id")] = (child, node)
+            walk(child)
+    walk(root)
+    (wait, _), (shutters, parent) = found["32t"], found["32u"]
+    links = [c for c in wait.children if c.name == "link"]
+    if (wait.get("state") != "wait_dlc_timer_for_popup_time" or shutters.get("state") != "shutters_slide_off"
+            or parent.get("state") != "global" or len(links) != 1 or links[0].attributes != [("id", "next"), ("target", "32u")]):
+        raise ValueError("Unexpected flow.bin skip_no_garage route")
+
+    def node(ident: str, state: str, children: list[Node]) -> Node:
+        return Node("node", None, [("id", ident), ("state", state)], children)
+
+    def link(ident: str, target: str) -> Node:
+        return Node("link", None, [("id", ident), ("target", target)], [])
+    # Nested like the normal start (31d event_monitor > 31c delay_invite_events >
+    # 31h cleanup_profile_operation > E, F, G): the event monitor pumps the save system's
+    # events that complete the asynchronous load. Profile events continue to the race.
+    added = [
+        node("d3s", "press_start_handle_signin", [link(i, "d3c") for i in ("autoload", "signin", "createprofile")]),
+        node("d3m", "event_monitor", [link(i, "32u") for i in ("profile_event", "invite_accepted", "invite_accepted_inactive")] + [
+            node("d3i", "delay_invite_events", [
+                node("d3c", "create_protected_data_context", [link("next", "d3d")]),
+                node("d3d", "load_profile_dataset_to_ep", [link("next", "d3e")]),
+                node("d3w", "cleanup_profile_operation", [
+                    node("d3e", "begin_load_profile", [link("next", "d3f")]),
+                    node("d3f", "wait_for_load_profile", [link("next", "d3g")] +
+                         [link(i, "32u") for i in ("cancelled", "list_select", "create_new", "corrupt")]),
+                    node("d3g", "check_loaded_profile", [link("next", "32u")]),
+                ]),
+            ]),
+        ]),
+    ]
+    if PROFILE_LOAD_STEPS == "signin":
+        added = [node("d3s", "press_start_handle_signin", [link(i, "32u") for i in ("autoload", "signin", "createprofile")])]
+    elif PROFILE_LOAD_STEPS == "dataset":
+        added = [node("d3s", "press_start_handle_signin", [link(i, "d3c") for i in ("autoload", "signin", "createprofile")]),
+                 node("d3c", "create_protected_data_context", [link("next", "d3d")]),
+                 node("d3d", "load_profile_dataset_to_ep", [link("next", "32u")])]
+    elif PROFILE_LOAD_STEPS == "begin":
+        added[1].children[-1].children[-1].children = [
+            node("d3e", "begin_load_profile", [link("next", "32u")])]
+    elif PROFILE_LOAD_STEPS != "full":
+        raise ValueError("Unknown profile load steps")
+    links[0].attributes = [("id", "next"), ("target", "d3s")]
+    at = parent.children.index(shutters)
+    parent.children[at:at] = added
+    return seat_cameras.encode(seat_cameras.from_tree(root, document.strings))
 
 
 # Every replaceable original: its pinned hash (looked up when used, so tests can pin

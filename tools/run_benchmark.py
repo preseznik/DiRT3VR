@@ -512,7 +512,7 @@ def main() -> int:
     parser.add_argument("--car", metavar="CODE", help="The (first) car, a catalog code; default frx, or the route discipline's first car")
     parser.add_argument("--opponents", type=int, default=0, metavar="N",
                         help="Add N more cars (0-7) of the route's discipline from the catalog")
-    parser.add_argument("--load-profile", action="store_true",
+    parser.add_argument("--load-profile", nargs="?", const="full", choices=("signin", "dataset", "begin", "full"),
                         help="Research: journaled system/flow.bin change that makes the benchmark start load the player's "
                              "profile (skipfe normally skips it)")
     parser.add_argument("--seat-test", type=parse_seat_offset, metavar="SIDE,UP,FORWARD",
@@ -600,6 +600,8 @@ def main() -> int:
             parser.error("--seat-test changes the frx camera file; use the frx as the (first) car")
         diagnostic_files.SEAT_TEST_OFFSET = args.seat_test
     seat = preflight_replacement(game, SEAT_NAME) if args.seat_test is not None else None
+    if args.load_profile:
+        diagnostic_files.PROFILE_LOAD_STEPS = args.load_profile
     profile_flow = preflight_replacement(game, FLOW_NAME) if args.load_profile else None
     preflight = {"gameSha256": EXPECTED_EXE, "proxySha256": hashlib.sha256(proxy_bytes).hexdigest(),
                  "mode": "headset-prototype" if xr_runtime else "desktop-eye-replay" if args.replay_pair else "desktop-observation",

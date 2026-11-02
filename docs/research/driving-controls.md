@@ -106,7 +106,26 @@ Why: the benchmark start takes `skip_no_garage` at the first `skipfe_decision` (
 (`32t`) → `shutters_slide_off` (`32u`) → `update_in_network_game` (`2Q`) → race. That
 route has no profile reset or load at all; `32e` is on the `skip` branch it never takes.
 
-Next: a profile load on the `skip_no_garage` route. The existing load nodes (`C` →
+Attempts with copied nodes on the `skip_no_garage` route (`--load-profile`,
+`diagnostic_files.profile_load_redirect`; `seat_cameras.to_tree/from_tree` now insert
+elements while keeping the game's exact layout, verified by a byte-identical tree round
+trip of flow.bin, states.bin and all 63 cameras.xml):
+
+| Run | Inserted after `32t`, then on to `32u` | Result |
+|---|---|---|
+| 52 | signin → create context → load dataset → [cleanup: begin → wait → check] | reads `QKRHMYXE`, then a black screen |
+| 53 | the same inside `event_monitor` > `delay_invite_events`, as the normal start | the same |
+| 54 | signin only | race starts; no profile read |
+| 55 | signin → context → dataset | race starts; no profile read |
+| 56 | … → [cleanup: begin] (no wait) | reads `QKRHMYXE`, then a black screen |
+
+So `begin_load_profile` starts the save system's load, which reads the profile's first
+file and then stalls; leaving the state doesn't help. In the normal start these states
+run inside `press_start` (and its music/audio wrappers), which presumably keeps the save
+operation going. Next: what `StateWaitForLoad`/the save system waits for (vtable route
+below), or whether a `press_start`-like parent can run without showing its screen.
+
+The earlier plan: a profile load on the `skip_no_garage` route. The existing load nodes (`C` →
 `D` → `E` → `F` → `G`) are shared with the normal start and continue into the front end
 (garage, main menu), which this route never loads, so they can't simply be linked to.
 The fix is DiRT2VR's: copies of those nodes with new ids (same `state` names), inserted
