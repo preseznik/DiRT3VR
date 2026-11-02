@@ -3,6 +3,7 @@
 #include <tlhelp32.h>
 #include <MinHook.h>
 #include <atomic>
+#include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -174,6 +175,183 @@ void SampleThreads(void (*log)(const char*,...),unsigned second) {
     }
     CloseHandle(snapshot);
 }
+// Press Start user: a direct start never shows ScreenPressStart, whose Start handler
+// (0x4f95b0) stores the pressing user's index in the input component (+0x1b4) and in the
+// press_start_user_index variable. StateHandleSignIn's enter (0x55eaf0) reads that variable
+// (-1 when unset) for the save system, which then asks for a save to be chosen.
+// DIRT3VR_RESEARCH_PRESS_START_USER=N sets both to N just before that enter runs.
+using SignInEnterFn=void(__thiscall*)(void*,void*);
+SignInEnterFn realSignInEnter{};
+int pressStartUser=-1;
+void __fastcall SignInEnter(void* self,void*,void* argument) {
+    auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+    auto* context=*reinterpret_cast<uint8_t**>(static_cast<uint8_t*>(self)+0x28);
+    auto** components=*reinterpret_cast<void***>(context+0x4);
+    void* data=components[*reinterpret_cast<unsigned*>(image+(0x10da9ec-0x400000))];
+    auto* input=static_cast<uint8_t*>(components[*reinterpret_cast<unsigned*>(image+(0xfe45cc-0x400000))]);
+    using LookupFn=void*(__thiscall*)(void*,void*,const char*);
+    const auto lookup=reinterpret_cast<LookupFn>(image+(0xd04300-0x400000));
+    void* variable=lookup(data,image+(0x10da2dc-0x400000),reinterpret_cast<const char*>(image+(0xe96ecc-0x400000)));
+    int before=-2;
+    if(variable) {
+        using GetFn=int(__thiscall*)(void*);
+        using SetFn=void(__thiscall*)(void*,int*);
+        auto** table=*reinterpret_cast<void***>(variable);
+        before=reinterpret_cast<GetFn>(table[2])(variable);
+        int value=pressStartUser;
+        reinterpret_cast<SetFn>(table[3])(variable,&value);
+    }
+    const int inputBefore=*reinterpret_cast<int*>(input+0x1b4);
+    *reinterpret_cast<int*>(input+0x1b4)=pressStartUser;
+    if(traceLog) traceLog("Research press start user: variable %s %d -> %d, input %d -> %d",variable ? "found" : "missing",
+                          before,pressStartUser,inputBefore,pressStartUser);
+    realSignInEnter(self,argument);
+}
+void InstallPressStartUser(void (*log)(const char*,...)) {
+    char text[8]{};
+    const auto length=GetEnvironmentVariableA("DIRT3VR_RESEARCH_PRESS_START_USER",text,sizeof(text));
+    if(!length || length>=sizeof(text)) return;
+    pressStartUser=static_cast<int>(std::strtol(text,nullptr,10));
+    if(pressStartUser<0 || pressStartUser>3) { log("Research press start user refused: %s",text); return; }
+    static const uint8_t entry[]{0x55,0x8b,0xec,0x51,0x56,0x8b,0xf1,0x8b,0x46,0x24};
+    auto* target=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr))+(0x55eaf0-0x400000);
+    if(std::memcmp(target,entry,sizeof(entry))!=0) { log("Research press start user refused: sign-in instructions differ"); return; }
+    traceLog=log;
+    const auto initialized=MH_Initialize();
+    if(initialized!=MH_OK && initialized!=MH_ERROR_ALREADY_INITIALIZED) return;
+    const auto created=MH_CreateHook(target,reinterpret_cast<void*>(&SignInEnter),reinterpret_cast<void**>(&realSignInEnter));
+    const auto enabled=created==MH_OK ? MH_EnableHook(target) : created;
+    log("Research press start user %d: created=%d enabled=%d",pressStartUser,created,enabled);
+}
+
+// Automatic save choice: when wait_for_load_profile's update (0x54fef0) asks for the save
+// list (list_select), choose the first save the way the list's confirm does
+// (SaveSystemUserInterface 0x5a7420(2, 0), see 0x4e9540) and keep waiting instead.
+// DIRT3VR_RESEARCH_AUTO_SAVE_CHOICE=1.
+using LinkFn=void*(__thiscall*)(void*,const char*);
+using WaitUpdateFn=int*(__thiscall*)(void*,int*);
+WaitUpdateFn realWaitUpdate{};
+std::atomic<unsigned> autoChoices{};
+bool autoSaveChoiceLogOnly{};
+// The save operation of the wait's type, looked up as 0x54fef0 does; -1 when there is none.
+int OperationStatus(void* self,uint8_t* image) {
+    auto* context=*reinterpret_cast<uint8_t**>(static_cast<uint8_t*>(self)+0x28);
+    auto** components=*reinterpret_cast<void***>(context+0x4);
+    void* data=components[*reinterpret_cast<unsigned*>(image+(0x10da9ec-0x400000))];
+    using LookupFn=uint8_t*(__thiscall*)(void*,void*,const void*);
+    auto* entry=reinterpret_cast<LookupFn>(image+(0xd04300-0x400000))(data,image+(0xfe79bc-0x400000),
+                                                                      *reinterpret_cast<void**>(static_cast<uint8_t*>(self)+0x2c));
+    auto* operation=entry ? *reinterpret_cast<uint8_t**>(entry+0x4) : nullptr;
+    if(!operation) return -1;
+    using StatusFn=int(__thiscall*)(void*);
+    auto* status=operation+0x20;
+    return reinterpret_cast<StatusFn>((*reinterpret_cast<void***>(status))[2])(status);
+}
+// The save system reports errors through 0xcba000, which formats them and passes them to the
+// sink at [[0xfe5a18]+0xc] as sink(0xfe5a18, "SAVE", text); the log keeps them.
+using SaveSinkFn=void(__cdecl*)(void*,const char*,const char*,...);
+SaveSinkFn realSaveSink{};
+std::atomic<unsigned> saveMessages{};
+void __cdecl SaveSink(void* sink,const char* tag,const char* format,...) {
+    char text[512]{};
+    if(format) {
+        va_list arguments;
+        va_start(arguments,format);
+        std::vsnprintf(text,sizeof(text),format,arguments);
+        va_end(arguments);
+    }
+    if(traceLog && saveMessages.fetch_add(1)<300) traceLog("Research save log [%.16s] %s",tag ? tag : "",text);
+    if(realSaveSink) realSaveSink(sink,tag,"%s",text);
+}
+void InstallSaveSink(uint8_t* image) {
+    static bool installed{};
+    if(installed) return;
+    auto* object=*reinterpret_cast<uint8_t**>(image+(0xfe5a18-0x400000));
+    if(!object) return;
+    installed=true;
+    auto* slot=reinterpret_cast<SaveSinkFn*>(object+0xc);
+    realSaveSink=*slot;
+    DWORD protection{};
+    if(!VirtualProtect(slot,sizeof(*slot),PAGE_READWRITE,&protection)) return;
+    *slot=&SaveSink;
+    VirtualProtect(slot,sizeof(*slot),protection,&protection);
+    if(traceLog) traceLog("Research save log sink installed (was %p)",reinterpret_cast<void*>(realSaveSink));
+}
+int* __fastcall WaitUpdate(void* self,void*,int* out) {
+    auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+    InstallSaveSink(image);
+    int* result=realWaitUpdate(self,out);
+    const auto makeLink=reinterpret_cast<LinkFn>(image+(0xcd8a10-0x400000));
+    int listSelect{},none{};
+    makeLink(&listSelect,reinterpret_cast<const char*>(image+(0xea613c-0x400000)));
+    makeLink(&none,nullptr);
+    static int lastStatus=-2,lastLink=-2;
+    const int status=OperationStatus(self,image);
+    if(traceLog && (status!=lastStatus || *result!=lastLink))
+        traceLog("Research wait: operation status %d, link 0x%x%s",status,*result,*result==listSelect ? " (list_select)" : *result==none ? " (stay)" : "");
+    lastStatus=status;
+    lastLink=*result;
+    if(autoSaveChoiceLogOnly) return result;
+    // Choosing sets the save UI's flag that the wait reports as "corrupt" on its next
+    // update (and clears); while the chosen load is still running (status 0x3c), keep waiting.
+    static bool chosen{};
+    int corrupt{};
+    makeLink(&corrupt,reinterpret_cast<const char*>(image+(0xe9ebb8-0x400000)));
+    auto* context=*reinterpret_cast<uint8_t**>(static_cast<uint8_t*>(self)+0x28);
+    auto** components=*reinterpret_cast<void***>(context+0x4);
+    auto* ui=static_cast<uint8_t*>(components[*reinterpret_cast<unsigned*>(image+(0xfe45d0-0x400000))]);
+    if(chosen && traceLog) {
+        // The save UI after the choice: its status (+0x1c), the answer (+0x40, +0x44) and what the
+        // pending request's callback (+0x38 on +0x3c) says; the list overlay acts on that result.
+        using StatusFn=int(__thiscall*)(void*);
+        auto* uiStatus=ui+0x1c;
+        const int state=reinterpret_cast<StatusFn>((*reinterpret_cast<void***>(uiStatus))[2])(uiStatus);
+        const auto callback=*reinterpret_cast<StatusFn*>(ui+0x38);
+        void* callbackObject=*reinterpret_cast<void**>(ui+0x3c);
+        const int advice=callback ? callback(callbackObject) : -1;
+        static int last[4]{-9,-9,-9,-9};
+        const int now[4]{state,*reinterpret_cast<int*>(ui+0x40),*reinterpret_cast<int*>(ui+0x44),advice};
+        if(std::memcmp(now,last,sizeof(now))) {
+            std::memcpy(last,now,sizeof(now));
+            traceLog("Research save UI: status %d, answer (%d, %d), request callback %d, operation %d",now[0],now[1],now[2],now[3],status);
+        }
+    }
+    if(chosen && *result==corrupt && status==0x3c) {
+        *result=none;
+        lastLink=none;
+        if(traceLog) traceLog("Research auto save choice: corrupt right after the choice while loading -> stay");
+        return result;
+    }
+    if(*result!=listSelect) return result;
+    chosen=true;
+    // The list's confirm (0x4e9340): (0, i) loads save i, (1, 0) creates a new one, (2, 0) backs out.
+    auto* saves=*reinterpret_cast<uint8_t**>(static_cast<uint8_t*>(ui)+0x30);
+    const auto count=(*reinterpret_cast<uintptr_t*>(saves+0x8)-*reinterpret_cast<uintptr_t*>(saves+0x4))/0x144;
+    const int action=count ? 0 : 2;
+    using ChooseFn=void(__thiscall*)(void*,int,int);
+    reinterpret_cast<ChooseFn>(image+(0x5a7420-0x400000))(ui,action,0);
+    *result=none;
+    lastLink=none;
+    if(traceLog && autoChoices.fetch_add(1)<4)
+        traceLog("Research auto save choice: list_select with %u saves -> (%d, 0)",static_cast<unsigned>(count),action);
+    return result;
+}
+void InstallAutoSaveChoice(void (*log)(const char*,...)) {
+    wchar_t flag[8]{};
+    // "1" chooses automatically; "2" only logs the wait's operation status and links.
+    if(GetEnvironmentVariableW(L"DIRT3VR_RESEARCH_AUTO_SAVE_CHOICE",flag,8)!=1 || (flag[0]!=L'1' && flag[0]!=L'2')) return;
+    autoSaveChoiceLogOnly=flag[0]==L'2';
+    static const uint8_t entry[]{0x55,0x8b,0xec,0x83,0xec,0x10,0x56,0x8b,0xf1,0x8b,0x46,0x24};
+    auto* target=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr))+(0x54fef0-0x400000);
+    if(std::memcmp(target,entry,sizeof(entry))!=0) { log("Research auto save choice refused: wait instructions differ"); return; }
+    traceLog=log;
+    const auto initialized=MH_Initialize();
+    if(initialized!=MH_OK && initialized!=MH_ERROR_ALREADY_INITIALIZED) return;
+    const auto created=MH_CreateHook(target,reinterpret_cast<void*>(&WaitUpdate),reinterpret_cast<void**>(&realWaitUpdate));
+    const auto enabled=created==MH_OK ? MH_EnableHook(target) : created;
+    log("Research auto save choice: created=%d enabled=%d",created,enabled);
+}
+
 // Call counter: DIRT3VR_RESEARCH_COUNT lists up to 8 function addresses (hex, as in the
 // disassembly at the preferred base 0x400000). Each gets a thunk that counts calls and jumps on
 // unchanged; the counts are logged with every stack sample.
@@ -185,18 +363,42 @@ unsigned countInstalled{};
 constexpr unsigned CapturedCalls=2,CapturedFrames=14;
 void* capturedStacks[CountSlots][CapturedCalls][CapturedFrames]{};
 // Keeps the call stacks of each function's first calls (logged with the counts).
+// ecx, edx and [ecx] (a vtable, when ecx is an object) at each captured call.
+uintptr_t capturedRegisters[CountSlots][CapturedCalls][3]{};
 // Frame 0 is the target's return address; the rest come from the caller's EBP chain.
-void __cdecl CaptureCall(unsigned slot,void* returnAddress) {
+// saved points at the pushfd/pushad block: flags, edi, esi, ebp, esp, ebx, edx, ecx, eax.
+void __cdecl CaptureCall(unsigned slot,void* returnAddress,const uintptr_t* saved) {
     const auto call=static_cast<unsigned>(callCounts[slot]);
     if(slot>=CountSlots || call>=CapturedCalls) return;
     capturedStacks[slot][call][0]=returnAddress;
     RtlCaptureStackBackTrace(2,CapturedFrames-1,capturedStacks[slot][call]+1,nullptr);
+    const auto ecx=saved[7];
+    capturedRegisters[slot][call][0]=ecx;
+    capturedRegisters[slot][call][1]=saved[6];
+    MEMORY_BASIC_INFORMATION info{};
+    if(ecx && VirtualQuery(reinterpret_cast<void*>(ecx),&info,sizeof(info)) && info.State==MEM_COMMIT &&
+       !(info.Protect&(PAGE_GUARD|PAGE_NOACCESS)))
+        capturedRegisters[slot][call][2]=*reinterpret_cast<const uintptr_t*>(ecx);
+    // At the serialiser's section-error exit (0xb2f10e): eax is the section decoder's error and
+    // [[esi+0x210]+8] the section's name.
+    if(countAddresses[slot]==0xb2f10e && traceLog) {
+        const auto esi=saved[2];
+        const char* name{};
+        if(Readable(reinterpret_cast<void*>(esi+0x210),4)) {
+            const auto item=*reinterpret_cast<const uintptr_t*>(esi+0x210);
+            if(item && Readable(reinterpret_cast<void*>(item+8),4)) name=*reinterpret_cast<const char* const*>(item+8);
+        }
+        char text[64]{};
+        if(name && Readable(name,1)) std::snprintf(text,sizeof(text),"%.60s",name);
+        traceLog("Research serialiser section error 0x%x in section '%s'",static_cast<unsigned>(saved[8]),text);
+    }
 }
 // Registers and flags are saved around the capture, so the target sees its original entry state.
-// After pushad (32 bytes) and pushfd (4) the target's return address is at [esp+36].
+// After pushad (32 bytes) and pushfd (4) the target's return address is at [esp+36]; after
+// pushing the block pointer it is at [esp+40].
 #define DIRT3VR_COUNT_THUNK(n) __declspec(naked) void CountThunk##n() { \
-    __asm { pushad } __asm { pushfd } __asm { push dword ptr [esp+36] } __asm { push n } \
-    __asm { call CaptureCall } __asm { add esp,8 } __asm { popfd } __asm { popad } \
+    __asm { pushad } __asm { pushfd } __asm { push esp } __asm { push dword ptr [esp+40] } __asm { push n } \
+    __asm { call CaptureCall } __asm { add esp,12 } __asm { popfd } __asm { popad } \
     __asm { lock inc dword ptr [callCounts+n*4] } __asm { jmp dword ptr [countTrampolines+n*4] } }
 DIRT3VR_COUNT_THUNK(0) DIRT3VR_COUNT_THUNK(1) DIRT3VR_COUNT_THUNK(2) DIRT3VR_COUNT_THUNK(3)
 DIRT3VR_COUNT_THUNK(4) DIRT3VR_COUNT_THUNK(5) DIRT3VR_COUNT_THUNK(6) DIRT3VR_COUNT_THUNK(7)
@@ -244,7 +446,12 @@ void LogCallCounts(void (*log)(const char*,...),unsigned second) {
                 stack+=f ? " < " : "";
                 stack+=frame;
             }
-            log("Research call 0x%x #%u from %s",countAddresses[i],call+1,stack.c_str());
+            char registers[160];
+            Describe(capturedRegisters[i][call][1],frame,sizeof(frame));
+            char table[96];
+            Describe(capturedRegisters[i][call][2],table,sizeof(table));
+            std::snprintf(registers,sizeof(registers),"ecx=0x%x [ecx]=%s edx=%s",static_cast<unsigned>(capturedRegisters[i][call][0]),table,frame);
+            log("Research call 0x%x #%u (%s) from %s",countAddresses[i],call+1,registers,stack.c_str());
         }
 }
 void InstallStackSampler(void (*log)(const char*,...)) {
@@ -295,6 +502,8 @@ void Apply(void (*log)(const char*,...)) {
     std::call_once(once,[log] {
         InstallFileTrace(log);
         InstallSettingsTrace(log);
+        InstallPressStartUser(log);
+        InstallAutoSaveChoice(log);
         InstallCallCounter(log);
         InstallStackSampler(log);
         char text[513]{};

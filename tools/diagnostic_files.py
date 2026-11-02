@@ -194,6 +194,12 @@ def profile_load_redirect(data: bytes) -> bytes:
         added[0].children = [link(i, "d3r") for i in ("autoload", "signin", "createprofile")]
         added[1:1] = [node("d3r", "profile_reset", [link("next", "d3q")]),
                       node("d3q", "profile_reset_p2", [link("next", "d3c")])]
+    elif PROFILE_LOAD_STEPS in ("bare", "cleanup"):
+        # Without the event_monitor / delay_invite_events wrappers ("cleanup" keeps
+        # cleanup_profile_operation around begin/wait/check, "bare" has no wrapper at all).
+        inner = added[1].children[-1].children
+        loads = inner[-1].children
+        added = [added[0], inner[0], inner[1]] + (loads if PROFILE_LOAD_STEPS == "bare" else [inner[-1]])
     elif PROFILE_LOAD_STEPS == "list":
         # After reading the profile index the load asks for a save to be chosen (list_select);
         # the normal start answers with 31l delay_system_events > 31i save_info_list, which
