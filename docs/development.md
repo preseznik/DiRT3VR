@@ -57,6 +57,12 @@ For a release to be offered:
 - Tag it `vX.Y.Z` matching `<Version>` in `launcher/DiRT3VR.vbproj`. Mark
   experimental releases as a GitHub prerelease, or use a prerelease version such
   as `0.2.0-beta.1`; those are offered only to players who opt in.
+- An Experimental-ring release keeps a plain version, as in DiRT2VR and GRID2VR:
+  package it with `tools/package.ps1 -Channel Experimental` (the launcher's
+  `ReleaseChannel` build property, recorded in `package.json`) and publish it as
+  a GitHub prerelease. The build then calls itself Experimental in **?** and
+  shows the **\*new\*** marks; development builds and `-Channel Stable` (the
+  default) are Stable unless the version has a `-`.
 - Attach `DiRT3VR-X.Y.Z-Setup.exe` from `tools/package.ps1` unchanged. The
   launcher accepts only that exact asset URL in this repository and verifies the
   download against the SHA-256 digest GitHub records for the asset (shown on the

@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([switch]$SkipBuild, [string]$InnoCompiler = "$env:LOCALAPPDATA\Programs\Inno Setup 7\ISCC.exe")
+param([switch]$SkipBuild, [string]$InnoCompiler = "$env:LOCALAPPDATA\Programs\Inno Setup 7\ISCC.exe", [ValidateSet('Stable', 'Experimental')][string]$Channel = 'Stable')
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 if (!$SkipBuild) { & "$PSScriptRoot/build.ps1" }
@@ -9,7 +9,7 @@ $output = Join-Path "$root/artifacts/packages" ($version + '-' + (Get-Date -Form
 if (Test-Path -LiteralPath $output) { throw 'Package directory already exists.' }
 $stage = Join-Path $output 'DiRT3VR'
 New-Item -ItemType Directory -Path "$stage/payload", "$stage/licenses/OpenXR" -Force | Out-Null
-& dotnet publish "$root/launcher/DiRT3VR.vbproj" -c Release -o "$output/publish" --nologo
+& dotnet publish "$root/launcher/DiRT3VR.vbproj" -c Release -o "$output/publish" --nologo "-p:ReleaseChannel=$Channel"
 if ($LASTEXITCODE) { throw 'Launcher publish failed.' }
 Copy-Item -LiteralPath "$output/publish/DiRT3VR.exe" -Destination $stage
 Copy-Item -LiteralPath "$root/build/native/bin/d3d11.dll", "$root/build/native/bin/DiRT3VR.RuntimeProbe.exe", "$root/build/driving-input/driving_input.dll" -Destination "$stage/payload"
@@ -34,7 +34,7 @@ Get-ChildItem -LiteralPath $stage -Recurse -File | ForEach-Object {
     $relative = $_.FullName.Substring($stage.Length + 1).Replace('\','/')
     $files[$relative] = (Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant()
 }
-$inventory = @{ schema=1; version=$version; builtUtc=[DateTime]::UtcNow.ToString('o'); stereoVerified=$false; files=$files }
+$inventory = @{ schema=1; version=$version; channel=$Channel; builtUtc=[DateTime]::UtcNow.ToString('o'); stereoVerified=$false; files=$files }
 [IO.File]::WriteAllText("$stage/package.json", ($inventory | ConvertTo-Json -Depth 4), $jsonEncoding)
 $zip = Join-Path $output "DiRT3VR-$version.zip"
 Compress-Archive -LiteralPath $stage -DestinationPath $zip

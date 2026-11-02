@@ -17,7 +17,12 @@
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <PublishTrimmed>false</PublishTrimmed>
+    <!-- Stable or Experimental (tools/package.ps1 -Channel); an Experimental-ring release keeps a plain version, as in DiRT2VR and GRID2VR. -->
+    <ReleaseChannel Condition="'$(ReleaseChannel)' == ''">Stable</ReleaseChannel>
   </PropertyGroup>
+  <ItemGroup>
+    <AssemblyMetadata Include="ReleaseChannel" Value="$(ReleaseChannel)" />
+  </ItemGroup>
   <ItemGroup>
     <Import Include="System.IO" />
     <Import Include="System.Diagnostics" />

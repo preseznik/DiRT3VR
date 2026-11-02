@@ -15,7 +15,15 @@ Public NotInheritable Class BuildInfo
     Public Shared ReadOnly FullVersion As String = If(GetType(BuildInfo).Assembly.GetCustomAttribute(Of AssemblyInformationalVersionAttribute)()?.InformationalVersion,
                                                       GetType(BuildInfo).Assembly.GetName().Version.ToString(3))
     Public Shared ReadOnly Version As String = FullVersion.Split("+"c)(0)
-    Public Shared ReadOnly Experimental As Boolean = Version.Contains("-"c)
+    ' Set by tools/package.ps1 -Channel (DiRT3VR.vbproj ReleaseChannel); development builds are Stable.
+    Public Shared ReadOnly ReleaseChannel As String = GetType(BuildInfo).Assembly.GetCustomAttributes(Of AssemblyMetadataAttribute)().FirstOrDefault(Function(a) a.Key = "ReleaseChannel")?.Value
+    Public Shared ReadOnly Experimental As Boolean = IsExperimental(ReleaseChannel, Version)
+
+    ' An Experimental-ring build keeps a plain version (0.1.21, as DiRT2VR and GRID2VR); a prerelease
+    ' version (0.2.0-beta.1) is experimental whatever the channel says.
+    Public Shared Function IsExperimental(channel As String, buildVersion As String) As Boolean
+        Return String.Equals(channel, "Experimental", StringComparison.Ordinal) OrElse If(buildVersion, "").Contains("-"c)
+    End Function
 
     Public Shared ReadOnly Property Channel As String
         Get
