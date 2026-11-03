@@ -277,6 +277,23 @@ Public NotInheritable Class SeatCameras
         Return Encode(document)
     End Function
 
+    ' The cockpit view's field of view on the monitor (#b330cc4f): the car's own plus change degrees, in the
+    ' game's format. A car without one, or with a value that isn't a plausible angle, is refused.
+    Public Shared Function FieldOfView(data As Byte(), change As Integer) As Byte()
+        Dim document = Decode(data)
+        Dim element As Integer
+        If Not ViewParameters(document, HeadCam(document)).TryGetValue("fov", element) Then Throw New IOException("The cockpit view has no field of view.")
+        Dim values = document.AttributesOf(element)
+        Dim own As Double
+        If GetValue(values, "type") <> "scalar" OrElse Not values.Keys.OrderBy(Function(key) key, StringComparer.Ordinal).SequenceEqual({"name", "type", "value"}) OrElse
+           Not Double.TryParse(values("value"), NumberStyles.Float, CultureInfo.InvariantCulture, own) OrElse Not Double.IsFinite(own) OrElse own < 20 OrElse own > 120 Then
+            Throw New IOException("Unexpected cockpit field of view.")
+        End If
+        If change < -SeatOffset.FovNarrower OrElse change > SeatOffset.FovWider OrElse own + change < 10 OrElse own + change > 150 Then Throw New IOException("The field of view change is out of range.")
+        document.SetAttribute(element, "value", (own + change).ToString("F4", CultureInfo.InvariantCulture))
+        Return Encode(document)
+    End Function
+
     ' A view's parameter values by name (ident "head-cam" for the cockpit), for checks and the tests.
     Public Shared Function ViewValues(data As Byte(), ident As String) As Dictionary(Of String, String)
         Dim document = Decode(data)

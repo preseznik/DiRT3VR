@@ -182,7 +182,7 @@ Public Class MainForm
                                                                        notice.Text = If(desktopStartup Is Nothing, "Starting DiRT 3… Closing this launcher leaves the game running.",
                                                                                         If(selected.LaunchMode = "direct", "Starting direct practice on the monitor… ", "Starting DiRT 3… ") & "DiRT3VR's temporary files are removed after exit, even if you close this window." &
                                                                                         If(desktopStartup.DrivingNote <> "", " " & desktopStartup.DrivingNote, "") &
-                                                                                        If(desktopStartup.SeatsSkipped.Count > 0, " Seat position not applied for " & String.Join(", ", desktopStartup.SeatsSkipped) & ": its camera file is missing or not in the expected format.", ""))
+                                                                                        If(desktopStartup.SeatsSkipped.Count > 0, " Cockpit changes (seat, comfort or field of view) not applied for " & String.Join(", ", desktopStartup.SeatsSkipped) & ": its camera file is missing or not in the expected format.", ""))
                                                                        launchProgress.Start()
                                                                    Finally
                                                                        If desktopStartup IsNot Nothing Then ObserveDesktopStartup()
@@ -218,7 +218,7 @@ Public Class MainForm
                                                                                                         RefreshState()
                                                                                                     End Sub
                                                               notice.Text = "Starting experimental VR. Original files are restored when DiRT 3 closes, even if you close this window." &
-                                                                  If(interactive.SeatsSkipped.Count > 0, " Seat position not applied for " & String.Join(", ", interactive.SeatsSkipped) & ": its camera file is missing or not in the expected format.", "") &
+                                                                  If(interactive.SeatsSkipped.Count > 0, " Cockpit changes (seat, comfort or field of view) not applied for " & String.Join(", ", interactive.SeatsSkipped) & ": its camera file is missing or not in the expected format.", "") &
                                                                   If(interactive.MotionBlurNote <> "", " " & interactive.MotionBlurNote, "") &
                                                                   If(interactive.TheaterNote <> "", " " & interactive.TheaterNote, "") &
                                                                   If(interactive.DrivingNote <> "", " " & interactive.DrivingNote, "")
@@ -823,6 +823,7 @@ Public Class MainForm
         desktopQuality.Values = settings.GraphicsQuality : vrQuality.Values = settings.VrGraphicsQuality
         seatPicker.Apply(settings.SeatOffsets, settings.SeatSameForAll, settings.SeatAllCars, settings.DirectCar, settings.StartInCockpit, settings.SeatOnDesktop)
         seatPicker.ApplyComfort(settings.CockpitSteady, settings.CockpitHideDriver, settings.CockpitHideCoDriver)
+        seatPicker.ApplyFieldOfView(settings.DesktopFov)
         directPicker.ApplyAssists(settings.DirectGearbox, settings.DirectAbs, settings.DirectStability, settings.DirectCornerBraking, settings.DirectThrottle, settings.DirectSteering)
         directPicker.Apply(settings.LaunchMode, settings.DirectRoute, settings.DirectCar, settings.DirectLaps, settings.DirectOpponents, settings.DirectOpponentCars, settings.DirectDifficulty, settings.DirectAfterFinish)
         applyingPreset = False
@@ -853,7 +854,7 @@ Public Class MainForm
             .DirectGearbox = directPicker.Gearbox, .DirectAbs = directPicker.AssistStates.Abs, .DirectStability = directPicker.AssistStates.Stability,
             .DirectCornerBraking = directPicker.AssistStates.CornerBraking, .DirectThrottle = directPicker.AssistStates.Throttle, .DirectSteering = directPicker.AssistStates.Steering,
             .SeatOffsets = seatPicker.Offsets, .SeatSameForAll = seatPicker.SameForAll, .SeatAllCars = seatPicker.AllCars, .StartInCockpit = seatPicker.StartInCockpit, .SeatOnDesktop = seatPicker.OnDesktop,
-            .CockpitSteady = seatPicker.SteadyCamera, .CockpitHideDriver = seatPicker.HidesDriver, .CockpitHideCoDriver = seatPicker.HidesCoDriver}
+            .CockpitSteady = seatPicker.SteadyCamera, .CockpitHideDriver = seatPicker.HidesDriver, .CockpitHideCoDriver = seatPicker.HidesCoDriver, .DesktopFov = seatPicker.DesktopFieldOfView}
     End Function
 
     Private Sub RememberSavedSettings()
@@ -1244,6 +1245,7 @@ Public Class MainForm
                 "Keep the horizon level when recentering is on by default: recentering turns the view to face forward but leaves pitch and roll alone. Turn it off if your headset sits tilted; the key or button then also makes the way you hold your head level. The automatic centering at the start of VR always keeps the horizon level." & vbCrLf & vbCrLf &
                 "Seat moves your eye point in the cockpit, for each car, up to 50 cm in each direction: sideways (+ left), height and forward. Pick the car (cars with their own position say adjusted), move the sliders, and Reset this car to go back to DiRT 3's seat. Same position for all cars uses one position everywhere. Launch VR writes each adjusted car's camera file (cars\models\<car>\cameras.xml) for the session and restores it after exit, like DiRT3VR's other temporary changes; a car whose camera file isn't in the expected format keeps its own seat, and the launcher names it. Also when playing on the monitor (off by default) does the same for Launch, including direct practice on the monitor; without it desktop play keeps DiRT 3's seat. Seat positions stay with this PC: settings profiles and Restore launcher defaults keep them." & vbCrLf & vbCrLf &
                 "Seat menu key (F11 by default) opens a seat menu in the headset during Launch VR; press it again to save and close. In the menu the arrows move the seat (hold Shift to move sideways), Enter saves and Esc cancels; on an Xbox controller the D-pad, X, A and B do the same, and on a wheel or button box its first hat moves the seat. Seat menu button adds a controller, wheel or button-box button that opens the menu too; the launcher reads it only while DiRT 3 is in front, without taking the device over. What you save is kept under Seat. No key removes the key; without a key or button there is no menu. DiRT 3 also receives the key or button that opens the menu, so pick one the game doesn't use." & vbCrLf & vbCrLf &
+                "Cockpit field of view (monitor) makes the cockpit view wider or narrower when you play on the monitor, by up to 30° wider or 20° narrower than each car's own (about 50° in DiRT 3). Launch writes it into every installed car's camera file for the session and restores it after exit, as for the seat. VR always uses your headset's own field of view." & vbCrLf & vbCrLf &
                 "Steady cockpit camera in VR (on by default): DiRT 3 moves the cockpit camera by itself with G-forces (head and body movement), shakes it under acceleration and over bumps, and briefly distorts it on hard hits. In the headset your own head already moves the view, so Launch VR turns these off in every installed car's cockpit view for the session. Hide the driver in VR and Hide the co-driver in VR (off by default) hide those models in the cockpit view. All three are restored after exit with the seat changes." & vbCrLf & vbCrLf &
                 "Cockpit view only (off by default): DiRT 3 starts a race with the first view in each car's camera list (chase close, chase far, bumper, bonnet, then cockpit), so for the VR session DiRT3VR hides those four views in every car's camera file. Races then start in the cockpit and Change View stays there. It is restored after exit with the seat changes."),
             New HelpTopic(HelpRuntime,

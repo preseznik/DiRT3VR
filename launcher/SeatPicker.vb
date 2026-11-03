@@ -18,6 +18,11 @@ Public NotInheritable Class SeatPicker
     Private ReadOnly cockpitStart As New CheckBox With {.Name = "SeatStartInCockpit", .Text = "Cockpit view only: start races in the cockpit", .AutoSize = True}
     Private ReadOnly cockpitNote As New Label With {.Name = "SeatStartInCockpitNote", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12),
         .Text = "DiRT 3 starts a race with the first view in each car's camera list: chase close, chase far, bumper, bonnet, then cockpit. This hides those four for the VR session, so races start in the cockpit and Change View stays there. Launch VR only."}
+    ' The cockpit field of view on the monitor (#b330cc4f), in degrees from each car's own.
+    Private ReadOnly desktopFov As New ValueSlider("SeatDesktopFov", -SeatOffset.FovNarrower, SeatOffset.FovWider, 0,
+        valueLabels:=Enumerable.Range(-SeatOffset.FovNarrower, SeatOffset.FovNarrower + SeatOffset.FovWider + 1).Select(Function(value) If(value = 0, "DiRT 3's own", Math.Abs(value) & "° " & If(value > 0, "wider", "narrower"))).ToArray())
+    Private ReadOnly desktopFovNote As New Label With {.Name = "SeatDesktopFovNote", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12),
+        .Text = "Launch writes it into every installed car's cockpit view for the session and restores it after exit (DiRT 3's cockpit is about 50°). VR always uses your headset's own field of view."}
     ' VR cockpit comfort (#cd56379b).
     Private ReadOnly steadyBox As New CheckBox With {.Name = "SeatSteadyCamera", .Text = "Steady cockpit camera in VR", .AutoSize = True, .Checked = True}
     Private ReadOnly steadyNote As New Label With {.Name = "SeatSteadyCameraNote", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12),
@@ -58,6 +63,9 @@ Public NotInheritable Class SeatPicker
         parent.Controls.Add(desktopSeat)
         parent.Controls.Add(desktopNote)
         AddHandler desktopSeat.CheckedChanged, Sub() If Not updating Then RaiseEvent Changed()
+        Field(parent, "Cockpit field of view (monitor)", desktopFov)
+        parent.Controls.Add(desktopFovNote)
+        AddHandler desktopFov.ValueChanged, Sub() If Not updating Then RaiseEvent Changed()
         parent.Controls.Add(cockpitStart)
         parent.Controls.Add(cockpitNote)
         AddHandler cockpitStart.CheckedChanged, Sub() If Not updating Then RaiseEvent Changed()
@@ -148,6 +156,22 @@ Public NotInheritable Class SeatPicker
             Return hideCoDriverBox.Checked
         End Get
     End Property
+
+    ' Degrees added to each car's cockpit field of view on the monitor.
+    Public ReadOnly Property DesktopFieldOfView As Integer
+        Get
+            Return desktopFov.Value
+        End Get
+    End Property
+
+    Public Sub ApplyFieldOfView(change As Integer)
+        updating = True
+        Try
+            desktopFov.Value = Math.Clamp(change, -SeatOffset.FovNarrower, SeatOffset.FovWider)
+        Finally
+            updating = False
+        End Try
+    End Sub
 
     ' Shows the saved cockpit comfort choices.
     Public Sub ApplyComfort(steady As Boolean, driver As Boolean, coDriver As Boolean)
