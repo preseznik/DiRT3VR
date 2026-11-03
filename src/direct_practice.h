@@ -1,7 +1,10 @@
 #pragma once
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <string>
+#include <vector>
 
 // Keeps the player's car under player control in a -benchmark start (direct practice).
 // DiRT 3's controller update (RVA 0x729f80) sets the controller's force-AI byte
@@ -188,8 +191,71 @@ inline int AssistAnswer(uint8_t benchmarkActive,int requested,int original) {
     return benchmarkActive==1 && requested>=0 ? requested : original;
 }
 
+// Driving device: a direct start has its own Press Start (0x56e070, only with the benchmark
+// flags). It lists the connected devices through the input service's 0xb04cf0 (12-byte
+// descriptors) and binds the first valid one to player 1, the next to player 2, through
+// 0xb31c70 as ScreenPressStart does. The keyboard is listed first, so a wheel bound in the
+// launcher never drives (#16fa2aa3). For that one call (returning to 0x56e150) the hook moves
+// the launcher's device to the front, and DiRT 3 binds it to player 1 itself (run
+// 20261103-104313: the Xbox pad became player 1, the keyboard player 2).
+// DIRT3VR_DIRECT_DEVICES="name|name|..." lists the session action maps' device names
+// (xinput_pad or a DirectInput product name), the steering device first.
+inline constexpr uintptr_t deviceListRva=0x704cf0;       // input service: list devices (jumps to 0xccf010)
+inline constexpr uintptr_t deviceListReturnRva=0x16e150; // after the direct start's call at 0x56e14b
+inline constexpr uintptr_t internRva=0x8cfe30;           // 0xccfe30: an id object from a name
+inline constexpr uint8_t deviceListEntry[]{0x55,0x8b,0xec,0x83,0xc1,0x78,0x5d,0xe9};
+inline constexpr size_t maxDeviceNames=8,maxDeviceNameLength=127,maxListedDevices=32;
+struct InputDevice { uint32_t backend,family,index; };
+// The list function, and the direct start's call to it (call rel32 ending at the return address).
+inline bool DeviceListMatches(const uint8_t* image) {
+    if(std::memcmp(image+deviceListRva,deviceListEntry,sizeof(deviceListEntry))!=0 || image[deviceListReturnRva-5]!=0xe8) return false;
+    int32_t relative;
+    std::memcpy(&relative,image+deviceListReturnRva-4,sizeof(relative));
+    return static_cast<uintptr_t>(static_cast<intptr_t>(deviceListReturnRva)+relative)==deviceListRva;
+}
+// Parses "name|name|..." into names (printable, at most 127 characters, never "keyboard",
+// no repeats, at most 8). Anything malformed rejects the whole value.
+inline bool ParseDeviceNames(const char* text,std::vector<std::string>& names) {
+    names.clear();
+    if(!text || !*text) return false;
+    std::vector<std::string> parsed;
+    for(const char* cursor=text;;) {
+        const char* end=std::strchr(cursor,'|');
+        const size_t length=end ? static_cast<size_t>(end-cursor) : std::strlen(cursor);
+        if(!length || length>maxDeviceNameLength || parsed.size()==maxDeviceNames) return false;
+        std::string name(cursor,length);
+        for(const char c:name) if(c<0x20 || c>0x7e) return false;
+        if(name=="keyboard" || std::find(parsed.begin(),parsed.end(),name)!=parsed.end()) return false;
+        parsed.push_back(std::move(name));
+        if(!end) break;
+        cursor=end+1;
+    }
+    names=std::move(parsed);
+    return true;
+}
+// Which listed device to bind first: the first wanted family (in the launcher's order) that is
+// listed, else the first device that isn't the keyboard; -1 when there is none. Entries without
+// a backend or family are skipped, as the game's own validity check (0xcbb7c0) skips them.
+inline int PreferredDevice(const InputDevice* devices,size_t count,const uint32_t* wanted,size_t wantedCount,uint32_t keyboard) {
+    const auto usable=[&](size_t i) { return devices[i].backend && devices[i].family; };
+    for(size_t w=0;w<wantedCount;++w)
+        for(size_t i=0;i<count;++i)
+            if(usable(i) && wanted[w] && devices[i].family==wanted[w]) return static_cast<int>(i);
+    for(size_t i=0;i<count;++i)
+        if(usable(i) && devices[i].family!=keyboard) return static_cast<int>(i);
+    return -1;
+}
+// Moves devices[index] to the front, keeping the others in their order.
+inline void MoveToFront(InputDevice* devices,size_t index) {
+    std::rotate(devices,devices+index,devices+index+1);
+}
+
 bool Requested();
 bool ReturnRequested();
+// DIRT3VR_DIRECT_DEVICES: true when it holds a valid list.
+bool DevicesRequested();
+// Hooks the device list once; false leaves DiRT 3's own order (keyboard first).
+bool InstallDevices(void (*log)(const char*,...));
 // DIRT3VR_DIRECT_ASSISTS="name=value,...": true when a valid request is set.
 bool AssistsRequested();
 // Hooks the settings lookup once; false leaves the game's own values in charge.

@@ -194,7 +194,7 @@ def diagnostic_environment(directory: Path, *, scene_observer: bool = False, rep
                            xr_runtime: Path | None = None, background_play: bool = False) -> dict:
     env = dict(os.environ, DIRT3VR_DIAGNOSTICS="1", DIRT3VR_LOG_DIR=str(directory), SteamAppId="321040")
     for flag in ("DIRT3VR_ENABLE_VR", "DIRT3VR_SCENE_DIAGNOSTICS", "DIRT3VR_REPLAY_DIAGNOSTICS",
-                 "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH", "DIRT3VR_RESEARCH_FILE_TRACE", "DIRT3VR_DIRECT_PRACTICE", "DIRT3VR_DIRECT_LAPS", "DIRT3VR_DIRECT_RETURN", "DIRT3VR_DIRECT_DIFFICULTY", "DIRT3VR_DIRECT_ASSISTS", "DIRT3VR_RESEARCH_LAPS", "DIRT3VR_SCREENSHOT_SECONDS", "DIRT3VR_RESEARCH_SETTINGS_TRACE",
+                 "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH", "DIRT3VR_RESEARCH_FILE_TRACE", "DIRT3VR_DIRECT_PRACTICE", "DIRT3VR_DIRECT_LAPS", "DIRT3VR_DIRECT_RETURN", "DIRT3VR_DIRECT_DIFFICULTY", "DIRT3VR_DIRECT_ASSISTS", "DIRT3VR_DIRECT_DEVICES", "DIRT3VR_RESEARCH_LAPS", "DIRT3VR_SCREENSHOT_SECONDS", "DIRT3VR_RESEARCH_SETTINGS_TRACE",
                 "DIRT3VR_RESEARCH_STACKS", "DIRT3VR_RESEARCH_COUNT", "DIRT3VR_RESEARCH_PRESS_START_USER",
                 "DIRT3VR_RESEARCH_AUTO_SAVE_CHOICE", "DIRT3VR_RESEARCH_STORE_TRACE",
                 "DIRT3VR_RESEARCH_DATA_WATCH", "DIRT3VR_RESEARCH_GAME_LOG", "DIRT3VR_RESEARCH_VEHICLES", "DIRT3VR_RESEARCH_DEVICES", "DIRT3VR_RESEARCH_DEVICE_FIRST"):
@@ -530,6 +530,9 @@ def main() -> int:
     parser.add_argument("--direct-assists", metavar="NAME=VALUE,...",
                         help="assists/gearbox for the benchmark start, e.g. assists_abs=0,transmission_type=1 "
                              "(renderer, DIRT3VR_DIRECT_ASSISTS)")
+    parser.add_argument("--direct-devices", metavar="NAME|NAME",
+                        help="devices to bind to player 1 in the benchmark start, e.g. xinput_pad "
+                             "(renderer, DIRT3VR_DIRECT_DEVICES)")
     parser.add_argument("--direct-return", action="store_true",
                         help="The renderer's return-to-menus change (DIRT3VR_DIRECT_RETURN): after the finish DiRT 3 goes to its "
                              "menus instead of quitting; implies --stay-after-result")
@@ -754,6 +757,8 @@ def main() -> int:
             env["DIRT3VR_DIRECT_DIFFICULTY"] = str(args.direct_difficulty)
         if args.direct_assists:
             env["DIRT3VR_DIRECT_ASSISTS"] = args.direct_assists
+        if args.direct_devices:
+            env["DIRT3VR_DIRECT_DEVICES"] = args.direct_devices
         if args.screenshots:
             env["DIRT3VR_SCREENSHOT_SECONDS"] = args.screenshots
         if args.research_laps:
