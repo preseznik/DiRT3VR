@@ -69,3 +69,26 @@ start (whose first car is always the player's). The race load's log lines are no
 a direct start (run `20261103-084140`, `--game-log`), so the table, not the log, is the
 source. Not yet checked: a race started from the menus (whether the player is still entry 0,
 e.g. in a career event with the player on a later grid slot) and the table between races.
+
+## A live seat on the monitor (#88b7f778)
+
+The desktop seat menu can move the cockpit view without reloading `cameras.xml`: the
+selected head camera keeps its own copy of the file's values, and the view follows them
+every frame. The Head loader (`0xb07cf0`, class vtable `0xf28530`) stores the eye point at
+`+0x19d0` (x left, y up, z forward, metres), the base FOV at `+0x19e4` (degrees), tilt at
+`+0x1a24`. The selected camera ("owner") is found as the renderer's camera classifier does:
+`[[[[base+0xbe7404]+8]+0x11b4]+0x24]` is the camera manager, its entry `[manager+0x140]`
+(entries of 0x280 bytes) the owner; it must have the Head vtable and the name `head-cam` at
+`+0xa1`.
+
+Run `20261103-113446` (research proxy, direct practice frx, `--seat-test 0,0,0` for a
+cockpit start, `--live-seat 50:y=0.3,80:fov=20`, screenshots at 45/55/75/85 s, no input):
+at 50 s the eye height went 1.068 -> 1.368 and the 55 s screenshot looks over the dashboard
+from roof height (as the file edit in run 41 did); it stayed there at 75 s; at 80 s the FOV
+went 50 -> 70 and the 85 s screenshot shows the wider view. So a menu writes the owner's
+`+0x19d0..+0x19d8` and `+0x19e4` (the file's value plus the seat offset; keep the file's
+values to apply only the difference, as the VR seat channel does with `applied`). The
+research switch: `DIRT3VR_RESEARCH_LIVE_SEAT="s:y=M,s:fov=D"` (`run_benchmark.py --live-seat`).
+Not yet checked: a car change or restart (whether the owner is rebuilt from the file), the
+reverse view, and replays.
+
