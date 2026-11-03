@@ -78,8 +78,8 @@ Module NewFeaturesTests
                             End While
                             Return DirectCast(item, SettingRow)
                         End Function
-            check(rowOf("SeatMenuKey").IsNew AndAlso rowOf("SeatMenuButton").IsNew AndAlso Not rowOf("RecenterKey").IsNew AndAlso Not rowOf("VrRenderScale").IsNew AndAlso Not headerOf("Launch mode").IsNew,
-                  "the listed features carry the mark; those of earlier releases don't")
+            check(Not rowOf("SeatMenuKey").IsNew AndAlso Not rowOf("DesktopAnisotropy").IsNew AndAlso Not rowOf("RecenterKey").IsNew AndAlso Not rowOf("VrRenderScale").IsNew AndAlso Not headerOf("Launch mode").IsNew,
+                  "features of earlier releases, 0.1.22's included, don't carry the mark")
 
             ' Each kind of mark, with features of every kind.
             check(NewFeatures.Apply(form, NewFeatures.NextVersion & "-beta.1", True, Kinds).Count = Kinds.Count, "every kind of feature is marked")
