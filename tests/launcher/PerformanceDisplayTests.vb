@@ -18,6 +18,10 @@ Module PerformanceDisplayTests
                """dips"":{""threshold"":0.95,""slowWindows"":5,""share"":" & share & ",""gpu"":5,""cpu"":0,""mixed"":0,""limit"":""" & dipLimit & """}}"
     End Function
 
+    Private Function WithoutLastBrace(json As String) As String
+        Return json.Substring(0, json.Length - 1)
+    End Function
+
     Private Function Measured(json As String) As MeasuredPerformance
         Using document = JsonDocument.Parse(json)
             Return MeasuredPerformance.Parse(document.RootElement)
@@ -59,6 +63,14 @@ Module PerformanceDisplayTests
             check(Measured(Summary("at_target", share:="0.01")).Describe().EndsWith("holding the headset rate", StringComparison.Ordinal), "holding the rate")
             check(Measured(Summary(windows:=4)).Describe().StartsWith("too short to measure", StringComparison.Ordinal) AndAlso Measured(Summary("insufficient")).Describe().StartsWith("too short", StringComparison.Ordinal),
                   "a session under 10 seconds of stereo driving is too short to measure")
+            ' #2667690f: the 32-bit process's peak address space, when the summary has it (Wrench's "memory" object).
+            Dim withMemory = WithoutLastBrace(Summary()) & ",""memory"":{""peakCommittedMb"":2900,""peakAddressMb"":3174,""addressLimitMb"":4096}}"
+            check(Measured(withMemory).Describe().EndsWith("limited by the GPU · memory 3.1 of 4.0 GB", StringComparison.Ordinal) AndAlso Measured(withMemory).PeakCommittedMb.GetValueOrDefault() = 2900,
+                  "the peak memory follows, as used of available (" & Measured(withMemory).Describe() & ")")
+            Dim nearLimit = WithoutLastBrace(Summary()) & ",""memory"":{""peakCommittedMb"":1800,""peakAddressMb"":1900,""addressLimitMb"":2048}}"
+            check(Measured(nearLimit).Describe().EndsWith("memory 1.9 of 2.0 GB (close to the limit)", StringComparison.Ordinal), "near the limit it says so")
+            Dim noSample = WithoutLastBrace(Summary()) & ",""memory"":{""peakCommittedMb"":null,""peakAddressMb"":null,""addressLimitMb"":null}}"
+            check(Not Measured(noSample).Describe().Contains("memory") AndAlso Not Measured(Summary()).Describe().Contains("memory"), "without a sample, or in older summaries, no memory is shown")
         Finally
             Globalization.CultureInfo.CurrentCulture = culture
         End Try

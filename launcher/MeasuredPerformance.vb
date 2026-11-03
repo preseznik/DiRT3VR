@@ -24,6 +24,12 @@ Public NotInheritable Class MeasuredPerformance
     ' Share of seconds below 95% of the headset rate, and what limited them.
     Public Property DipShare As Double?
     Public Property DipLimit As String = "unknown"
+    ' DiRT 3's 32-bit process at its peak (#2667690f, Wrench's "memory" object), in MB: committed memory, address
+    ' space in use and the address space limit (4 GB with Large Address Aware, else 2 GB). Nothing before the first
+    ' sample and in older summaries.
+    Public Property PeakCommittedMb As Integer?
+    Public Property PeakAddressMb As Integer?
+    Public Property AddressLimitMb As Integer?
 
     ' At least ten seconds of stereo driving, with a known limit, rate and FPS.
     Public ReadOnly Property Usable As Boolean
@@ -43,7 +49,12 @@ Public NotInheritable Class MeasuredPerformance
         If summary.ValueKind <> JsonValueKind.Object OrElse Number(summary, "schema") <> 1 Then Return Nothing
         Dim fps = Child(summary, "fps"), headset = Child(summary, "headset"), dips = Child(summary, "dips")
         Dim adapterName = Text(Child(summary, "adapter"), "name", "")
-        Return New MeasuredPerformance With {
+        Dim memory = Child(summary, "memory")
+        Dim megabytes = Function(key As String) As Integer?
+                            Dim value = Number(memory, key)
+                            Return If(value.HasValue AndAlso value.Value >= 0 AndAlso value.Value <= 1048576, CInt(value.Value), CType(Nothing, Integer?))
+                        End Function
+        Return New MeasuredPerformance With {.PeakCommittedMb = megabytes("peakCommittedMb"), .PeakAddressMb = megabytes("peakAddressMb"), .AddressLimitMb = megabytes("addressLimitMb"),
             .TargetFps = If(Number(summary, "targetFps"), 0), .FpsMedian = If(Number(fps, "p50"), 0), .FpsLow = If(Number(fps, "p5"), 0),
             .Windows = CInt(Math.Clamp(If(Number(fps, "windows"), 0), 0, Integer.MaxValue)), .GpuPercent = Number(Child(summary, "gpuPercent"), "p50"),
             .Limit = Text(summary, "limit", "insufficient"),
@@ -83,9 +94,17 @@ Public NotInheritable Class MeasuredPerformance
         Return If(value.ValueKind = JsonValueKind.Object AndAlso value.TryGetProperty(key, item) AndAlso item.ValueKind = JsonValueKind.String, item.GetString(), fallback)
     End Function
 
-    ' "72 FPS median, 61 low (headset 90) · GPU 97% · limited by the GPU".
+    ' " · memory 3.1 of 4.0 GB" from the peak address space, or "" without it; near the limit DiRT 3 can run out.
+    Public Function DescribeMemory() As String
+        If Not PeakAddressMb.HasValue OrElse Not AddressLimitMb.HasValue OrElse AddressLimitMb.Value <= 0 Then Return ""
+        Dim c = CultureInfo.CurrentCulture
+        Return " · memory " & (PeakAddressMb.Value / 1024.0).ToString("0.0", c) & " of " & (AddressLimitMb.Value / 1024.0).ToString("0.0", c) & " GB" &
+            If(PeakAddressMb.Value >= AddressLimitMb.Value * 0.9, " (close to the limit)", "")
+    End Function
+
+    ' "72 FPS median, 61 low (headset 90) · GPU 97% · limited by the GPU · memory 3.1 of 4.0 GB".
     Public Function Describe() As String
-        If Not Usable Then Return "too short to measure FPS (at least 10 seconds of driving in VR are needed)"
+        If Not Usable Then Return "too short to measure FPS (at least 10 seconds of driving in VR are needed)" & DescribeMemory()
         Dim c = CultureInfo.CurrentCulture
         Dim gpu = If(GpuPercent.HasValue, "GPU " & GpuPercent.Value.ToString("0", c) & "%", "GPU usage unavailable")
         Dim limited As String
@@ -101,6 +120,6 @@ Public NotInheritable Class MeasuredPerformance
             Case "cpu" : limited = "limited by the CPU"
             Case Else : limited = "below the headset rate"
         End Select
-        Return FpsMedian.ToString("0", c) & " FPS median, " & FpsLow.ToString("0", c) & " low (headset " & TargetFps.ToString("0", c) & ") · " & gpu & " · " & limited
+        Return FpsMedian.ToString("0", c) & " FPS median, " & FpsLow.ToString("0", c) & " low (headset " & TargetFps.ToString("0", c) & ") · " & gpu & " · " & limited & DescribeMemory()
     End Function
 End Class
