@@ -164,7 +164,15 @@ void TestGraphics() {
     for(bool top:{false,true}) {
         reset(); Quad(-10.6016f,10.6016f,top ? .7902f : -3.7836f,top ? 3.7723f : -.7902f);
         draw(); Check(Pixel(image.Get(),160,top ? 10 : 330)[1]>200,"Witnessed letterbox was not culled");
+        // #7d2ac4d9: the screen-wide bars of transitions, at the letterbox line and sliding in.
+        reset(); Quad(-1,1,top ? .7902f : -1.f,top ? 1.f : -.7902f);
+        draw(); Check(Pixel(image.Get(),160,top ? 10 : 330)[1]>200,"Screen-wide letterbox was not culled");
+        reset(); Quad(-1,1,top ? .9f : -1.f,top ? 1.f : -.9f);
+        draw(); Check(Pixel(image.Get(),160,top ? 5 : 335)[1]>200,"Sliding letterbox was not culled");
     }
+    // Black bars narrower than the screen, or reaching below the letterbox line, are not letterbox.
+    reset(); Quad(-.9f,.9f,.7902f,1); draw(); Check(Pixel(image.Get(),160,10)[1]==0,"Narrow black top bar culled");
+    reset(); Quad(-1,1,.5f,1); draw(); Check(Pixel(image.Get(),160,10)[1]==0,"Tall black top panel culled");
     // Preserve ordinary black menu panels, fullscreen fades, translucent and
     // coloured bars, other pixel shaders, and unverified homogeneous W.
     reset(); Quad(-.5f,.5f,-.4f,.4f); draw(); Check(Pixel(image.Get(),160,170)[1]==0,"Black menu panel culled");

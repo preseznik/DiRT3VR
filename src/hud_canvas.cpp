@@ -38,9 +38,13 @@ void main(triangle Vertex input[3],inout TriangleStream<Vertex> output) {
         float2 xy=p.xy/p.w;
         lo=min(lo,xy); hi=max(hi,xy);
     }
-    bool top=lo.y>=0.7901 && lo.y<=0.7903 && hi.y>3.0;
-    bool bottom=hi.y<=-0.7901 && hi.y>=-0.7903 && lo.y<-3.0;
-    if(bar && lo.x<-2.0 && hi.x>2.0 && (top || bottom)) return;
+    // At least the native width: the witnessed overscan quads, and the screen-wide bars of some
+    // transitions (#7d2ac4d9), which X scaling would otherwise leave floating mid-panel. Each runs
+    // from the letterbox line (or between it and the edge while sliding in) out to the edge.
+    bool wide=lo.x<=-0.999 && hi.x>=0.999;
+    bool top=lo.y>=0.7901 && lo.y<1.0 && hi.y>=0.999;
+    bool bottom=hi.y<=-0.7901 && hi.y>-1.0 && lo.y<=-0.999;
+    if(bar && wide && (top || bottom)) return;
     [unroll] for(uint j=0;j<3;++j) {
         Vertex v=input[j]; v.position.x*=scaleX; output.Append(v);
     }
