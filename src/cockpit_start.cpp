@@ -37,20 +37,21 @@ bool Install(void (*log)(const char*,...)) {
         auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
         const auto base=reinterpret_cast<uintptr_t>(image);
         if(!SitesMatch(image,base)) { log("Cockpit start refused: chase-view instructions differ; races start in the chase view"); return; }
-        uint8_t push[5]; Push(base,push);
+        uint8_t push[5],headCam[5]; Push(base,push); Push(base,headCam,headCamRva);
         size_t written=0;
         for(;written<std::size(sites);++written) {
             uint8_t patched[5]; Patched(sites[written],patched);
             if(!Write(image+sites[written].rva,patched)) break;
         }
-        if(written<std::size(sites)) {
-            // Both or neither: put back the sites already changed.
+        const bool complete=written==std::size(sites) && Write(image+defaultRva,headCam);
+        if(!complete) {
+            // All or none: put back the sites already changed.
             for(size_t i=0;i<written;++i) Write(image+sites[i].rva,push);
             log("Cockpit start refused: the code change could not be completed");
             return;
         }
         installed=true;
-        log("Cockpit start: DiRT 3's race-start switches to the chase view are skipped (0x553c03, 0x53bcc9); the car keeps its first view");
+        log("Cockpit start: current_camera defaults to head-cam (0x59fb31) and DiRT 3's race-start switches to the chase view are skipped (0x553c03, 0x53bcc9)");
     });
     return installed || !requested;
 }
