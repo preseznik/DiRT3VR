@@ -51,6 +51,9 @@ Public Class MainForm
     Private ReadOnly modern As New AppearanceSwitch()
     Private ReadOnly logging As New CheckBox With {.Name = "DiagnosticLogging", .Text = "On", .AutoSize = True}
     Private ReadOnly renderScale As New ValueSlider("VrRenderScale", 50, 300, 100, "%", recommendedValue:=100)
+    ' The VR HUD panel (#3652b9aa): half-metre steps from 1 to 5 m, and follow view.
+    Private ReadOnly hudDistance As New ValueSlider("HudDistance", 2, 10, 4, " m", 2D, recommendedValue:=4)
+    Private ReadOnly hudFollow As New CheckBox With {.Name = "HudFollowView", .Text = "Follow view", .AutoSize = True}
     Private ReadOnly desktopResolution As New ComboBox With {.Name = "DesktopResolution", .DropDownStyle = ComboBoxStyle.DropDownList}
     Private ReadOnly desktopMode As New ComboBox With {.Name = "DesktopDisplayMode", .DropDownStyle = ComboBoxStyle.DropDownList}
     Private ReadOnly desktopVSync As New ComboBox With {.Name = "DesktopVSync", .DropDownStyle = ComboBoxStyle.DropDownList}
@@ -376,6 +379,10 @@ Public Class MainForm
         vrSettings.Controls.Add(lastSessionSummary)
         UpdateLastSession()
         vrSettings.Controls.Add(Info("Changing game graphics during VR can leave a recovery conflict; the launcher preserves your changes and the original backup."))
+        Dim hud = Section(columns.Second, "VR HUD")
+        Field(hud, "Distance", hudDistance)
+        hud.Controls.Add(hudFollow)
+        hud.Controls.Add(Info("The HUD and the menus show on a transparent panel in front of you, 2 m away by default. Nearer or farther keeps the panel the same size in your view, so only how far away it seems changes. Follow view keeps it in front of you as you turn your head; off, it stays where you last recentered. Applies on the next VR launch."))
         BuildQuality(content)
         Field(content, "Game graphics file", graphicsPath)
         content.Controls.Add(graphicsDefaultsButton)
@@ -819,6 +826,7 @@ Public Class MainForm
         seatMenuKey = settings.SeatMenuKey : seatMenuModifiers = settings.SeatMenuModifiers : seatMenuDevice = settings.SeatMenuButton : capturingSeatMenu = False : UpdateSeatMenuLabels()
         recenterKeepLevel.Checked = settings.RecenterKeepLevel
         renderScale.Value = settings.VrRenderScale
+        hudDistance.Value = CInt(settings.HudDistance * 2D) : hudFollow.Checked = settings.HudFollowView
         applyingPreset = True
         desktopQuality.Values = settings.GraphicsQuality : vrQuality.Values = settings.VrGraphicsQuality
         seatPicker.Apply(settings.SeatOffsets, settings.SeatSameForAll, settings.SeatAllCars, settings.DirectCar, settings.StartInCockpit, settings.SeatOnDesktop)
@@ -843,7 +851,7 @@ Public Class MainForm
 
     Public Function CurrentSettings() As LauncherSettings
         Dim resolution = TryCast(desktopResolution.SelectedItem, DesktopResolutionChoice)
-        Return New LauncherSettings With {.ModernInterface = modern.Checked, .RuntimeMode = If(runtime.SelectedIndex = 1, "steamvr", "vdxr"), .SteamRuntimeManifest = manifest.Text, .VdxrRuntimeManifest = vdxrManifest.Text, .DiagnosticLogging = logging.Checked, .ExperimentalVrEnabled = experimental.Checked, .VrRenderScale = renderScale.Value,
+        Return New LauncherSettings With {.ModernInterface = modern.Checked, .RuntimeMode = If(runtime.SelectedIndex = 1, "steamvr", "vdxr"), .SteamRuntimeManifest = manifest.Text, .VdxrRuntimeManifest = vdxrManifest.Text, .DiagnosticLogging = logging.Checked, .ExperimentalVrEnabled = experimental.Checked, .VrRenderScale = renderScale.Value, .HudDistance = hudDistance.Value / 2D, .HudFollowView = hudFollow.Checked,
             .DesktopWidth = If(resolution Is Nothing, 0, resolution.Size.Width), .DesktopHeight = If(resolution Is Nothing, 0, resolution.Size.Height),
             .DesktopDisplayMode = {"game", "windowed", "fullscreen", "borderless"}(Math.Max(0, desktopMode.SelectedIndex)), .DesktopVSync = {"game", "off", "on"}(Math.Max(0, desktopVSync.SelectedIndex)), .SkipStartupMovies = skipStartupMovies.Checked,
             .RecenterKey = recenterKey, .RecenterModifiers = recenterModifiers, .RecenterDevice = recenterDevice, .RecenterKeepLevel = recenterKeepLevel.Checked,
@@ -1219,6 +1227,7 @@ Public Class MainForm
             New HelpTopic(HelpVr,
                 "Advanced → Enable experimental VR turns on the VR session when this package supports it. Choose VDXR (through Virtual Desktop) or SteamVR under Settings → VR runtime. " & RuntimeCapabilities.SteamVrNote & " Close other VR games first." & vbCrLf & vbCrLf &
                 "All rendered 3D camera views use stereo and headset tracking, including cockpit, bonnet, bumper, chase and replay. Loading screens, movies and frames without a 3D scene use a virtual screen, and recognized HUD and menu draws use a transparent panel 2 metres away. Camera transitions are still experimental." & vbCrLf & vbCrLf &
+                "Graphics → VR HUD moves that panel from 1 to 5 metres away; it keeps the same size in your view, so only how far away it seems changes. Follow view keeps it in front of you as you turn your head; off (the default), it stays where you last recentered." & vbCrLf & vbCrLf &
                 "DiRT 3's motion blur is switched off for VR sessions: in the headset every head movement counts as camera movement, so it smeared the nearest ground and objects. DiRT3VR writes the game's postprocess\effects.xml with the blur lengths at zero for the session and restores it after exit; desktop play keeps the game's motion blur." & vbCrLf & vbCrLf &
                 ExperimentalFiles.ProfileDescription & vbCrLf & vbCrLf &
                 "If an OpenXR add-on such as ReShade or the OBS mirror stops VR from starting, Launch VR names it and offers Disable and retry, which turns it off for DiRT 3 only. Turn it back on under Settings → VR runtime → OpenXR add-ons…." & vbCrLf & vbCrLf &
@@ -1245,7 +1254,7 @@ Public Class MainForm
                 "Keep the horizon level when recentering is on by default: recentering turns the view to face forward but leaves pitch and roll alone. Turn it off if your headset sits tilted; the key or button then also makes the way you hold your head level. The automatic centering at the start of VR always keeps the horizon level." & vbCrLf & vbCrLf &
                 "Seat moves your eye point in the cockpit, for each car, up to 50 cm in each direction: sideways (+ left), height and forward. Pick the car (cars with their own position say adjusted), move the sliders, and Reset this car to go back to DiRT 3's seat. Same position for all cars uses one position everywhere. Launch VR writes each adjusted car's camera file (cars\models\<car>\cameras.xml) for the session and restores it after exit, like DiRT3VR's other temporary changes; a car whose camera file isn't in the expected format keeps its own seat, and the launcher names it. Also when playing on the monitor (off by default) does the same for Launch, including direct practice on the monitor; without it desktop play keeps DiRT 3's seat. Seat positions stay with this PC: settings profiles and Restore launcher defaults keep them." & vbCrLf & vbCrLf &
                 "Seat menu key (F11 by default) opens a seat menu in the headset during Launch VR; press it again to save and close. In the menu the arrows move the seat (hold Shift to move sideways), Enter saves and Esc cancels; on an Xbox controller the D-pad, X, A and B do the same, and on a wheel or button box its first hat moves the seat. Seat menu button adds a controller, wheel or button-box button that opens the menu too; the launcher reads it only while DiRT 3 is in front, without taking the device over. What you save is kept under Seat. No key removes the key; without a key or button there is no menu. DiRT 3 also receives the key or button that opens the menu, so pick one the game doesn't use." & vbCrLf & vbCrLf &
-                "Cockpit field of view (monitor) makes the cockpit view wider or narrower when you play on the monitor, by up to 30° wider or 20° narrower than each car's own (about 50° in DiRT 3). Launch writes it into every installed car's camera file for the session and restores it after exit, as for the seat. VR always uses your headset's own field of view." & vbCrLf & vbCrLf &
+                "Cockpit field of view (monitor) makes the cockpit view wider or narrower when you play on the monitor, by up to 30° wider or 20° narrower than each car's own (50–55° in DiRT 3). Launch writes it into every installed car's camera file for the session and restores it after exit, as for the seat. VR always uses your headset's own field of view." & vbCrLf & vbCrLf &
                 "Steady cockpit camera in VR (on by default): DiRT 3 moves the cockpit camera by itself with G-forces (head and body movement), shakes it under acceleration and over bumps, and briefly distorts it on hard hits. In the headset your own head already moves the view, so Launch VR turns these off in every installed car's cockpit view for the session. Hide the driver in VR and Hide the co-driver in VR (off by default) hide those models in the cockpit view. All three are restored after exit with the seat changes." & vbCrLf & vbCrLf &
                 "Cockpit view only (off by default): DiRT 3 starts a race with the first view in each car's camera list (chase close, chase far, bumper, bonnet, then cockpit), so for the VR session DiRT3VR hides those four views in every car's camera file. Races then start in the cockpit and Change View stays there. It is restored after exit with the seat changes."),
             New HelpTopic(HelpRuntime,

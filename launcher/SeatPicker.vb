@@ -22,7 +22,7 @@ Public NotInheritable Class SeatPicker
     Private ReadOnly desktopFov As New ValueSlider("SeatDesktopFov", -SeatOffset.FovNarrower, SeatOffset.FovWider, 0,
         valueLabels:=Enumerable.Range(-SeatOffset.FovNarrower, SeatOffset.FovNarrower + SeatOffset.FovWider + 1).Select(Function(value) If(value = 0, "DiRT 3's own", Math.Abs(value) & "° " & If(value > 0, "wider", "narrower"))).ToArray())
     Private ReadOnly desktopFovNote As New Label With {.Name = "SeatDesktopFovNote", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12),
-        .Text = "Launch writes it into every installed car's cockpit view for the session and restores it after exit (DiRT 3's cockpit is about 50°). VR always uses your headset's own field of view."}
+        .Text = "Launch writes it into every installed car's cockpit view for the session and restores it after exit (DiRT 3's cockpits are 50–55°). VR always uses your headset's own field of view."}
     ' VR cockpit comfort (#cd56379b).
     Private ReadOnly steadyBox As New CheckBox With {.Name = "SeatSteadyCamera", .Text = "Steady cockpit camera in VR", .AutoSize = True, .Checked = True}
     Private ReadOnly steadyNote As New Label With {.Name = "SeatSteadyCameraNote", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12),

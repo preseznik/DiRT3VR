@@ -58,6 +58,7 @@ Public Class ProfileValues
             .SeatOffsets = If(local.SeatOffsets, New Dictionary(Of String, SeatOffset)).ToDictionary(Function(pair) pair.Key, Function(pair) pair.Value.Copy()),
             .SeatSameForAll = local.SeatSameForAll, .SeatAllCars = If(local.SeatAllCars, New SeatOffset).Copy(), .StartInCockpit = local.StartInCockpit, .SeatOnDesktop = local.SeatOnDesktop,
             .CockpitSteady = local.CockpitSteady, .CockpitHideDriver = local.CockpitHideDriver, .CockpitHideCoDriver = local.CockpitHideCoDriver, .DesktopFov = local.DesktopFov,
+            .HudDistance = local.HudDistance, .HudFollowView = local.HudFollowView,
             .SeatMenuKey = local.SeatMenuKey, .SeatMenuModifiers = local.SeatMenuModifiers, .SeatMenuButton = local.SeatMenuButton,
             .DiagnosticLogging = DiagnosticLogging, .ExperimentalVrEnabled = ExperimentalVrEnabled,
             .VrRenderScale = VrRenderScale, .DesktopWidth = DesktopWidth, .DesktopHeight = DesktopHeight,

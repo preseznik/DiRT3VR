@@ -203,6 +203,11 @@ Public Class LauncherSettings
     ' The cockpit field of view on the monitor (#b330cc4f): degrees added to each car's own, 0 = DiRT 3's.
     ' Launch writes it into the cars' camera files for the session; VR uses the headset's own field of view.
     Public Property DesktopFov As Integer
+    ' The VR HUD panel (#3652b9aa; Lens's renderer side): metres away, 1 to 5 in 0.5 m steps (it keeps its size
+    ' in view), and whether it follows the view instead of staying where the view was last recentered.
+    Public Const DefaultHudDistance As Decimal = 2D
+    Public Property HudDistance As Decimal = DefaultHudDistance
+    Public Property HudFollowView As Boolean
     ' Seat positions on the monitor too (Launch, #b330cc4f): the same camera files, journaled for a desktop session.
     Public Property SeatOnDesktop As Boolean
     ' The in-game seat menu's key (#bd820b32, docs/seat-channel.md): opens it, and saves and closes it; 0 = none.
@@ -255,6 +260,7 @@ Public Class LauncherSettings
         If Not DirectPractice.AfterFinishChoices.Contains(DirectAfterFinish) Then Throw New IOException("Choose what happens after the finish.")
         If Not DirectPractice.GearboxChoices.Contains(DirectGearbox) Then Throw New IOException("Choose the gearbox for direct practice.")
         SeatAllCars = If(SeatAllCars, New SeatOffset) : SeatAllCars.ClearSessionFlags() : SeatAllCars.Validate()
+        If HudDistance < 1D OrElse HudDistance > 5D OrElse HudDistance * 2D <> Decimal.Truncate(HudDistance * 2D) Then Throw New IOException("Choose a VR HUD distance from 1 to 5 m, in 0.5 m steps.")
         If DesktopFov < -SeatOffset.FovNarrower OrElse DesktopFov > SeatOffset.FovWider Then Throw New IOException("Choose a cockpit field of view between " & SeatOffset.FovNarrower & "° narrower and " & SeatOffset.FovWider & "° wider.")
         Dim seats As New Dictionary(Of String, SeatOffset)(StringComparer.Ordinal)
         For Each pair In If(SeatOffsets, New Dictionary(Of String, SeatOffset)).OrderBy(Function(item) item.Key, StringComparer.Ordinal)
