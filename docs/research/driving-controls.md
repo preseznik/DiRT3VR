@@ -301,9 +301,13 @@ each through `0xb31c70(map, &descriptor)` (call sites `0x56e214`/`0x56e254`). Ru
 the interned "keyboard" id), and bound it to map 0; the Bluetooth pad was off, so it wasn't
 listed. So with a keyboard first in that list, a wheel is never bound: iztok's G920. Fix
 candidate: in that one call (return address `0x56e150`), move the launcher's bound device to
-the front of the list, and the game binds it to player 1 as Press Start would. Still to
-check: the move with a connected pad here, and the G920's family name on PC4090 (expected:
-its DirectInput product name, the deviceName the launcher writes in the session map).
+the front of the list, and the game binds it to player 1 as Press Start would. Run
+-104313 (pad on, `--device-first xinput_pad`): the list was keyboard, `xinput_pad`; after the
+move the game bound the pad to map 0 (player 1) and the keyboard to map 1 (player 2), from
+the same call sites. Without the move it is the other way round. Still to check: that the pad
+then drives the car (a press test), whether the keyboard on player 2 still pauses, and the
+G920's family name on PC4090 (expected: its DirectInput product name, the deviceName the
+launcher writes in the session map).
 The research switch: `DIRT3VR_RESEARCH_DEVICES=1`, `DIRT3VR_RESEARCH_DEVICE_FIRST=<family>`
 (`run_benchmark.py --devices --device-first NAME`).
 
