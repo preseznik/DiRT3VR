@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Toggle VR (#288ceec1): press **F6** during Launch VR to switch the headset between VR and a flat screen in front of you, for a view that looks wrong or uncomfortable; press it again to go back. Change the key, or add a controller or wheel button, under **Controls → VR and seat controls**.
 - Place the VR HUD (#3652b9aa): **Graphics → VR HUD** sets how far away the HUD and menu panel is (1 to 5 m; it keeps the same size in your view) and whether it follows your view or stays where you recentered.
 - Cockpit field of view on the monitor (#b330cc4f): **Controls → Seat → Cockpit field of view (monitor)** makes the cockpit view up to 30° wider or 20° narrower than DiRT 3's own when you play with **Launch**. VR always uses your headset's field of view.
 - A steadier cockpit in VR (#cd56379b): DiRT 3 no longer moves and shakes the cockpit camera by itself under braking, cornering and over bumps, since your head already moves the view. You can turn this off, and hide the driver or the co-driver, under **Controls → Seat**.

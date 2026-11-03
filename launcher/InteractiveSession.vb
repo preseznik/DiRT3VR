@@ -8,6 +8,8 @@ Public Class InteractiveSession
     Public ReadOnly LogDirectory As String
     Public ReadOnly StopPath As String
     Public ReadOnly RecenterRequestPath As String
+    ' Where the Toggle VR button's requests appear (#288ceec1); the renderer deletes the file when it acts.
+    Public ReadOnly ToggleRequestPath As String
     Public ReadOnly StartedUtc As DateTime
     ' Cars whose seat position couldn't be applied (their camera file is missing or not the expected format).
     Public Property SeatsSkipped As IReadOnlyList(Of String) = Array.Empty(Of String)()
@@ -29,6 +31,7 @@ Public Class InteractiveSession
         context = install : Game = child : LogDirectory = folder : lease = sessionLease
         StopPath = Path.Combine(folder, "xr-stop.request")
         RecenterRequestPath = Path.Combine(folder, "recenter.request")
+        ToggleRequestPath = Path.Combine(folder, "toggle-vr.request")
         StartedUtc = DateTime.UtcNow
         Try
             StartedUtc = child.StartTime.ToUniversalTime()
@@ -64,6 +67,17 @@ Public Class InteractiveSession
             start.Environment("DIRT3VR_RECENTER_REQUEST_FILE") = Path.Combine(directory, "recenter.request")
         Else
             start.Environment.Remove("DIRT3VR_RECENTER_REQUEST_FILE")
+        End If
+        ' Toggle VR (#288ceec1, Lens's contract): the key as "<vk> <modifiers>" and, with a bound button, its request file.
+        If settings.ToggleVrKey <> 0 Then
+            start.Environment("DIRT3VR_TOGGLE_KEY") = String.Format(Globalization.CultureInfo.InvariantCulture, "{0} {1}", settings.ToggleVrKey, settings.ToggleVrModifiers)
+        Else
+            start.Environment.Remove("DIRT3VR_TOGGLE_KEY")
+        End If
+        If settings.ToggleVrDevice IsNot Nothing Then
+            start.Environment("DIRT3VR_TOGGLE_REQUEST_FILE") = Path.Combine(directory, "toggle-vr.request")
+        Else
+            start.Environment.Remove("DIRT3VR_TOGGLE_REQUEST_FILE")
         End If
         start.Environment("XR_RUNTIME_JSON") = runtime.ManifestPath
         ' The in-game seat menu's shared memory (docs/seat-channel.md); without it the renderer shows no menu.

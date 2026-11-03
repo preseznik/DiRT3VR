@@ -60,6 +60,7 @@ Public Class ProfileValues
             .CockpitSteady = local.CockpitSteady, .CockpitHideDriver = local.CockpitHideDriver, .CockpitHideCoDriver = local.CockpitHideCoDriver, .DesktopFov = local.DesktopFov,
             .HudDistance = local.HudDistance, .HudFollowView = local.HudFollowView,
             .SeatMenuKey = local.SeatMenuKey, .SeatMenuModifiers = local.SeatMenuModifiers, .SeatMenuButton = local.SeatMenuButton,
+            .ToggleVrKey = local.ToggleVrKey, .ToggleVrModifiers = local.ToggleVrModifiers, .ToggleVrDevice = local.ToggleVrDevice,
             .DiagnosticLogging = DiagnosticLogging, .ExperimentalVrEnabled = ExperimentalVrEnabled,
             .VrRenderScale = VrRenderScale, .DesktopWidth = DesktopWidth, .DesktopHeight = DesktopHeight,
             .DesktopDisplayMode = DesktopDisplayMode, .DesktopVSync = DesktopVSync, .SkipStartupMovies = SkipStartupMovies,

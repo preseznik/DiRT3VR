@@ -125,15 +125,17 @@ Public NotInheritable Class RecenterDeviceWatcher
     Private ReadOnly isForeground As Func(Of Boolean)
     Private ReadOnly edge As New RecenterEdge()
     Private ReadOnly cleanup As Action
+    Private ReadOnly logName As String
     Private pollTimer As Timer
     Public ReadOnly Property Requests As Integer
     Public ReadOnly Property ConnectedPolls As Integer
     Public Property Result As String = "running"
 
-    Public Sub New(binding As RecenterDeviceBinding, requestPath As String, readSample As Func(Of DrivingInput.Sample), isForeground As Func(Of Boolean), Optional cleanup As Action = Nothing)
+    ' Also watches the Toggle VR button (#288ceec1): the same request-file handshake, its own file and log.
+    Public Sub New(binding As RecenterDeviceBinding, requestPath As String, readSample As Func(Of DrivingInput.Sample), isForeground As Func(Of Boolean), Optional cleanup As Action = Nothing, Optional logName As String = "recenter-controller.json")
         binding.Validate()
         If Not Path.IsPathFullyQualified(requestPath) Then Throw New IOException("The recenter request path must be absolute.")
-        Me.binding = binding : Me.requestPath = requestPath : Me.readSample = readSample : Me.isForeground = isForeground : Me.cleanup = cleanup
+        Me.binding = binding : Me.requestPath = requestPath : Me.readSample = readSample : Me.isForeground = isForeground : Me.cleanup = cleanup : Me.logName = logName
     End Sub
 
     ' One poll; True when a recenter request was written.
@@ -178,7 +180,7 @@ Public NotInheritable Class RecenterDeviceWatcher
     End Function
 
     ' Watches the real device through driving_input.dll, re-finding it every two seconds if it is unplugged.
-    Public Shared Function ForSession(libraryPath As String, window As IntPtr, binding As RecenterDeviceBinding, gameProcessId As Integer, requestPath As String) As RecenterDeviceWatcher
+    Public Shared Function ForSession(libraryPath As String, window As IntPtr, binding As RecenterDeviceBinding, gameProcessId As Integer, requestPath As String, Optional logName As String = "recenter-controller.json") As RecenterDeviceWatcher
         Dim input As DrivingInput = Nothing, device As DrivingInput.Device = Nothing
         Dim refreshAt As Long = 0
         Dim read = Function() As DrivingInput.Sample
@@ -193,7 +195,7 @@ Public NotInheritable Class RecenterDeviceWatcher
                        If sample.Connected = 0UI Then device = Nothing
                        Return sample
                    End Function
-        Return New RecenterDeviceWatcher(binding, requestPath, read, Function() InFront(gameProcessId), Sub() input?.Dispose())
+        Return New RecenterDeviceWatcher(binding, requestPath, read, Function() InFront(gameProcessId), Sub() input?.Dispose(), logName)
     End Function
 
     ' Stops watching and records what happened in the session logs.
@@ -203,7 +205,7 @@ Public NotInheritable Class RecenterDeviceWatcher
         If Result = "running" Then Result = "stopped"
         Try
             Dim folder = Path.GetDirectoryName(requestPath)
-            If Directory.Exists(folder) Then SafeFiles.SaveJson(Path.Combine(folder, "recenter-controller.json"), New With {.schema = 1, .binding = binding.Describe(), .requests = Requests, .connectedPolls = ConnectedPolls, .result = Result})
+            If Directory.Exists(folder) Then SafeFiles.SaveJson(Path.Combine(folder, logName), New With {.schema = 1, .binding = binding.Describe(), .requests = Requests, .connectedPolls = ConnectedPolls, .result = Result})
         Catch ex As Exception When TypeOf ex Is IOException OrElse TypeOf ex Is UnauthorizedAccessException
         End Try
     End Sub
