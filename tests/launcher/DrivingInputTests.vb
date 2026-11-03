@@ -62,5 +62,23 @@ Module DrivingInputTests
             End Using
         Next
         Console.WriteLine("Note: live input " & If(installed, "tested with", "tested without") & " driving_input.dll")
+
+        ' It opens tall enough to show a device down to its feedback test (#2a6e6f28), and never past the screen.
+        Dim pad As New DrivingInput.Device(0UI, "xinput:0", "Xbox controller 1", "xinput_pad")
+        Dim wheel As New DrivingInput.Device(1UI, "{11111111-1111-1111-1111-111111111111}", "Logitech G HUB G920 Driving Force Racing Wheel USB", "{22222222-2222-2222-2222-222222222222}")
+        Using monitor As New DrivingInputMonitor(Path.Combine(root, "no-driving-input.dll"))
+            monitor.ShowInTaskbar = False : monitor.StartPosition = FormStartPosition.Manual : monitor.Location = New Drawing.Point(-30000, -30000)
+            monitor.Show() : Application.DoEvents()
+            Dim area = Screen.FromControl(monitor).WorkingArea
+            check(area.Contains(monitor.Bounds), "the window opens on the screen")
+            monitor.ShowDevices({pad}) : monitor.FitToContent(again:=True) : Application.DoEvents()
+            check(monitor.ShowsEverything AndAlso area.Contains(monitor.Bounds), "one controller fits, down to Test rumble, without scrolling (" & monitor.ClientSize.ToString() & ")")
+            check(monitor.Controls.Find("LiveInputFeedbackTest", True).Single().Text = "Test rumble", "the pad's test is Test rumble")
+            monitor.ShowDevices({wheel}) : monitor.FitToContent(again:=True) : Application.DoEvents()
+            check(monitor.ShowsEverything AndAlso area.Contains(monitor.Bounds), "a wheel fits too, with its eight axes")
+            monitor.ShowDevices({pad, wheel, wheel, pad}) : monitor.FitToContent(again:=True) : Application.DoEvents()
+            check(area.Contains(monitor.Bounds) AndAlso monitor.Height <= area.Height, "four devices: as tall as the screen allows, then it scrolls")
+            monitor.Close()
+        End Using
     End Sub
 End Module

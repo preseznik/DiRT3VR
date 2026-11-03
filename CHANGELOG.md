@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The **Live input and force feedback** window now opens tall enough to show your controller or wheel down to **Test rumble** / **Test force feedback**, also with Windows display scaling above 100% (#2a6e6f28). With several devices it fills the screen and scrolls.
 - Launch VR no longer refuses a VR render scale that is too high for your headset (#7f93667d). DiRT3VR can render at most 4096 pixels per side, so with a Quest 3 at Virtual Desktop's 3072 × 3264 the most is 125%. A higher scale now runs at that maximum, and the launch message and **Graphics → VR rendering** say so.
 - **Recommend for this PC** (#68e16dc9) under **Graphics → Quality**: after a VR session, it suggests a VR render scale, or the VR Balanced or Potato preset, from that session's measured frame rate. It only changes the controls; Undo preset brings them back.
 - FPS in VR (#4896ffd3): **Graphics → VR HUD → Show FPS and GPU usage in the headset** adds a small performance display, and the last VR session's measured frame rate (median, low, GPU usage and what held it back) shows under **Graphics → VR rendering**.
