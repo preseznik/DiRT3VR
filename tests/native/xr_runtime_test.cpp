@@ -246,6 +246,23 @@ int main() {
             { auto seat=frame.AcquireSeatPanel(); Require(!seat,"Seat panel acquired without the menu"); }
             frame.Abort();
         }
+        Reset(); { // HUD placement: distance at the same angular size, fixed or following the view.
+            XrRuntime runtime; Require(runtime.Initialize(device.Get(),1.f,0,0,true),"HUD init failed");
+            const auto submit=[&](uint64_t sequence,float distance,float width,bool follow) {
+                auto frame=runtime.BeginFrame(sequence); CompletePair(frame);
+                { auto panel=frame.AcquireOverlay(); Require(panel.Complete(),"HUD release failed"); }
+                return frame.SubmitOverlay(4.f/3.f,distance,width,follow);
+            };
+            Require(submit(1,5.f,4.f,false) && layers==2 && Near(lastQuad.pose.position.z,-5.f) && Near(lastQuad.size.width,4.f) && Near(lastQuad.size.height,3.f),
+                    "Distant HUD not placed at its distance and size");
+            Require(!submit(2,5.f,1.f,false) && layers==0,"HUD below its angular minimum accepted");
+            Require(!submit(3,1.f,2.5f,false) && layers==0,"HUD above its angular maximum accepted");
+            headOrientation={0,std::sin(.7853982f),0,std::cos(.7853982f)}; // The head turns 90° left after recentering.
+            Require(submit(4,2.f,1.6f,false) && Near(lastQuad.pose.position.x,0) && Near(lastQuad.pose.position.z,-2.f) && Near(lastQuad.pose.orientation.w,1),
+                    "Fixed HUD followed the view");
+            Require(submit(5,2.f,1.6f,true) && Near(lastQuad.pose.position.x,-2.f) && Near(lastQuad.pose.position.y,1.4f) && Near(lastQuad.pose.position.z,0) &&
+                    Near(std::abs(lastQuad.pose.orientation.y),std::sin(.7853982f)),"Following HUD not ahead of the view");
+        }
         Reset(); failChain=2; {
             XrRuntime runtime; Require(!runtime.Initialize(device.Get(),1.f,0,0,true) && destroyedChains==2 && destroyedSessions==1 && destroyedInstances==1,"HUD allocation failure leaked XR resources");
         }

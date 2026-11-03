@@ -299,7 +299,7 @@ bool XrRuntime::Release(uint64_t generation,unsigned index,bool completed) noexc
     if(!eye.completed) frameFailed_=true;
     return eye.completed;
 }
-bool XrRuntime::EndFrame(uint64_t generation,bool submit,FrameMode mode,float aspect,float distance,float width,bool overlay,bool video) noexcept {
+bool XrRuntime::EndFrame(uint64_t generation,bool submit,FrameMode mode,float aspect,float distance,float width,bool overlay,bool video,bool follow) noexcept {
     if(!Current(generation)) return false;
     for(unsigned i=0;i<eyes_.size();++i) if(eyes_[i].acquired) { Release(generation,i,false); submit=false; }
     bool complete=submit && mode==frameMode_ && frameRenderable_ && !frameFailed_ && !failed_ && !exiting_ && eyes_[0].completed;
@@ -324,15 +324,17 @@ bool XrRuntime::EndFrame(uint64_t generation,bool submit,FrameMode mode,float as
     if(complete && (mode==FrameMode::Screen || overlay)) {
         complete=std::isfinite(aspect) && aspect>0 && std::isfinite(distance) && distance>0 &&
                  std::isfinite(width) && width>0;
-        if(overlay) complete&=distance>=1.f && distance<=5.f && width>=.5f && width<=4.f;
+        // Angular bounds: the 0.5–4 m wide, at most 1.8 m tall panel at 2 m, at any distance.
+        if(overlay) complete&=distance>=1.f && distance<=5.f && width>=.25f*distance && width<=2.f*distance;
         if(complete) {
             screen.size={width,width/aspect};
-            if(overlay && screen.size.height>1.8f) screen.size={1.8f*aspect,1.8f};
+            if(overlay && screen.size.height>.9f*distance) screen.size={.9f*distance*aspect,.9f*distance};
             complete=std::isfinite(screen.size.height) && screen.size.height>0;
             try {
                 // Fixed in LOCAL space until recenter: head turns do not drag
                 // the screen. RecenterPose retains an upright yaw reference.
-                screen.pose=math::OffsetPose(reference_,{0,0,-distance});
+                // A following HUD panel stays ahead of the current view instead.
+                screen.pose=math::OffsetPose(overlay && follow && mode==FrameMode::Stereo && !video ? math::CenterPose(views_) : reference_,{0,0,-distance});
                 complete&=math::Finite(screen.pose.position);
             } catch(...) { complete=false; }
         }
@@ -420,9 +422,9 @@ bool XrRuntime::ShowSeat(uint64_t generation,const XrPosef& pose,float width,flo
     seatSize_={width,height}; seatShown_=true;
     return true;
 }
-bool XrRuntime::Frame::SubmitOverlay(float aspect,float distance,float width) noexcept {
+bool XrRuntime::Frame::SubmitOverlay(float aspect,float distance,float width,bool follow) noexcept {
     if(!owner_) return false;
-    const bool submitted=owner_->EndFrame(generation_,mode_==FrameMode::Stereo,FrameMode::Stereo,aspect,distance,width,true);
+    const bool submitted=owner_->EndFrame(generation_,mode_==FrameMode::Stereo,FrameMode::Stereo,aspect,distance,width,true,false,follow);
     owner_=nullptr; return submitted;
 }
 bool XrRuntime::Frame::SubmitVideo(float aspect,float distance,float width) noexcept {

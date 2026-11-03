@@ -34,7 +34,9 @@ public:
         Eye AcquireSeatPanel();
         bool ShowSeatPanel(const XrPosef& pose,float width,float height) noexcept;
         bool Submit() noexcept;
-        bool SubmitOverlay(float aspect,float distance=2.f,float width=1.6f) noexcept;
+        // follow: the panel stays ahead of the current view instead of the recentered reference.
+        // Its angular size is bounded: width 0.25–2 × distance, height at most 0.9 × distance.
+        bool SubmitOverlay(float aspect,float distance=2.f,float width=1.6f,bool follow=false) noexcept;
         // A recognized movie/startup screen replaces a COMPLETE stereo pair with the
         // current overlay image. Never a fallback for a failed/partial pair.
         bool SubmitVideo(float aspect,float distance=3.f,float width=3.f) noexcept;
@@ -115,7 +117,7 @@ private:
     bool Acquire(uint64_t,unsigned) noexcept;
     bool Release(uint64_t,unsigned,bool completed) noexcept;
     bool EndFrame(uint64_t,bool submit,FrameMode mode=FrameMode::Stereo,
-                  float aspect=0,float distance=3.f,float width=3.f,bool overlay=false,bool video=false) noexcept;
+                  float aspect=0,float distance=3.f,float width=3.f,bool overlay=false,bool video=false,bool follow=false) noexcept;
     bool Current(uint64_t) const noexcept;
     bool EyeCurrent(uint64_t,unsigned) const noexcept;
     bool Check(XrResult,const char*) noexcept;
