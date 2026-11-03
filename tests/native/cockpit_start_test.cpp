@@ -9,13 +9,15 @@ void Require(bool value,const char* message) { if(!value) throw std::runtime_err
 namespace cs=dirt3vr::cockpitstart;
 
 std::vector<uint8_t> Image(uintptr_t loadedBase) {
-    std::vector<uint8_t> image(cs::sites[0].endRva+0x100,0xcc);
+    std::vector<uint8_t> image(cs::defaultRva+0x100,0xcc);
     uint8_t push[5]; cs::Push(loadedBase,push);
     for(const auto& site:cs::sites) {
         std::copy(std::begin(push),std::end(push),image.begin()+site.rva);
         std::copy(site.after,site.after+site.afterSize,image.begin()+site.rva+5);
         std::copy(site.end,site.end+site.endSize,image.begin()+site.endRva);
     }
+    std::copy(std::begin(push),std::end(push),image.begin()+cs::defaultRva);
+    std::copy(std::begin(cs::defaultAfter),std::end(cs::defaultAfter),image.begin()+cs::defaultRva+5);
     return image;
 }
 
@@ -24,13 +26,14 @@ std::vector<uint8_t> Image(uintptr_t loadedBase) {
 bool InstalledGameMatches(const char* path) {
     std::ifstream file(path,std::ios::binary);
     if(!file) return false;
-    std::vector<uint8_t> image(cs::sites[0].endRva+0x100,0);
-    for(const auto& site:cs::sites)
-        for(const auto [rva,size]:{std::pair{site.rva,5+site.afterSize},std::pair{site.endRva,site.endSize}}) {
-            file.seekg(static_cast<std::streamoff>(rva-0x1000+0x400));
-            file.read(reinterpret_cast<char*>(image.data()+rva),static_cast<std::streamsize>(size));
-            if(!file) return false;
-        }
+    std::vector<uint8_t> image(cs::defaultRva+0x100,0);
+    std::vector<std::pair<uintptr_t,size_t>> ranges{{cs::defaultRva,5+sizeof(cs::defaultAfter)}};
+    for(const auto& site:cs::sites) { ranges.push_back({site.rva,5+site.afterSize}); ranges.push_back({site.endRva,site.endSize}); }
+    for(const auto [rva,size]:ranges) {
+        file.seekg(static_cast<std::streamoff>(rva-0x1000+0x400));
+        file.read(reinterpret_cast<char*>(image.data()+rva),static_cast<std::streamsize>(size));
+        if(!file) return false;
+    }
     return cs::SitesMatch(image.data(),0x400000);
 }
 }
@@ -54,6 +57,23 @@ int main(int argc,char** argv) {
                 std::copy(std::begin(patched),std::end(patched),image.begin()+site.rva);
                 Require(cs::Applied(image.data(),site) && !cs::SiteMatches(image.data(),base,site),"A patched site was not recognised");
             }
+        }
+        uint8_t headCam[5]; cs::Push(0x400000,headCam,cs::headCamRva);
+        Require(headCam[0]==0x68 && headCam[1]==0x2c && headCam[2]==0x55 && headCam[3]==0xe8 && headCam[4]==0x00,
+                "The default does not push 0xe8552c (head-cam) at the preferred base");
+        for(const uintptr_t base:{uintptr_t{0x400000},uintptr_t{0x550000}}) {
+            auto image=Image(base);
+            Require(cs::DefaultMatches(image.data(),base,cs::chaseCloseRva) && !cs::DefaultMatches(image.data(),base,cs::headCamRva),
+                    "The current_camera default was not recognised");
+            uint8_t patched[5]; cs::Push(base,patched,cs::headCamRva);
+            std::copy(std::begin(patched),std::end(patched),image.begin()+cs::defaultRva);
+            Require(cs::DefaultMatches(image.data(),base,cs::headCamRva) && !cs::SitesMatch(image.data(),base),
+                    "The patched default was not recognised");
+        }
+        {
+            auto image=Image(0x400000);
+            image[cs::defaultRva+5]=0x90;
+            Require(!cs::SitesMatch(image.data(),0x400000),"A different instruction after the default was accepted");
         }
         for(const auto& site:cs::sites) {
             auto image=Image(0x400000);
