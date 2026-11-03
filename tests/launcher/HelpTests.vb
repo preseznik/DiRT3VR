@@ -49,6 +49,8 @@ Module HelpTests
             Dim list = DirectCast(about.Controls.Find("InstructionTopics", True).Single(), ListBox)
             Dim picker = DirectCast(about.Controls.Find("InstructionTopicPicker", True).Single(), ComboBox)
             check(view.SelectedTopic = MainForm.HelpGraphics AndAlso view.ArticleText.StartsWith(MainForm.HelpGraphics & vbCrLf, StringComparison.Ordinal) AndAlso view.ArticleText.Contains("render scale"), "a section's link opens its topic")
+            Dim work = Screen.FromControl(about).WorkingArea
+            check(about.Width >= Math.Min(Px(about, 820), work.Width), $"the window is sized for its own display (dpi {about.DeviceDpi}, window {about.Width})")
             check(Not view.Compact AndAlso list.Visible AndAlso Not picker.Visible AndAlso list.Items.Count = topics.Count, $"the topic list sits beside the article in a wide window (dpi {about.DeviceDpi}, window {about.Width}, view {view.Width})")
             list.SelectedIndex = topics.ToList().FindIndex(Function(topic) topic.Title = MainForm.HelpRestore)
             Application.DoEvents()
