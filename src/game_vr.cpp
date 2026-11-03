@@ -15,10 +15,12 @@
 #include "seat_menu.h"
 #include "seat_panel.h"
 #include "seat_input.h"
+#include "hud_placement.h"
 #include <windows.h>
 #include <MinHook.h>
 #include <array>
 #include <atomic>
+#include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <stdexcept>
@@ -292,6 +294,21 @@ bool SceneMatches(const HeadsetResolutionRequest& request,ID3D11Texture2D* back)
     D3D11_TEXTURE2D_DESC desc{}; back->GetDesc(&desc);
     return desc.Width==request.sceneWidth && desc.Height==request.sceneHeight;
 }
+// The launcher's VR HUD placement (#3652b9aa), read once.
+const HudPlacement& ConfiguredHudPlacement() {
+    static const HudPlacement placement=[] {
+        HudPlacement value; char text[16]{};
+        DWORD length=GetEnvironmentVariableA("DIRT3VR_HUD_DISTANCE",text,sizeof(text));
+        if(length && length<sizeof(text)) value.distance=HudPlacement::ParseDistance(std::string_view(text,length));
+        length=GetEnvironmentVariableA("DIRT3VR_HUD_FOLLOW",text,sizeof(text));
+        value.follow=length && length<sizeof(text) && HudPlacement::ParseFollow(std::string_view(text,length));
+        char message[96]{};
+        snprintf(message,sizeof(message),"XR HUD distance=%.2f m follow=%u",value.distance,unsigned(value.follow));
+        RuntimeLog(message);
+        return value;
+    }();
+    return placement;
+}
 // The launcher's seat channel (docs/seat-channel.md). A missing or invalid channel leaves the menu off.
 void OpenSeatChannel(PrototypeState& state,ID3D11Device* device) {
     wchar_t name[96]{};
@@ -481,7 +498,9 @@ void VrBeforePresent(IDXGISwapChain* chain) noexcept {
                 auto overlay=frame.AcquireOverlay();
                 const bool copied=overlay && state->hudPresenter.Draw(introScreen ? back.Get() : image,
                     overlay.Target(),overlay.Width(),overlay.Height(),introScreen ? TexturePresenter::Mode::Opaque : TexturePresenter::Mode::StraightAlpha) && overlay.Complete();
-                if(copied) successful=introScreen ? frame.SubmitVideo(16.f/9.f) : frame.SubmitOverlay(state->hud.Aspect(),2.f,state->hud.PanelWidth());
+                const auto& placement=ConfiguredHudPlacement();
+                if(copied) successful=introScreen ? frame.SubmitVideo(16.f/9.f) :
+                    frame.SubmitOverlay(state->hud.Aspect(),placement.distance,placement.Width(state->hud.PanelWidth()),placement.follow);
                 else frame.Abort();
             } else successful=frame.Submit();
             state->pendingFrame.reset();
