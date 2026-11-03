@@ -1,3 +1,4 @@
+Imports System.Globalization
 Imports System.Drawing
 Imports System.Runtime.InteropServices
 Imports System.Windows.Forms
@@ -54,6 +55,7 @@ Public NotInheritable Class DrivingControlsForm
                                                                           monitor.ShowDialog(Me)
                                                                       End Using
                                                                   End Sub)
+        AddButton(setup.Item2, "DrivingWheelRotation", "Wheel rotation…", Sub() WheelRotation())
         setup.Item1.Margin = New Padding(0, 0, 0, 8) : layout.Controls.Add(setup.Item1, 0, 2)
         layout.Controls.Add(rows, 0, 3)
 
@@ -241,6 +243,15 @@ Public NotInheritable Class DrivingControlsForm
         Next
         If any Then enabledBox.Checked = True
         RefreshRows()
+    End Sub
+
+    ' Wheel rotation (#a72b44ea, as DiRT2VR 0.18): the steering saturation from the wheel's rotation and
+    ' the rotation wanted in DiRT 3.
+    Private Sub WheelRotation()
+        If model.SteeringWheel() Is Nothing Then Throw New IOException("Bind Steer Left and Steer Right to your wheel first, with the Binding wizard or Device….")
+        Using dialog As New WheelRotationForm(model)
+            If dialog.ShowDialog(Me) = DialogResult.OK Then RefreshRows()
+        End Using
     End Sub
 
     Private Sub Calibrate()
@@ -599,4 +610,93 @@ Public NotInheritable Class DrivingBindingForm
         If disposing Then pollTimer.Dispose() : input?.Dispose()
         MyBase.Dispose(disposing)
     End Sub
+End Class
+
+' Wheel rotation…: your wheel's rotation lock to lock and the rotation you want in DiRT 3. Apply sets Steer
+' Left and Steer Right's saturation to their ratio (DrivingControls.ApplyWheelRotation).
+Public NotInheritable Class WheelRotationForm
+    Inherits LauncherForm
+
+    Private ReadOnly model As DrivingControls
+    Private ReadOnly wheel As New NumericUpDown With {.Name = "WheelRotationHardware", .AccessibleName = "Your wheel's rotation in degrees", .Minimum = DrivingControls.MinimumWheelRotation, .Maximum = DrivingControls.MaximumWheelRotation, .Width = 92, .Anchor = AnchorStyles.Right}
+    Private ReadOnly game As New NumericUpDown With {.Name = "WheelRotationGame", .AccessibleName = "Steering rotation in DiRT 3 in degrees", .Minimum = DrivingControls.MinimumGameRotation, .Maximum = DrivingControls.MaximumWheelRotation, .Width = 92, .Anchor = AnchorStyles.Right}
+    Private ReadOnly result As New Label With {.Name = "WheelRotationResult", .AutoSize = True, .MaximumSize = New Size(600, 0), .Margin = New Padding(3, 8, 3, 8), .UseMnemonic = False}
+    Private ReadOnly problem As New Label With {.Name = "WheelRotationProblem", .AutoSize = True, .MaximumSize = New Size(600, 0), .UseMnemonic = False}
+
+    Public Sub New(model As DrivingControls)
+        Me.model = model
+        Dim steering = model.SteeringWheel()
+        If steering Is Nothing Then Throw New IOException("Bind Steer Left and Steer Right to your wheel first, with the Binding wizard or Device….")
+        Dim device = steering(0).Device, suggested = DrivingControls.SuggestedWheelRotation(device)
+        Dim wheelValue = If(model.WheelRotation <> 0, model.WheelRotation, If(suggested <> 0, suggested, 900))
+        wheel.Value = wheelValue
+        game.Maximum = wheelValue : game.Value = Math.Clamp(CInt(Math.Round(steering.Max(Function(b) b.Saturation) * wheelValue)), DrivingControls.MinimumGameRotation, wheelValue)
+        Text = "Wheel rotation" : ClientSize = New Size(650, 470) : MinimumSize = Size
+        StartPosition = FormStartPosition.CenterParent : AutoScaleMode = AutoScaleMode.Dpi : MinimizeBox = False : MaximizeBox = False
+        Dim note = If(suggested <> 0, "Suggested: " & suggested.ToString(CultureInfo.CurrentCulture) & "°, this wheel's maximum. If you lowered it in the wheel's software, use that value.",
+                      If(device.ToUpperInvariant().Contains("FANATEC"), "Use the SEN value from your wheelbase's tuning menu.", "Use the rotation set in your wheel's software."))
+        Dim layout As New TableLayoutPanel With {.Dock = DockStyle.Fill, .Padding = New Padding(20), .ColumnCount = 1, .RowCount = 9, .AutoScroll = True}
+        layout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
+        For i = 0 To 8
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+        Next
+        Dim caption = Function(value As String, top As Integer) New Label With {.Text = value, .AutoSize = True, .MaximumSize = New Size(600, 0), .Margin = New Padding(3, top, 3, 3), .UseMnemonic = False}
+        layout.Controls.Add(caption("Wheel: " & device, 0), 0, 0)
+        layout.Controls.Add(caption("Your wheel's rotation, lock to lock (°)", 10), 0, 1) : layout.Controls.Add(Slider(wheel), 0, 2)
+        layout.Controls.Add(caption(note, 0), 0, 3)
+        layout.Controls.Add(caption("Steering rotation in DiRT 3, lock to lock (°)", 10), 0, 4) : layout.Controls.Add(Slider(game), 0, 5)
+        layout.Controls.Add(result, 0, 6)
+        layout.Controls.Add(caption("The cockpit wheel can't turn further than each car's animation, so lower DiRT 3's rotation until it keeps up with your hands. If your wheel's software can set its rotation, setting it to the same value also stops the wheel at full lock.", 0), 0, 7)
+        Dim apply As New Button With {.Name = "WheelRotationApply", .Text = "Apply", .AutoSize = True}
+        AddHandler apply.Click, Sub() ApplyRotation()
+        Dim cancel As New Button With {.Text = "Cancel", .AutoSize = True, .DialogResult = DialogResult.Cancel}
+        CancelButton = cancel
+        Dim buttons As New FlowLayoutPanel With {.Dock = DockStyle.Fill, .AutoSize = True, .WrapContents = True}
+        buttons.Controls.AddRange({apply, cancel, problem}) : layout.Controls.Add(buttons, 0, 8)
+        Controls.Add(layout)
+        AddHandler wheel.ValueChanged, Sub()
+                                           game.Maximum = wheel.Value
+                                           ShowResult()
+                                       End Sub
+        AddHandler game.ValueChanged, Sub() ShowResult()
+        ShowResult()
+    End Sub
+
+    ' Applies the two rotations to the edited bindings; the controls window saves them with Save.
+    Public Sub ApplyRotation()
+        Try
+            model.ApplyWheelRotation(CInt(wheel.Value), CInt(game.Value))
+            DialogResult = DialogResult.OK : Close()
+        Catch ex As IOException
+            problem.Text = ex.Message
+        End Try
+    End Sub
+
+    Private Sub ShowResult()
+        result.Text = "Full steering lock at " & CInt(game.Value).ToString(CultureInfo.CurrentCulture) & "° lock to lock: " &
+            Math.Round(game.Value / wheel.Value, 2).ToString("P0", CultureInfo.CurrentCulture) & " of your wheel's travel (Steer Left and Steer Right saturation)."
+    End Sub
+
+    ' A slider beside the number box; the slider follows the box's range when it changes.
+    Private Shared Function Slider(number As NumericUpDown) As Control
+        Dim track As New TrackBar With {.Name = number.Name & "Slider", .AccessibleName = number.AccessibleName, .Minimum = CInt(number.Minimum), .Maximum = CInt(number.Maximum),
+                                        .Value = CInt(number.Value), .SmallChange = 10, .LargeChange = 90, .TickStyle = TickStyle.None, .AutoSize = False, .Dock = DockStyle.Fill, .Margin = Padding.Empty}
+        Dim panel As New TableLayoutPanel With {.Dock = DockStyle.Fill, .Height = 38, .MinimumSize = New Size(240, 38), .ColumnCount = 2, .RowCount = 1, .Margin = Padding.Empty}
+        panel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100)) : panel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        panel.RowStyles.Add(New RowStyle(SizeType.Percent, 100))
+        panel.Controls.Add(track) : panel.Controls.Add(number)
+        Dim synchronizing = False
+        AddHandler track.ValueChanged, Sub()
+                                           If Not synchronizing Then number.Value = track.Value
+                                       End Sub
+        AddHandler number.ValueChanged, Sub()
+                                            synchronizing = True
+                                            Try
+                                                track.Maximum = CInt(number.Maximum) : track.Value = CInt(number.Value)
+                                            Finally
+                                                synchronizing = False
+                                            End Try
+                                        End Sub
+        Return panel
+    End Function
 End Class
