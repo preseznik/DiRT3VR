@@ -31,7 +31,7 @@ Public Module Program
                 If arguments.Contains("--check-install") Then context.ValidateGame()
                 If InstallContext.GameRunning() Then Throw New IOException("Close DiRT 3 and let DiRT3VR restore its files first.")
                 If New OwnedFileTransaction(context).Pending Then Throw New IOException("File recovery is pending for this game folder. Open DiRT3VR and use Restore original files first.")
-                If arguments.Contains("--check-install") Then Console.WriteLine("Supported DiRT 3 Complete Edition executable. Experimental VDXR requires an explicit launcher opt-in and a matching package; full interactive acceptance is pending.")
+                If arguments.Contains("--check-install") Then Console.WriteLine("Supported DiRT 3 Complete Edition executable. Experimental VR requires an explicit launcher opt-in and a matching package; full interactive acceptance is pending.")
                 Return 0
             End If
             If arguments.Contains("--probe-runtime") Then
