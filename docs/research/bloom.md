@@ -92,6 +92,8 @@ have neither group. Bloom and glare edits touch different elements and give the 
 either order (`tests/test_glare.py`). `run_benchmark.py --no-glare` (alone or with `--no-bloom`)
 applies it for one journaled run. For the launcher: a second option, journaling the same
 `postprocess\effects.xml` target as bloom and motion blur and writing whichever edits are on.
-Not yet seen in the game: a run with the sun in view settles whether `multiplier` alone turns
-the flare chain off. Night tracks, finish and flashback effects (higher mixes, e.g.
+Seen in the game (run 20261103-204434, Aspen intro with the sun in view, `--no-glare`): the blue
+horizontal streak through the sun and the coloured flare blobs are gone, so the LensFlares
+`multiplier` does switch the whole chain off; the same tower shot from run 20261103-161640 shows
+both (`glare-on-vs-off.png` in the run folder). Night tracks, finish and flashback effects (higher mixes, e.g.
 finish_fx_green mixLarge 1.5954) weren't run.
