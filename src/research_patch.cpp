@@ -5,6 +5,7 @@
 #include <intrin.h>
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
@@ -336,6 +337,62 @@ void InstallVehicleNames(void (*log)(const char*,...)) {
         }
     }).detach();
     log("Research vehicles: reading at %u time(s)",static_cast<unsigned>(seconds.size()));
+}
+// Live seat on the monitor (#88b7f778): does changing the selected head camera's own fields
+// move the view without reloading cameras.xml? The Head loader (0xb07cf0) keeps the eye point
+// at +0x19d0 (x left, y up, z forward, metres) and the base FOV at +0x19e4; the selected camera
+// ("owner") is found as the camera classifier does: [[[[base+0xbe7404]+8]+0x11b4]+0x24] is the
+// manager, its entry [manager+0x140] (0x280 bytes each) the owner. The owner must have the Head
+// vtable (0xf28530) and the name "head-cam" (+0xa1). DIRT3VR_RESEARCH_LIVE_SEAT="s:y=0.3,s:fov=15"
+// adds those amounts at those seconds (at most 4 changes); pair it with --screenshots.
+void InstallLiveSeat(void (*log)(const char*,...)) {
+    char text[96]{};
+    const auto length=GetEnvironmentVariableA("DIRT3VR_RESEARCH_LIVE_SEAT",text,sizeof(text));
+    if(!length || length>=sizeof(text)) return;
+    struct Change { unsigned second; bool fov; float amount; };
+    std::vector<Change> changes;
+    for(char* cursor=text;*cursor && changes.size()<4;) {
+        char* end{};
+        const auto second=std::strtoul(cursor,&end,10);
+        const bool fov=end && std::strncmp(end,":fov=",5)==0, up=end && std::strncmp(end,":y=",3)==0;
+        if(end==cursor || second<1 || second>900 || (!fov && !up)) { log("Research live seat refused: %s",text); return; }
+        cursor=end+(fov ? 5 : 3);
+        const float amount=std::strtof(cursor,&end);
+        if(end==cursor || !std::isfinite(amount) || std::fabs(amount)>(fov ? 40.0f : 0.5f)) { log("Research live seat refused: %s",text); return; }
+        changes.push_back({static_cast<unsigned>(second),fov,amount});
+        cursor=*end==',' ? end+1 : end;
+    }
+    std::thread([log,changes] {
+        auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+        const auto base=reinterpret_cast<uintptr_t>(image);
+        const auto read=[](uintptr_t at,void* out,size_t bytes) {
+            SIZE_T copied{};
+            return at && ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<const void*>(at),out,bytes,&copied) && copied==bytes;
+        };
+        const auto pointer=[&](uintptr_t at,uintptr_t& out) { uint32_t value{}; out=0; return read(at,&value,4) && (out=value)!=0; };
+        unsigned waited=0;
+        for(const auto& change:changes) {
+            if(change.second>waited) { Sleep((change.second-waited)*1000); waited=change.second; }
+            uintptr_t root{},game{},controller{},manager{},begin{},owner{},table{};
+            uint32_t index{};
+            char name[16]{};
+            if(!pointer(base+0xbe7404,root) || !pointer(root+8,game) || !pointer(game+0x11b4,controller) || !pointer(controller+0x24,manager) ||
+               !pointer(manager,begin) || !read(manager+0x140,&index,4) || index>1024 || !pointer(begin+index*0x280,owner) ||
+               !pointer(owner,table) || !read(owner+0xa1,name,sizeof(name)-1)) {
+                log("Research live seat at %us: no selected camera",change.second); continue;
+            }
+            if(table!=base+0xb28530 || std::strcmp(name,"head-cam")) { log("Research live seat at %us: selected camera is '%s', not the head camera",change.second,name); continue; }
+            const auto field=owner+(change.fov ? 0x19e4 : 0x19d4);
+            float before{};
+            if(!read(field,&before,4)) { log("Research live seat at %us: field unreadable",change.second); continue; }
+            const float after=before+change.amount;
+            SIZE_T written{};
+            const bool ok=WriteProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(field),&after,4,&written) && written==4;
+            log("Research live seat at %us: owner %p %s %.4f -> %.4f (%s)",change.second,reinterpret_cast<void*>(owner),
+                change.fov ? "fov" : "eye y",before,after,ok ? "written" : "write failed");
+        }
+    }).detach();
+    log("Research live seat: %u change(s) queued",static_cast<unsigned>(changes.size()));
 }
 // The direct start's own Press Start (0x56e070, only with the benchmark flags 0xf9cef0/1): it
 // lists the connected devices through the input service's 0xb04cf0 (12-byte descriptors
@@ -740,6 +797,7 @@ void Apply(void (*log)(const char*,...)) {
         InstallGameLog(log);
         InstallVehicleNames(log);
         InstallDevices(log);
+        InstallLiveSeat(log);
         char text[513]{};
         const auto length=GetEnvironmentVariableA("DIRT3VR_RESEARCH_PATCH",text,sizeof(text));
         if(!length) return;
