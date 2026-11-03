@@ -14,7 +14,7 @@ Public NotInheritable Class NewFeatures
 
     ' Control or section names, and the version that first ships them.
     Private Shared ReadOnly Since As New Dictionary(Of String, String)(StringComparer.Ordinal) From {
-        {"SeatMenuKey", NextVersion}, {"SeatMenuButton", NextVersion}, {"SeatSteadyCamera", NextVersion}, {"SeatHideDriver", NextVersion}, {"SeatHideCoDriver", NextVersion}, {"SeatDesktopFov", NextVersion}, {"SectionVRHUD", NextVersion}, {"ToggleVrKey", NextVersion}, {"ToggleVrDevice", NextVersion}}
+        {"SeatMenuKey", NextVersion}, {"SeatMenuButton", NextVersion}, {"SeatSteadyCamera", NextVersion}, {"SeatHideDriver", NextVersion}, {"SeatHideCoDriver", NextVersion}, {"SeatDesktopFov", NextVersion}, {"SectionVRHUD", NextVersion}, {"ToggleVrKey", NextVersion}, {"ToggleVrDevice", NextVersion}, {"PerfDisplay", NextVersion}}
     Private Shared ReadOnly marked As New ConditionalWeakTable(Of Control, Object)
     ' Whether the running build is an experimental one (BuildInfo.Experimental); tests may set it.
     Public Shared Property ExperimentalBuild As Boolean = BuildInfo.Experimental

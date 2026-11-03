@@ -57,6 +57,9 @@ Public Class InteractiveSession
         ' The HUD panel's distance and follow mode (#3652b9aa, Lens's contract).
         start.Environment("DIRT3VR_HUD_DISTANCE") = settings.HudDistance.ToString("0.0", Globalization.CultureInfo.InvariantCulture)
         start.Environment("DIRT3VR_HUD_FOLLOW") = If(settings.HudFollowView, "1", "0")
+        ' FPS and GPU usage in the headset (#4896ffd3, Lens's contract).
+        start.Environment("DIRT3VR_PERF_DISPLAY") = If(settings.PerfDisplay, "1", "0")
+        start.Environment("DIRT3VR_PERF_FOLLOW") = If(settings.PerfFollowView, "1", "0")
         start.Environment("DIRT3VR_HEADSET_WIDTH") = headset.Width.ToString(Globalization.CultureInfo.InvariantCulture)
         start.Environment("DIRT3VR_HEADSET_HEIGHT") = headset.Height.ToString(Globalization.CultureInfo.InvariantCulture)
         start.Environment("DIRT3VR_LOG_DIR") = directory

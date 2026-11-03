@@ -22,6 +22,8 @@ Public NotInheritable Class LastVrSession
     Public Property StereoFrames As Boolean
     ' Nothing when the log doesn't say (older builds); NaN when the runtime can't report it.
     Public Property RefreshHz As Double?
+    ' The renderer's performance summary for the session (#4896ffd3), or Nothing.
+    Public Property Performance As MeasuredPerformance
 
     Public Shared Function Parse(log As String, startedUtc As DateTime) As LastVrSession
         Dim scene = Requested.Match(log)
@@ -64,7 +66,9 @@ Public NotInheritable Class LastVrSession
                     Dim buffer(ReadLimit - 1) As Char
                     text = New String(buffer, 0, reader.ReadBlock(buffer, 0, buffer.Length))
                 End Using
-                Return Parse(text, Directory.GetCreationTimeUtc(folder))
+                Dim result = Parse(text, Directory.GetCreationTimeUtc(folder))
+                If result IsNot Nothing Then result.Performance = MeasuredPerformance.Load(folder)
+                Return result
             Next
         Catch ex As Exception When TypeOf ex Is IOException OrElse TypeOf ex Is UnauthorizedAccessException
             ' Diagnostics only: an unreadable log simply shows nothing.
@@ -101,6 +105,7 @@ Public NotInheritable Class LastVrSession
         Else
             parts.Add("requested scene " & requestedSize & "; no stereo frame was shown, so the actual size is unknown")
         End If
+        If Performance IsNot Nothing Then parts.Add(Performance.Describe())
         Return "Last VR session (" & StartedUtc.ToLocalTime().ToString("d MMM HH:mm", CultureInfo.CurrentCulture) & "): " & String.Join(" · ", parts) & "."
     End Function
 End Class

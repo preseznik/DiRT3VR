@@ -63,6 +63,9 @@ Public Class MainForm
     ' The VR HUD panel (#3652b9aa): half-metre steps from 1 to 5 m, and follow view.
     Private ReadOnly hudDistance As New ValueSlider("HudDistance", 2, 10, 4, " m", 2D, recommendedValue:=4)
     Private ReadOnly hudFollow As New CheckBox With {.Name = "HudFollowView", .Text = "Follow view", .AutoSize = True}
+    ' FPS and GPU usage in the headset (#4896ffd3).
+    Private ReadOnly perfDisplay As New CheckBox With {.Name = "PerfDisplay", .Text = "Show FPS and GPU usage in the headset", .AutoSize = True}
+    Private ReadOnly perfFollow As New CheckBox With {.Name = "PerfFollowView", .Text = "Performance display follows view", .AutoSize = True, .Enabled = False}
     Private ReadOnly desktopResolution As New ComboBox With {.Name = "DesktopResolution", .DropDownStyle = ComboBoxStyle.DropDownList}
     Private ReadOnly desktopMode As New ComboBox With {.Name = "DesktopDisplayMode", .DropDownStyle = ComboBoxStyle.DropDownList}
     Private ReadOnly desktopVSync As New ComboBox With {.Name = "DesktopVSync", .DropDownStyle = ComboBoxStyle.DropDownList}
@@ -393,6 +396,10 @@ Public Class MainForm
         Field(hud, "Distance", hudDistance)
         hud.Controls.Add(hudFollow)
         hud.Controls.Add(Info("The HUD and the menus show on a transparent panel in front of you, 2 m away by default. Nearer or farther keeps the panel the same size in your view, so only how far away it seems changes. Follow view keeps it in front of you as you turn your head; off, it stays where you last recentered. Applies on the next VR launch."))
+        hud.Controls.Add(perfDisplay)
+        hud.Controls.Add(perfFollow)
+        hud.Controls.Add(Info("A small display with frames per second and GPU usage, below straight ahead (or in front of you with follows view). Every VR session also measures its FPS for the Last VR session line under VR rendering, with or without the display."))
+        AddHandler perfDisplay.CheckedChanged, Sub() perfFollow.Enabled = perfDisplay.Checked
         BuildQuality(content)
         Field(content, "Game graphics file", graphicsPath)
         content.Controls.Add(graphicsDefaultsButton)
@@ -479,7 +486,7 @@ Public Class MainForm
     ' What the last VR session ran with: headset refresh rate and requested vs actual scene size.
     Private Sub UpdateLastSession()
         Dim last = LastVrSession.Load(context)
-        lastSessionSummary.Text = If(last Is Nothing, "No VR session with rendering has been recorded yet. After one, its headset refresh rate and scene size appear here.", last.Describe())
+        lastSessionSummary.Text = If(last Is Nothing, "No VR session with rendering has been recorded yet. After one, its headset refresh rate, scene size and measured FPS appear here.", last.Describe())
     End Sub
 
     Private Sub UpdateResolutionLabels()
@@ -936,6 +943,7 @@ Public Class MainForm
         recenterKeepLevel.Checked = settings.RecenterKeepLevel
         renderScale.Value = settings.VrRenderScale
         hudDistance.Value = CInt(settings.HudDistance * 2D) : hudFollow.Checked = settings.HudFollowView
+        perfDisplay.Checked = settings.PerfDisplay : perfFollow.Checked = settings.PerfFollowView : perfFollow.Enabled = perfDisplay.Checked
         applyingPreset = True
         desktopQuality.Values = settings.GraphicsQuality : vrQuality.Values = settings.VrGraphicsQuality
         seatPicker.Apply(settings.SeatOffsets, settings.SeatSameForAll, settings.SeatAllCars, settings.DirectCar, settings.StartInCockpit, settings.SeatOnDesktop)
@@ -960,7 +968,7 @@ Public Class MainForm
 
     Public Function CurrentSettings() As LauncherSettings
         Dim resolution = TryCast(desktopResolution.SelectedItem, DesktopResolutionChoice)
-        Return New LauncherSettings With {.ModernInterface = modern.Checked, .RuntimeMode = If(runtime.SelectedIndex = 1, "steamvr", "vdxr"), .SteamRuntimeManifest = manifest.Text, .VdxrRuntimeManifest = vdxrManifest.Text, .DiagnosticLogging = logging.Checked, .ExperimentalVrEnabled = experimental.Checked, .VrRenderScale = renderScale.Value, .HudDistance = hudDistance.Value / 2D, .HudFollowView = hudFollow.Checked,
+        Return New LauncherSettings With {.ModernInterface = modern.Checked, .RuntimeMode = If(runtime.SelectedIndex = 1, "steamvr", "vdxr"), .SteamRuntimeManifest = manifest.Text, .VdxrRuntimeManifest = vdxrManifest.Text, .DiagnosticLogging = logging.Checked, .ExperimentalVrEnabled = experimental.Checked, .VrRenderScale = renderScale.Value, .HudDistance = hudDistance.Value / 2D, .HudFollowView = hudFollow.Checked, .PerfDisplay = perfDisplay.Checked, .PerfFollowView = perfFollow.Checked,
             .DesktopWidth = If(resolution Is Nothing, 0, resolution.Size.Width), .DesktopHeight = If(resolution Is Nothing, 0, resolution.Size.Height),
             .DesktopDisplayMode = {"game", "windowed", "fullscreen", "borderless"}(Math.Max(0, desktopMode.SelectedIndex)), .DesktopVSync = {"game", "off", "on"}(Math.Max(0, desktopVSync.SelectedIndex)), .SkipStartupMovies = skipStartupMovies.Checked,
             .RecenterKey = recenterKey, .RecenterModifiers = recenterModifiers, .RecenterDevice = recenterDevice, .RecenterKeepLevel = recenterKeepLevel.Checked,
@@ -1338,6 +1346,7 @@ Public Class MainForm
             New HelpTopic(HelpVr,
                 "Advanced → Enable experimental VR turns on the VR session when this package supports it. Choose VDXR (through Virtual Desktop) or SteamVR under Settings → VR runtime. " & RuntimeCapabilities.SteamVrNote & " Close other VR games first." & vbCrLf & vbCrLf &
                 "All rendered 3D camera views use stereo and headset tracking, including cockpit, bonnet, bumper, chase and replay. Loading screens, movies and frames without a 3D scene use a virtual screen, and recognized HUD and menu draws use a transparent panel 2 metres away. Camera transitions are still experimental." & vbCrLf & vbCrLf &
+                "Show FPS and GPU usage in the headset (Graphics → VR HUD, off by default) adds a small display below straight ahead, or in front of you when it follows the view. Each VR session also measures its frame rate; Graphics → VR rendering shows the last one (median and low FPS, GPU usage, and whether the GPU or CPU held it back)." & vbCrLf & vbCrLf &
                 "Graphics → VR HUD moves that panel from 1 to 5 metres away; it keeps the same size in your view, so only how far away it seems changes. Follow view keeps it in front of you as you turn your head; off (the default), it stays where you last recentered." & vbCrLf & vbCrLf &
                 "DiRT 3's motion blur is switched off for VR sessions: in the headset every head movement counts as camera movement, so it smeared the nearest ground and objects. DiRT3VR writes the game's postprocess\effects.xml with the blur lengths at zero for the session and restores it after exit; desktop play keeps the game's motion blur." & vbCrLf & vbCrLf &
                 ExperimentalFiles.ProfileDescription & vbCrLf & vbCrLf &
