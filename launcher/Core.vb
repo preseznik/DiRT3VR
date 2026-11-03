@@ -150,6 +150,9 @@ Public Class LauncherSettings
     Public Property RuntimeMode As String = "vdxr"
     Public Property SteamRuntimeManifest As String = ""
     Public Property VdxrRuntimeManifest As String = ""
+    ' "Other OpenXR runtime" (#982a5c40): a 32-bit OpenXR runtime manifest the player browsed to, for headsets with
+    ' their own runtime. Machine-specific like the other runtime paths; there is no discovery.
+    Public Property OtherRuntimeManifest As String = ""
     Public Property DiagnosticLogging As Boolean = False
     Public Property ExperimentalVrEnabled As Boolean = False
     Public Property VrRenderScale As Integer = 100
@@ -259,7 +262,8 @@ Public Class LauncherSettings
     Public Sub Validate()
         If Version <> 1 Then Throw New IOException("Unsupported launcher settings version. The existing settings were preserved.")
         If RuntimeMode = "openxr" Then RuntimeMode = "vdxr" ' Migrate the initial research build's system-runtime choice.
-        If RuntimeMode <> "vdxr" AndAlso RuntimeMode <> "steamvr" Then Throw New IOException("Choose VDXR or SteamVR.")
+        If Not VrRuntime.Modes.Contains(RuntimeMode) Then Throw New IOException("Choose VDXR, SteamVR or another OpenXR runtime.")
+        If OtherRuntimeManifest Is Nothing OrElse OtherRuntimeManifest.Length > 32768 Then Throw New IOException("Invalid OpenXR runtime path.")
         If SteamRuntimeManifest Is Nothing OrElse SteamRuntimeManifest.Length > 32768 Then Throw New IOException("Invalid SteamVR runtime path.")
         If VdxrRuntimeManifest Is Nothing OrElse VdxrRuntimeManifest.Length > 32768 Then Throw New IOException("Invalid VDXR runtime path.")
         If VrRenderScale < 50 OrElse VrRenderScale > 300 Then Throw New IOException("Choose a VR render scale between 50% and 300%.")

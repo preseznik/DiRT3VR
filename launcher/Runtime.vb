@@ -27,7 +27,7 @@ Public Class RuntimeCapabilities
         Try
             Dim capability = Read(context)
             If Not capability.ExperimentalInteractive OrElse Not capability.Runtimes.Contains(settings.RuntimeMode) Then
-                Return "This package does not include interactive experimental VR for " & If(settings.RuntimeMode = "steamvr", "SteamVR", "VDXR") & ". Desktop launch and runtime checks remain available."
+                Return "This package does not include interactive experimental VR for " & VrRuntime.Label(settings.RuntimeMode) & ". Desktop launch and runtime checks remain available."
             End If
         Catch ex As Exception When TypeOf ex Is IOException OrElse TypeOf ex Is JsonException OrElse TypeOf ex Is UnauthorizedAccessException
             Return ex.Message
@@ -56,9 +56,24 @@ Public Class RuntimeCapabilities
 End Class
 
 Public Module VrRuntime
-    Public Function Resolve(mode As String, steamManifest As String, Optional vdxrManifest As String = "") As RuntimeInfo
+    ' VDXR, SteamVR, and any other 32-bit OpenXR runtime the player browses to (#982a5c40).
+    Public ReadOnly Modes As String() = {"vdxr", "steamvr", "other"}
+    Public Const OtherName As String = "Other OpenXR runtime"
+
+    Public Function Label(mode As String) As String
+        Return If(mode = "steamvr", "SteamVR", If(mode = "other", "the other OpenXR runtime", "VDXR"))
+    End Function
+
+    Public Function Resolve(mode As String, steamManifest As String, Optional vdxrManifest As String = "", Optional otherManifest As String = "") As RuntimeInfo
         If mode = "openxr" Then mode = "vdxr" ' Compatibility with initial settings and command lines.
-        If mode <> "vdxr" AndAlso mode <> "steamvr" Then Throw New IOException("Choose VDXR or SteamVR.")
+        If Not Modes.Contains(mode) Then Throw New IOException("Choose VDXR, SteamVR or another OpenXR runtime.")
+        If mode = "other" Then
+            ' Any runtime manifest, as long as its library is 32-bit (ReadManifest); the runtime check shows the rest.
+            If String.IsNullOrWhiteSpace(otherManifest) Then Throw New IOException("Select the OpenXR runtime's .json file in Settings → VR runtime, then check the runtime and headset.")
+            If Not String.Equals(IO.Path.GetExtension(otherManifest), ".json", StringComparison.OrdinalIgnoreCase) Then Throw New IOException("Select the OpenXR runtime's .json manifest file.")
+            If Not File.Exists(otherManifest) Then Throw New IOException("The OpenXR runtime manifest was not found: " & otherManifest)
+            Return ReadManifest(mode, otherManifest)
+        End If
         Dim path = If(mode = "steamvr", If(String.IsNullOrWhiteSpace(steamManifest), Discovery.SteamRuntime(), steamManifest), If(String.IsNullOrWhiteSpace(vdxrManifest), Discovery.VdxrRuntime(), vdxrManifest))
         Dim expected = If(mode = "steamvr", "steamxr_win32.json", "virtualdesktop-openxr-32.json")
         If String.IsNullOrWhiteSpace(path) OrElse Not File.Exists(path) Then Throw New IOException(If(mode = "vdxr", "VDXR's 32-bit runtime was not found. Install Virtual Desktop Streamer or select its virtualdesktop-openxr-32.json file in Settings.", "SteamVR's 32-bit runtime was not found. Install SteamVR or select its steamxr_win32.json file in Settings."))
@@ -83,7 +98,7 @@ Public Module VrRuntime
                 stream.Position = pe
                 If reader.ReadUInt32() <> &H4550UI OrElse reader.ReadUInt16() <> &H14C Then Throw New IOException("DiRT 3 requires a 32-bit (x86) OpenXR runtime.")
             End Using
-            Dim name = If(mode = "steamvr", "SteamVR", "VDXR")
+            Dim name = If(mode = "steamvr", "SteamVR", If(mode = "other", OtherName, "VDXR"))
             Dim suppliedName As JsonElement
             If runtime.TryGetProperty("name", suppliedName) AndAlso suppliedName.ValueKind = JsonValueKind.String Then name = suppliedName.GetString()
             Return New RuntimeInfo With {.Mode = mode, .ManifestPath = IO.Path.GetFullPath(path), .Name = name}
@@ -97,7 +112,7 @@ Public Module VrRuntime
 
     Public Async Function ReadHeadsetAsync(context As InstallContext, settings As LauncherSettings, Optional cancellation As CancellationToken = Nothing, Optional selectedRuntime As RuntimeInfo = Nothing, Optional layers As IReadOnlyList(Of VrLayerBypass) = Nothing) As Task(Of HeadsetResolution)
         settings.Validate()
-        Dim runtime = If(selectedRuntime, Resolve(settings.RuntimeMode, settings.SteamRuntimeManifest, settings.VdxrRuntimeManifest))
+        Dim runtime = If(selectedRuntime, Resolve(settings.RuntimeMode, settings.SteamRuntimeManifest, settings.VdxrRuntimeManifest, settings.OtherRuntimeManifest))
         Dim start = ProbeStartInfo(context, runtime, layers)
         Dim disabledLayers = If(layers, Array.Empty(Of VrLayerBypass)()).Select(Function(layer) layer.LayerName).ToArray()
         Using child As New Process With {.StartInfo = start}

@@ -22,7 +22,7 @@ $capabilities = @{
     supportedExeSha256 = 'c502b495bb34a097440756769c80dcb36a79b618943f739e20d591d54171ff98'
     stereoVerified = $false
     experimentalInteractive = $true
-    runtimes = @('vdxr', 'steamvr')
+    runtimes = @('vdxr', 'steamvr', 'other')
     milestone = 'Experimental VDXR and SteamVR stereo for all rendered 3D cameras; interactive acceptance pending'
 }
 $jsonEncoding = New-Object System.Text.UTF8Encoding($false)

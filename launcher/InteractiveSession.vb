@@ -125,7 +125,7 @@ Public Class InteractiveSession
             ' DiRT 3 inherits the launcher's image-load rule; refuse before staging anything if it would skip DiRT3VR's d3d11.dll.
             Dim blocked = RendererLoad.LaunchBlock(context)
             If blocked <> "" Then Throw New IOException(blocked)
-            Dim runtime = VrRuntime.Resolve(settings.RuntimeMode, settings.SteamRuntimeManifest, settings.VdxrRuntimeManifest)
+            Dim runtime = VrRuntime.Resolve(settings.RuntimeMode, settings.SteamRuntimeManifest, settings.VdxrRuntimeManifest, settings.OtherRuntimeManifest)
             ' Always re-query the selected runtime before staging; UI results may be stale.
             ' An OpenXR add-on that blocks the probe can be turned off for DiRT 3 with the player's approval.
             Dim preflight = Await VrLayerPreflight.ReadHeadsetAsync(context, Function(layers) VrRuntime.ReadHeadsetAsync(context, settings, selectedRuntime:=runtime, layers:=layers), confirmLayers)

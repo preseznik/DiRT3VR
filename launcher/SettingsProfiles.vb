@@ -53,7 +53,7 @@ Public Class ProfileValues
     Public Function ApplyTo(local As LauncherSettings) As LauncherSettings
         Dim result As New LauncherSettings With {
             .ModernInterface = ModernInterface, .RuntimeMode = RuntimeMode,
-            .SteamRuntimeManifest = local.SteamRuntimeManifest, .VdxrRuntimeManifest = local.VdxrRuntimeManifest, .RecenterDevice = local.RecenterDevice,
+            .SteamRuntimeManifest = local.SteamRuntimeManifest, .VdxrRuntimeManifest = local.VdxrRuntimeManifest, .OtherRuntimeManifest = local.OtherRuntimeManifest, .RecenterDevice = local.RecenterDevice,
             .RecenterKeepLevel = local.RecenterKeepLevel,
             .SeatOffsets = If(local.SeatOffsets, New Dictionary(Of String, SeatOffset)).ToDictionary(Function(pair) pair.Key, Function(pair) pair.Value.Copy()),
             .SeatSameForAll = local.SeatSameForAll, .SeatAllCars = If(local.SeatAllCars, New SeatOffset).Copy(), .StartInCockpit = local.StartInCockpit, .SeatOnDesktop = local.SeatOnDesktop,
