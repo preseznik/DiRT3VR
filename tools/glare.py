@@ -6,9 +6,9 @@ ParameterGroups of the same Effects in postprocess/effects.xml:
 - Streaks: multiplier_0, multiplier_1 and multiplier_2 weight three anamorphic streaks (in
   Aspen 1.27, 1.16 and 4.0, the last one blue: the horizontal line through the sun). 50 effects
   set them, race_base among them (0.4, 0.4, 1.5).
-- LensFlares: multiplier, by its name the overall strength of the flare chain next to the
-  per-element multiplierAndThreshold_* vectors (not yet confirmed in the shader; the game run
-  is). 61 effects have it, 55 non-zero.
+- LensFlares: multiplier, the overall strength of the flare chain next to the per-element
+  multiplierAndThreshold_* vectors (zeroing it removed every flare in run 20261103-204434).
+  61 effects have it, 55 non-zero.
 
 Both are screen-space effects, so in VR each eye draws its own streak and flare. Zeroing these
 four values turns them off and leaves thresholds, colours, positions and every other group
