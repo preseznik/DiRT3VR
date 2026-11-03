@@ -88,6 +88,22 @@ Module SessionActionMapsTests
         check(wheelMap.DeviceName = "Test wheel" AndAlso wheelMap.Priority = 8 AndAlso wheelMap.Actions.Select(Function(a) a.Name).SequenceEqual({"Accelerate", "Brake"}) AndAlso
               wheelMap.Actions(0).Axes(0).DeadZone = "0.0" AndAlso wheelMap.Actions(1).Axes(0).DeadZone Is Nothing, "a stock map is read leniently, without commented-out actions")
 
+        ' Which device a direct start gives the player (#16fa2aa3): the one bound to steering, then by binding count.
+        Dim pad = Function(action As String, input As String) Bound(action, "Xbox controller", "xinput:0", "xinput_pad", input)
+        Dim key = Function(action As String) New DrivingBinding With {.Action = action, .Device = "Keyboard", .DeviceId = "keyboard", .DeviceType = "keyboard", .Input = "vk_code_0x26"}
+        Dim mixed As New DrivingControls With {.Enabled = True, .Bindings = New List(Of DrivingBinding) From {
+            pad("Accelerate", "xinput_right_trigger"), pad("Brake", "xinput_left_trigger"), pad("Handbrake", "xinput_button_a"),
+            Bound("Steer Left", "Test wheel", WheelId, WheelProduct, "di_x_axis", "biDirectionalLower"), key("Pause")}}
+        check(SessionActionMaps.PreferredDevices(mixed).SequenceEqual({"Test wheel", "xinput_pad"}), "the device bound to steering comes first, the keyboard never")
+        Dim noSteering As New DrivingControls With {.Enabled = True, .Bindings = New List(Of DrivingBinding) From {
+            Bound("Gear Up", "Test wheel", WheelId, WheelProduct, "di_button_4"), pad("Accelerate", "xinput_right_trigger"), pad("Brake", "xinput_left_trigger")}}
+        check(SessionActionMaps.PreferredDevices(noSteering).SequenceEqual({"xinput_pad", "Test wheel"}), "without steering, the device with more bindings comes first")
+        check(SessionActionMaps.PreferredDevices(New DrivingControls With {.Enabled = False, .Bindings = mixed.Bindings}).Length = 0 AndAlso
+              SessionActionMaps.PreferredDevices(New DrivingControls With {.Enabled = True, .Bindings = New List(Of DrivingBinding) From {key("Pause")}}).Length = 0,
+              "off, or keyboard only: no preference, so DiRT 3 starts as it would")
+        check(SessionActionMaps.PreferredDevices(New DrivingControls With {.Enabled = True, .Bindings = New List(Of DrivingBinding) From {
+            Bound("Steer Left", "Odd | wheel", WheelId, WheelProduct, "di_x_axis", "biDirectionalLower")}}).Length = 0, "a name that can't be passed is left out")
+
         ' Off, or no bindings: nothing changes.
         check(SessionActionMaps.Changes(ctx, New DrivingControls()).Files.Count = 0 AndAlso
               SessionActionMaps.Changes(ctx, New DrivingControls With {.Bindings = New List(Of DrivingBinding) From {Bound("Brake", "Test wheel", WheelId, WheelProduct, "di_z_axis")}}).Files.Count = 0,

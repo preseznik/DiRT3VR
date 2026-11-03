@@ -51,11 +51,11 @@ Public NotInheritable Class DesktopStartupSession
 
     ' Direct practice on the desktop: the benchmark start with the player-control fix and laps. The
     ' renderer only observes presentation (DIRT3VR_DIAGNOSTICS, needed for the lap count) and logs.
-    Public Shared Function StartInfo(context As InstallContext, settings As LauncherSettings, logDirectory As String) As ProcessStartInfo
+    Public Shared Function StartInfo(context As InstallContext, settings As LauncherSettings, logDirectory As String, Optional directDevices As IReadOnlyList(Of String) = Nothing) As ProcessStartInfo
         Dim start = Session.DesktopStartInfo(context)
         If settings.LaunchMode <> "direct" Then Return start
         If Not Path.IsPathFullyQualified(logDirectory) Then Throw New IOException("The session log path must be absolute.")
-        DirectPractice.AddStart(start, settings)
+        DirectPractice.AddStart(start, settings, directDevices)
         start.Environment("DIRT3VR_DIAGNOSTICS") = "1"
         start.Environment("DIRT3VR_LOG_DIR") = logDirectory
         Return start
@@ -81,7 +81,7 @@ Public NotInheritable Class DesktopStartupSession
             If settings.LaunchMode = "direct" Then
                 SafeFiles.NoLinks(logs) : Directory.CreateDirectory(logs)
                 ' Marks the folder as a desktop session, so Last VR session skips it.
-                SafeFiles.SaveJson(Path.Combine(logs, "session.json"), New With {.schema = 1, .mode = DirectMode, .startedUtc = DateTime.UtcNow, .launchMode = settings.LaunchMode, .directRoute = settings.DirectRoute, .directCar = settings.DirectCar, .directLaps = DirectPractice.Laps(settings), .directOpponents = DirectPractice.Opponents(settings), .directOpponentCars = settings.DirectOpponentCars, .directDifficulty = DirectPractice.Difficulty(settings), .directAfterFinish = settings.DirectAfterFinish, .directAssists = DirectPractice.Assists(settings), .drivingMaps = actionMaps.Devices.Select(Function(d) d.DeviceName & " (" & d.BaseFile & ")").ToArray(), .drivingSkipped = actionMaps.Skipped.ToArray()})
+                SafeFiles.SaveJson(Path.Combine(logs, "session.json"), New With {.schema = 1, .mode = DirectMode, .startedUtc = DateTime.UtcNow, .launchMode = settings.LaunchMode, .directRoute = settings.DirectRoute, .directCar = settings.DirectCar, .directLaps = DirectPractice.Laps(settings), .directOpponents = DirectPractice.Opponents(settings), .directOpponentCars = settings.DirectOpponentCars, .directDifficulty = DirectPractice.Difficulty(settings), .directAfterFinish = settings.DirectAfterFinish, .directAssists = DirectPractice.Assists(settings), .drivingMaps = actionMaps.Devices.Select(Function(d) d.DeviceName & " (" & d.BaseFile & ")").ToArray(), .drivingSkipped = actionMaps.Skipped.ToArray(), .directDevices = actionMaps.PreferredDevices})
             End If
             settings.Save(context)
             DesktopGraphics.Apply(context, settings, monitor)
@@ -92,7 +92,7 @@ Public NotInheritable Class DesktopStartupSession
                 Await RecoveryWorker.ApplyAsync(context)
             End If
             context.RequireClosed()
-            game = Process.Start(StartInfo(context, settings, logs))
+            game = Process.Start(StartInfo(context, settings, logs, actionMaps.PreferredDevices))
             If game Is Nothing Then Throw New IOException("DiRT 3 could not start.")
             Session.WriteLaunchStatus(context, "starting", "Waiting for the game window. DiRT3VR's temporary files are removed after exit.", game.Id, DateTime.UtcNow, mode:=If(settings.LaunchMode = "direct", "direct-practice", "desktop"))
             Return New DesktopStartupSession(context, game, lease) With {.DrivingNote = actionMaps.Note, .SeatsSkipped = seats.Skipped}
