@@ -42,10 +42,17 @@ Module SeatTests
             check(SeatPositions.Apply(original, expected.Item2).SequenceEqual(Fixture("cameras-" & expected.Item1 & ".bin")), "the " & expected.Item1 & " offset gives exactly the reference tool's file")
         Next
         check(SeatPositions.Apply(original, New SeatOffset).SequenceEqual(original), "a zero offset gives back the original bytes")
-        ' Start in the cockpit view (Wrench's start_in_cockpit), after any seat offset.
+        ' Start in the cockpit view, hiding nothing (Wrench's cockpit_first, iztok 2026-11-03), after any seat offset.
+        check(SeatPositions.Apply(original, New SeatOffset With {.CockpitFirst = True}).SequenceEqual(Fixture("cameras-first.bin")) AndAlso
+              SeatPositions.Apply(original, New SeatOffset With {.Sideways = 10, .Up = 5, .Forward = 30, .CockpitFirst = True}).SequenceEqual(Fixture("cameras-left-up-forward-first.bin")),
+              "the cockpit start matches the reference tool, alone and after a seat offset")
+        check(SeatCameras.CockpitFirst(Fixture("cameras-first.bin")).SequenceEqual(Fixture("cameras-first.bin")) AndAlso SeatCameras.Eye(Fixture("cameras-first.bin")).Equals(SeatCameras.Eye(original)) AndAlso
+              SeatCameras.ViewValues(Fixture("cameras-first.bin"), "head-cam").Count = SeatCameras.ViewValues(original, "head-cam").Count,
+              "doing it twice changes nothing, and the cockpit view and its eye point stay the same")
+        ' The earlier cockpit start (start_in_cockpit, hiding the views before the cockpit), kept to recover its journals.
         check(SeatPositions.Apply(original, New SeatOffset With {.Cockpit = True}).SequenceEqual(Fixture("cameras-cockpit.bin")) AndAlso
               SeatPositions.Apply(original, New SeatOffset With {.Sideways = 10, .Up = 5, .Forward = 30, .Cockpit = True}).SequenceEqual(Fixture("cameras-left-up-forward-cockpit.bin")),
-              "the cockpit start matches the reference tool, alone and after a seat offset")
+              "the earlier cockpit start still matches its reference files, for recovering its sessions")
         check(SeatCameras.StartInCockpit(Fixture("cameras-cockpit.bin")).SequenceEqual(Fixture("cameras-cockpit.bin")) AndAlso SeatCameras.Eye(Fixture("cameras-cockpit.bin")).Equals(SeatCameras.Eye(original)),
               "doing it twice changes nothing, and the eye point stays")
         Dim moved = SeatCameras.Eye(SeatPositions.Apply(original, New SeatOffset With {.Sideways = 10, .Up = 5, .Forward = 30}))
@@ -108,7 +115,8 @@ Module SeatTests
         cockpitSettings.Validate()
         check(Not cockpitSettings.SeatOffsets("frx").Cockpit, "stored seat positions never carry the cockpit flag; it comes from the setting")
         Dim effective = SeatPositions.Effective(cockpitSettings)
-        check(effective.Count = EventCatalog.Current.Cars.Count AndAlso effective.Values.All(Function(item) item.Cockpit) AndAlso effective("frx").Up = 3 AndAlso effective("stx").IsZero, "every car starts in the cockpit; frx also keeps its seat position")
+        check(effective.Count = EventCatalog.Current.Cars.Count AndAlso effective.Values.All(Function(item) item.CockpitFirst AndAlso Not item.Cockpit) AndAlso effective("frx").Up = 3 AndAlso effective("stx").IsZero,
+              "every car starts in the cockpit (moved first, nothing hidden); frx also keeps its seat position")
         Dim cockpitSeats = SeatPositions.Changes(cockpitCtx, cockpitSettings)
         check(cockpitSeats.Files.Count = 2 AndAlso cockpitSeats.Skipped.Count = 0, "only the installed cars' camera files change; the others aren't named")
         Dim cockpitChanges = ExperimentalFiles.Changes(cockpitCtx, 1800, 1950).ToDictionary(Function(pair) pair.Key, Function(pair) pair.Value)
@@ -118,13 +126,21 @@ Module SeatTests
         Dim cockpitTransaction As New OwnedFileTransaction(cockpitCtx)
         cockpitTransaction.Prepare(cockpitChanges, experimental:=True, apply:=False, seats:=cockpitSeats.Offsets)
         Dim cockpitJournal = SafeFiles.ReadJson(Of RecoveryJournal)(cockpitTransaction.JournalPath)
-        check(cockpitJournal.Seats("stx").Cockpit AndAlso cockpitJournal.Seats("stx").IsZero AndAlso cockpitJournal.Seats("frx").Up = 3, "the journal records the cockpit start with each car's offset")
+        check(cockpitJournal.Seats("stx").CockpitFirst AndAlso cockpitJournal.Seats("stx").IsZero AndAlso cockpitJournal.Seats("frx").Up = 3, "the journal records the cockpit start with each car's offset")
         For Each pair In cockpitChanges
             Dim target = If(SeatPositions.IsTarget(pair.Key), SeatPositions.CameraPath(cockpitCtx, pair.Key.Substring(5)), If(pair.Key = "proxy", Path.Combine(cockpitCtx.GameRoot, "d3d11.dll"), If(pair.Key = "graphics", cockpitCtx.GraphicsPath, Path.Combine(cockpitCtx.GameRoot, "system", "hardware_settings_restrictions.xml"))))
             File.WriteAllBytes(target, pair.Value)
         Next
         check(cockpitTransaction.Recover() AndAlso File.ReadAllBytes(SeatPositions.CameraPath(cockpitCtx, "stx")).SequenceEqual(original) AndAlso File.ReadAllBytes(SeatPositions.CameraPath(cockpitCtx, "frx")).SequenceEqual(original),
               "recovery restores every car's original camera file")
+        ' The renderer keeps the race in that first view (#cd56379b, Wrench's DIRT3VR_START_IN_COCKPIT).
+        Dim headset As New HeadsetResolution("vdxr", "Test headset", 2400, 2600)
+        Dim runtime As New RuntimeInfo With {.Mode = "vdxr", .ManifestPath = "C:\runtime\virtualdesktop-openxr-32.json"}
+        Dim sessionLogs = Path.Combine(cockpitCtx.UserRoot, "logs", "fixture")
+        cockpitSettings.SteamRuntimeManifest = "" : cockpitSettings.VdxrRuntimeManifest = ""
+        check(InteractiveSession.StartInfo(cockpitCtx, runtime, sessionLogs, cockpitSettings, headset).Environment("DIRT3VR_START_IN_COCKPIT") = "1", "with it on, a VR session asks the renderer to keep the cockpit start")
+        cockpitSettings.StartInCockpit = False
+        check(Not InteractiveSession.StartInfo(cockpitCtx, runtime, sessionLogs, cockpitSettings, headset).Environment.ContainsKey("DIRT3VR_START_IN_COCKPIT"), "off, nothing is passed")
 
         ' Seat positions on the monitor (#b330cc4f): Launch journals only the camera files (schema 9), alone or with
         ' the startup change or direct practice; the cockpit-only start stays a VR option.

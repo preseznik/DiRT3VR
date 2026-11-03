@@ -15,9 +15,9 @@ Public NotInheritable Class SeatPicker
     Private ReadOnly desktopSeat As New CheckBox With {.Name = "SeatOnDesktop", .Text = "Also when playing on the monitor (Launch)", .AutoSize = True}
     Private ReadOnly desktopNote As New Label With {.Name = "SeatOnDesktopNote", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12),
         .Text = "Launch then writes the same camera files for the session and restores them after exit, as Launch VR does. Off: desktop play keeps DiRT 3's own seat."}
-    Private ReadOnly cockpitStart As New CheckBox With {.Name = "SeatStartInCockpit", .Text = "Cockpit view only: start races in the cockpit", .AutoSize = True}
+    Private ReadOnly cockpitStart As New CheckBox With {.Name = "SeatStartInCockpit", .Text = "Start races in the cockpit view", .AutoSize = True}
     Private ReadOnly cockpitNote As New Label With {.Name = "SeatStartInCockpitNote", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12),
-        .Text = "DiRT 3 starts a race with the first view in each car's camera list: chase close, chase far, bumper, bonnet, then cockpit. This hides those four for the VR session, so races start in the cockpit and Change View stays there. Launch VR only."}
+        .Text = "DiRT 3 starts a race in the first view of each car's camera list (chase close). For the VR session the cockpit view moves to the front of that list, so races start in the cockpit, and Change View still reaches every view. Launch VR only."}
     ' The cockpit field of view on the monitor (#b330cc4f), in degrees from each car's own.
     Private ReadOnly desktopFov As New ValueSlider("SeatDesktopFov", -SeatOffset.FovNarrower, SeatOffset.FovWider, 0,
         valueLabels:=Enumerable.Range(-SeatOffset.FovNarrower, SeatOffset.FovNarrower + SeatOffset.FovWider + 1).Select(Function(value) If(value = 0, "DiRT 3's own", Math.Abs(value) & "° " & If(value > 0, "wider", "narrower"))).ToArray())
