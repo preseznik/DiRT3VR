@@ -173,8 +173,8 @@ control. Circuits (rallycross, Land Rush) take 1 to 5 laps. It works with
 opponents (same class, mixed, or your car's model) at DiRT 3's default difficulty
 or a chosen level from 0 to 5. A direct start doesn't load your DiRT 3 profile,
 so it uses the game's default controls preset and difficulty; choose the
-gearbox and assists (ABS, stability, corner braking, throttle, steering) in the
-picker, and your bindings under **Controls → Driving controls**. After the finish DiRT 3 either closes by itself (launch again for another
+assists (ABS, stability, corner braking, throttle, steering) in the picker, and
+your bindings and gearbox under **Controls → Driving controls**. After the finish DiRT 3 either closes by itself (launch again for another
 run) or, with **After the finish → Return to DiRT 3's menus**, goes to its main menu so you can play on. During the run, Esc opens DiRT 3's pause menu: Restart goes back
 to the start line, Retire ends the run. Normal launch stays the default.
 VR sessions switch DiRT 3's motion blur off (head movement would smear the

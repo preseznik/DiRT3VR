@@ -23,6 +23,9 @@ Public NotInheritable Class DrivingControlsForm
     ' The device direct practice drives with (#1b46c373): Automatic, then each bound device by DiRT 3's name.
     Private ReadOnly activeDevice As New ComboBox With {.Name = "DrivingActiveDevice", .DropDownStyle = ComboBoxStyle.DropDownList, .Width = 380, .AccessibleName = "Device direct practice drives with"}
     Private ReadOnly deviceNames As New List(Of String)
+    ' Direct practice's gearbox (iztok, 2026-11-03: it belongs with the driving controls). It stays a launcher setting
+    ' (LauncherSettings.DirectGearbox); Save writes it to the preferences with the bindings.
+    Private ReadOnly gearboxBox As New ComboBox With {.Name = "DrivingGearbox", .DropDownStyle = ComboBoxStyle.DropDownList, .Width = 380, .AccessibleName = "Gearbox for direct practice"}
     Private refreshingDevices As Boolean
     ' Live highlight (#9ff647cf): bound rows light up while their input is pressed or moved.
     Private ReadOnly pollTimer As New Timer With {.Interval = 50}
@@ -51,9 +54,9 @@ Public NotInheritable Class DrivingControlsForm
                                        Dim hovered = rows.GetItemAt(e.X, e.Y)
                                        If hovered IsNot Nothing Then rows.Invalidate(hovered.Bounds)
                                    End Sub
-        Dim layout As New TableLayoutPanel With {.Dock = DockStyle.Fill, .Padding = New Padding(16), .RowCount = 7, .ColumnCount = 1}
+        Dim layout As New TableLayoutPanel With {.Dock = DockStyle.Fill, .Padding = New Padding(16), .RowCount = 8, .ColumnCount = 1}
         layout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
-        For i = 0 To 6
+        For i = 0 To 7
             layout.RowStyles.Add(If(i = 3, New RowStyle(SizeType.Percent, 100), New RowStyle(SizeType.AutoSize)))
         Next
         layout.Controls.Add(enabledBox, 0, 0)
@@ -96,6 +99,12 @@ Public NotInheritable Class DrivingControlsForm
                                                           If refreshingDevices Then Return
                                                           model.ActiveDevice = If(activeDevice.SelectedIndex <= 0, "", deviceNames(activeDevice.SelectedIndex - 1))
                                                       End Sub
+        Dim gears = Toolbar("DrivingGearboxRow", "Gearbox")
+        gearboxBox.Items.AddRange(DirectPractice.GearboxNames)
+        Me.Gearbox = SavedGearbox()
+        gears.Item2.Controls.Add(gearboxBox)
+        gears.Item2.Controls.Add(New Label With {.Name = "DrivingGearboxNote", .Text = "For direct practice; DiRT 3's menus keep your profile's gearbox.", .AutoSize = True, .Anchor = AnchorStyles.Left, .Margin = New Padding(8, 6, 0, 0), .UseMnemonic = False})
+        gears.Item1.Margin = New Padding(0, 8, 0, 0) : layout.Controls.Add(gears.Item1, 0, 6)
 
         Dim presets = Toolbar("DrivingPresets", "Presets")
         AddButton(presets.Item2, "DrivingSavePreset", "Save…", Sub() SavePreset())
@@ -106,7 +115,7 @@ Public NotInheritable Class DrivingControlsForm
         dialogButtons.Controls.Add(cancel) : CancelButton = cancel
         Dim footer As New TableLayoutPanel With {.Name = "DrivingFooter", .Dock = DockStyle.Fill, .AutoSize = True, .ColumnCount = 2, .RowCount = 1, .Margin = New Padding(0, 12, 0, 0)}
         footer.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100)) : footer.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
-        footer.Controls.Add(presets.Item1) : footer.Controls.Add(dialogButtons) : layout.Controls.Add(footer, 0, 6)
+        footer.Controls.Add(presets.Item1) : footer.Controls.Add(dialogButtons) : layout.Controls.Add(footer, 0, 7)
         AddHandler rows.SelectedIndexChanged, Sub() UpdateSelection()
         Controls.Add(layout) : RefreshRows()
         AddHandler Shown, Sub() StartHighlight()
@@ -352,8 +361,32 @@ Public NotInheritable Class DrivingControlsForm
         model.Enabled = enabledBox.Checked
     End Sub
 
+    ' The gearbox shown here: a DirectPractice.GearboxChoices value.
+    <System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)>
+    Public Property Gearbox As String
+        Get
+            Return DirectPractice.GearboxChoices(Math.Max(0, gearboxBox.SelectedIndex))
+        End Get
+        Set(value As String)
+            gearboxBox.SelectedIndex = Math.Max(0, Array.IndexOf(DirectPractice.GearboxChoices, value))
+        End Set
+    End Property
+
+    Private Function SavedGearbox() As String
+        Try
+            Return LauncherSettings.Load(context).DirectGearbox
+        Catch ex As IOException
+            Return DirectPractice.GearboxChoices(0)
+        End Try
+    End Function
+
     Private Sub SaveAndClose()
         ReadOptions() : model.Save(context)
+        If Gearbox <> SavedGearbox() Then
+            Dim preferences = LauncherSettings.Load(context)
+            preferences.DirectGearbox = Gearbox
+            preferences.Save(context)
+        End If
         DialogResult = DialogResult.OK : Close()
     End Sub
 End Class
