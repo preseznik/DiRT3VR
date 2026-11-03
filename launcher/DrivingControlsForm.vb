@@ -20,6 +20,10 @@ Public NotInheritable Class DrivingControlsForm
     Private ReadOnly calibrateButton As Button
     Private ReadOnly removeButton As Button
     Private ReadOnly resetButton As Button
+    ' The device direct practice drives with (#1b46c373): Automatic, then each bound device by DiRT 3's name.
+    Private ReadOnly activeDevice As New ComboBox With {.Name = "DrivingActiveDevice", .DropDownStyle = ComboBoxStyle.DropDownList, .Width = 380, .AccessibleName = "Device direct practice drives with"}
+    Private ReadOnly deviceNames As New List(Of String)
+    Private refreshingDevices As Boolean
     ' Live highlight (#9ff647cf): bound rows light up while their input is pressed or moved.
     Private ReadOnly pollTimer As New Timer With {.Interval = 50}
     Private ReadOnly rests As New Dictionary(Of String, DrivingInput.Sample)(StringComparer.OrdinalIgnoreCase)
@@ -47,9 +51,9 @@ Public NotInheritable Class DrivingControlsForm
                                        Dim hovered = rows.GetItemAt(e.X, e.Y)
                                        If hovered IsNot Nothing Then rows.Invalidate(hovered.Bounds)
                                    End Sub
-        Dim layout As New TableLayoutPanel With {.Dock = DockStyle.Fill, .Padding = New Padding(16), .RowCount = 6, .ColumnCount = 1}
+        Dim layout As New TableLayoutPanel With {.Dock = DockStyle.Fill, .Padding = New Padding(16), .RowCount = 7, .ColumnCount = 1}
         layout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
-        For i = 0 To 5
+        For i = 0 To 6
             layout.RowStyles.Add(If(i = 3, New RowStyle(SizeType.Percent, 100), New RowStyle(SizeType.AutoSize)))
         Next
         layout.Controls.Add(enabledBox, 0, 0)
@@ -84,6 +88,15 @@ Public NotInheritable Class DrivingControlsForm
                                                                                    End Sub)
         selected.Item1.Margin = New Padding(0, 8, 0, 0) : layout.Controls.Add(selected.Item1, 0, 4)
 
+        Dim drives = Toolbar("DrivingActiveDeviceRow", "Drives with")
+        drives.Item2.Controls.Add(activeDevice)
+        drives.Item2.Controls.Add(New Label With {.Name = "DrivingActiveDeviceNote", .Text = "Direct practice drives with one device; the others wait.", .AutoSize = True, .Anchor = AnchorStyles.Left, .Margin = New Padding(8, 6, 0, 0), .UseMnemonic = False})
+        drives.Item1.Margin = New Padding(0, 8, 0, 0) : layout.Controls.Add(drives.Item1, 0, 5)
+        AddHandler activeDevice.SelectedIndexChanged, Sub()
+                                                          If refreshingDevices Then Return
+                                                          model.ActiveDevice = If(activeDevice.SelectedIndex <= 0, "", deviceNames(activeDevice.SelectedIndex - 1))
+                                                      End Sub
+
         Dim presets = Toolbar("DrivingPresets", "Presets")
         AddButton(presets.Item2, "DrivingSavePreset", "Save…", Sub() SavePreset())
         AddButton(presets.Item2, "DrivingLoadPreset", "Load…", Sub() LoadPreset())
@@ -93,7 +106,7 @@ Public NotInheritable Class DrivingControlsForm
         dialogButtons.Controls.Add(cancel) : CancelButton = cancel
         Dim footer As New TableLayoutPanel With {.Name = "DrivingFooter", .Dock = DockStyle.Fill, .AutoSize = True, .ColumnCount = 2, .RowCount = 1, .Margin = New Padding(0, 12, 0, 0)}
         footer.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100)) : footer.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
-        footer.Controls.Add(presets.Item1) : footer.Controls.Add(dialogButtons) : layout.Controls.Add(footer, 0, 5)
+        footer.Controls.Add(presets.Item1) : footer.Controls.Add(dialogButtons) : layout.Controls.Add(footer, 0, 6)
         AddHandler rows.SelectedIndexChanged, Sub() UpdateSelection()
         Controls.Add(layout) : RefreshRows()
         AddHandler Shown, Sub() StartHighlight()
@@ -144,6 +157,25 @@ Public NotInheritable Class DrivingControlsForm
             If row.ForeColor <> fore Then row.ForeColor = fore
         Next
         rows.EndUpdate()
+    End Sub
+
+    ' The bound devices, Automatic first; a pick whose device has no bindings left goes back to Automatic.
+    Private Sub RefreshDevices()
+        refreshingDevices = True
+        Try
+            Dim devices = model.DrivingDevices()
+            activeDevice.Items.Clear() : deviceNames.Clear()
+            activeDevice.Items.Add("Automatic: the device bound to steering")
+            For Each device In devices
+                deviceNames.Add(device.Name) : activeDevice.Items.Add(device.Label)
+            Next
+            Dim index = deviceNames.IndexOf(If(model.ActiveDevice, ""))
+            If index < 0 Then model.ActiveDevice = ""
+            activeDevice.SelectedIndex = index + 1
+            activeDevice.Enabled = devices.Count > 1
+        Finally
+            refreshingDevices = False
+        End Try
     End Sub
 
     ' A lit row keeps the accent when selected; otherwise the selection colour, else the row's own colours.
@@ -246,6 +278,7 @@ Public NotInheritable Class DrivingControlsForm
             Dim fallback = rows.Items.Cast(Of ListViewItem)().FirstOrDefault(Function(r) r.Text = selectedAction)
             If fallback IsNot Nothing Then fallback.Selected = True
         End If
+        RefreshDevices()
         UpdateSelection()
     End Sub
 

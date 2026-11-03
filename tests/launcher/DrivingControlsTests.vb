@@ -201,6 +201,20 @@ Module DrivingControlsTests
         check(DrivingControls.LoadFile(presetFile).WheelRotation = 900, "the wheel's rotation is saved with the controls and presets")
         File.WriteAllText(presetFile, "{""Version"":1,""WheelRotation"":50,""Bindings"":[]}")
         check(Refused(Sub() DrivingControls.LoadFile(presetFile)), "an impossible wheel rotation is refused")
+
+        ' The device direct practice drives with (#1b46c373): DiRT 3 drives with one device per player.
+        Dim both As New DrivingControls With {.Enabled = True, .Bindings = New List(Of DrivingBinding) From {steer("Steer Left", "biDirectionalLower"), steer("Steer Right", "biDirectionalUpper")}}
+        both.Bindings.AddRange(DrivingControls.XboxPreset().Where(Function(b) Not b.Action.StartsWith("Steer ", StringComparison.Ordinal)))
+        check(both.DrivingDevices().Select(Function(d) d.Name).SequenceEqual({G920, "xinput_pad"}) AndAlso both.DrivingDevices()(1).Label = "Xbox controller 1", "both bound devices are offered, by DiRT 3's names")
+        check(SessionActionMaps.PreferredDevices(both).First() = G920, "Automatic: the device bound to steering drives")
+        both.ActiveDevice = "xinput_pad"
+        check(SessionActionMaps.PreferredDevices(both).SequenceEqual({"xinput_pad", G920}), "a picked device is listed first, so it drives")
+        both.ActiveDevice = "Missing wheel"
+        check(SessionActionMaps.PreferredDevices(both).First() = G920, "a pick that isn't bound is ignored")
+        both.ActiveDevice = "xinput_pad"
+        both.SaveFile(presetFile)
+        check(DrivingControls.LoadFile(presetFile).ActiveDevice = "xinput_pad", "the pick is saved with the controls and presets")
+        check(Refused(Sub() Call New DrivingControls With {.ActiveDevice = "a|b"}.Validate()) AndAlso Refused(Sub() Call New DrivingControls With {.ActiveDevice = Nothing}.Validate()), "a damaged pick is refused")
         check(File.ReadAllText(DrivingControls.SettingsPath(ctx)) = saved, "loading presets doesn't touch the saved controls")
     End Sub
 
@@ -493,6 +507,20 @@ Module DrivingControlsTests
             check(form.HighlightedActions.SequenceEqual({"Steer Left"}) AndAlso form.RowColors("Steer Left").Back = LauncherAppearance.Accent, "turning left lights the selected Steer Left row in the accent")
             form.ShowActive(New Dictionary(Of String, DrivingInput.Sample) From {{WheelId, centre}}, Function(key) False)
             check(form.RowColors("Steer Left").Back = SystemColors.Highlight, "back at the centre it shows the selection again")
+        End Using
+        ' Drives with: Automatic, then each bound device.
+        Using form As New DrivingControlsForm(ctx, noInput)
+            Dim pick = DirectCast(form.Controls.Find("DrivingActiveDevice", True).Single(), ComboBox)
+            Dim wheelAndPad As New DrivingControls With {.Enabled = True, .Bindings = New List(Of DrivingBinding) From {
+                New DrivingBinding With {.Action = "Steer Left", .Device = "Wheel", .DeviceId = WheelId, .DeviceType = WheelProduct, .Input = "di_x_axis", .Calibration = "biDirectionalLower"}}}
+            wheelAndPad.Bindings.AddRange(DrivingControls.XboxPreset())
+            form.UsePreset(wheelAndPad)
+            check(pick.Items.Count = 3 AndAlso pick.SelectedIndex = 0 AndAlso pick.Enabled AndAlso pick.Items(2).ToString() = "Xbox controller 1", "Drives with offers Automatic, the wheel and the controller")
+            pick.SelectedIndex = 2
+            check(form.Current.ActiveDevice = "xinput_pad", "picking the controller makes it the direct practice device")
+            form.UsePreset(New DrivingControls With {.Enabled = True, .ActiveDevice = "xinput_pad", .Bindings = New List(Of DrivingBinding) From {
+                New DrivingBinding With {.Action = "Steer Left", .Device = "Wheel", .DeviceId = WheelId, .DeviceType = WheelProduct, .Input = "di_x_axis", .Calibration = "biDirectionalLower"}}})
+            check(pick.SelectedIndex = 0 AndAlso Not pick.Enabled AndAlso form.Current.ActiveDevice = "", "with one device, or a pick that's no longer bound, it's Automatic")
         End Using
         Using form As New DrivingControlsForm(ctx, noInput)
             check(form.Current.Enabled AndAlso form.Current.Bindings.Count = DrivingControls.XboxPreset().Count, "the window reopens with the saved bindings")
