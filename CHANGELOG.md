@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The README is now a short quickstart, like DiRT2VR's (iztok). The full launcher reference moved to [docs/launcher-guide.md](docs/launcher-guide.md).
+
 ## 0.1.22 — in-game seat menu, wheels in direct practice and VR image options (Experimental)
 
 - The seat menu key is now **Tab** by default, as in DiRT2VR. A key you saved before (F11 was the default in 0.1.21) stays; change it under **Controls → Seat**.
