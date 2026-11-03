@@ -45,7 +45,8 @@ Public NotInheritable Class GraphicsRecommendation
             Return New Result With {.Reason = "The last VR session used another headset resolution. " & AfterSession}
         End If
         Dim quality = VrQuality(current)
-        If last.VrQuality Is Nothing OrElse Not last.VrQuality.OrderBy(Function(pair) pair.Key, StringComparer.Ordinal).SequenceEqual(quality) OrElse last.VrAntiAliasing <> current.VrAntiAliasing Then
+        If last.VrQuality Is Nothing OrElse Not last.VrQuality.OrderBy(Function(pair) pair.Key, StringComparer.Ordinal).SequenceEqual(quality) OrElse last.VrAntiAliasing <> current.VrAntiAliasing OrElse
+           last.VrFov <> LastVrSession.FovKey(current.VrFovWidth(), current.VrFovHeight()) Then
             Return New Result With {.Reason = "The last VR session used other VR quality settings, so its frame rate doesn't tell how these would run. " & AfterSession}
         End If
 

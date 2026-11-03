@@ -58,7 +58,7 @@ Public Class ProfileValues
             .SeatOffsets = If(local.SeatOffsets, New Dictionary(Of String, SeatOffset)).ToDictionary(Function(pair) pair.Key, Function(pair) pair.Value.Copy()),
             .SeatSameForAll = local.SeatSameForAll, .SeatAllCars = If(local.SeatAllCars, New SeatOffset).Copy(), .StartInCockpit = local.StartInCockpit, .SeatOnDesktop = local.SeatOnDesktop,
             .CockpitSteady = local.CockpitSteady, .CockpitHideDriver = local.CockpitHideDriver, .CockpitHideCoDriver = local.CockpitHideCoDriver, .DesktopFov = local.DesktopFov,
-            .HudDistance = local.HudDistance, .HudFollowView = local.HudFollowView, .PerfDisplay = local.PerfDisplay, .PerfFollowView = local.PerfFollowView, .DesktopAnisotropy = local.DesktopAnisotropy, .VrAnisotropy = local.VrAnisotropy, .VrAntiAliasing = local.VrAntiAliasing,
+            .HudDistance = local.HudDistance, .HudFollowView = local.HudFollowView, .PerfDisplay = local.PerfDisplay, .PerfFollowView = local.PerfFollowView, .DesktopAnisotropy = local.DesktopAnisotropy, .VrAnisotropy = local.VrAnisotropy, .VrAntiAliasing = local.VrAntiAliasing, .VrFieldOfView = local.VrFieldOfView, .VrHelmetView = local.VrHelmetView,
             .SeatMenuKey = local.SeatMenuKey, .SeatMenuModifiers = local.SeatMenuModifiers, .SeatMenuButton = local.SeatMenuButton, .SeatMenuOnDesktop = local.SeatMenuOnDesktop,
             .ToggleVrKey = local.ToggleVrKey, .ToggleVrModifiers = local.ToggleVrModifiers, .ToggleVrDevice = local.ToggleVrDevice,
             .DiagnosticLogging = DiagnosticLogging, .ExperimentalVrEnabled = ExperimentalVrEnabled,

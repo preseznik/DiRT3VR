@@ -28,6 +28,16 @@ Public Class HeadsetResolution
         Return size
     End Function
 
+    ' The scene size with the VR field of view cropped (#16a86c75, Lens's contract): each axis times its kept share,
+    ' after the render scale, in whole pixels.
+    Public Function CroppedSceneSize(scale As Integer, widthPercent As Integer, heightPercent As Integer) As Size
+        If widthPercent < LauncherSettings.MinimumVrFieldOfView OrElse widthPercent > 100 OrElse heightPercent < LauncherSettings.MinimumVrFieldOfView OrElse heightPercent > 100 Then Throw New IOException("Choose a VR field of view from 70% to 100%.")
+        Dim size = SceneSize(scale)
+        Dim cropped As New Size(size.Width * widthPercent \ 100, size.Height * heightPercent \ 100)
+        ValidateSceneSize(cropped.Width, cropped.Height)
+        Return cropped
+    End Function
+
     Public ReadOnly Property MaximumScale As Integer
         Get
             Return Math.Min(300, Math.Min(((MaximumDimension + 1) * 100 - 1) \ Width, ((MaximumDimension + 1) * 100 - 1) \ Height))
@@ -47,13 +57,14 @@ Public Class HeadsetResolution
         Return If(used < scale, $"VR render scale {scale}% is above the {used}% this headset's {Width} × {Height} allows (4096 per dimension), so this session uses {used}%.", "")
     End Function
 
-    Public Function Summary(scale As Integer) As String
+    Public Function Summary(scale As Integer, Optional widthPercent As Integer = 100, Optional heightPercent As Integer = 100) As String
         Dim text = $"{Headset} · {If(RuntimeMode = "other", VrRuntime.OtherName, VrRuntime.Label(RuntimeMode))}" & Environment.NewLine &
             $"Output: {Width} × {Height} per eye (100% baseline)." & Environment.NewLine
         Try
             Dim used = EffectiveScale(scale)
-            Dim size = SceneSize(used)
-            text &= $"Render: {size.Width} × {size.Height} per eye at {used}%." & If(used < scale, $" {scale}% is above this headset's maximum, so Launch VR uses {used}%.", "")
+            Dim size = CroppedSceneSize(used, widthPercent, heightPercent)
+            Dim cropped = If(widthPercent < 100 OrElse heightPercent < 100, $" with a {If(widthPercent = heightPercent, $"{heightPercent}%", $"{widthPercent}% × {heightPercent}%")} field of view", "")
+            text &= $"Render: {size.Width} × {size.Height} per eye at {used}%{cropped}." & If(used < scale, $" {scale}% is above this headset's maximum, so Launch VR uses {used}%.", "")
         Catch ex As IOException
             text &= "Requested render size is unsupported. Lower VR render scale."
         End Try

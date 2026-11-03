@@ -28,6 +28,8 @@ Public NotInheritable Class LastVrSession
     Public Property VrQuality As Dictionary(Of String, String)
     ' The session's VR anti-aliasing (#c8076a1e); sessions before it always ran with it off. Nothing if not valid.
     Public Property VrAntiAliasing As String = "off"
+    ' The session's VR field of view (#16a86c75), "100x100" for sessions before it or "" if not valid.
+    Public Property VrFov As String = "100x100"
 
     Public Shared Function Parse(log As String, startedUtc As DateTime) As LastVrSession
         Dim scene = Requested.Match(log)
@@ -71,7 +73,7 @@ Public NotInheritable Class LastVrSession
                     text = New String(buffer, 0, reader.ReadBlock(buffer, 0, buffer.Length))
                 End Using
                 Dim result = Parse(text, Directory.GetCreationTimeUtc(folder))
-                If result IsNot Nothing Then result.Performance = MeasuredPerformance.Load(folder) : result.VrQuality = ReadVrQuality(folder) : result.VrAntiAliasing = ReadVrAntiAliasing(folder)
+                If result IsNot Nothing Then result.Performance = MeasuredPerformance.Load(folder) : result.VrQuality = ReadVrQuality(folder) : result.VrAntiAliasing = ReadVrAntiAliasing(folder) : result.VrFov = ReadVrFov(folder)
                 Return result
             Next
         Catch ex As Exception When TypeOf ex Is IOException OrElse TypeOf ex Is UnauthorizedAccessException
@@ -87,7 +89,27 @@ Public NotInheritable Class LastVrSession
     Private Class SessionQuality
         Public Property VrQuality As Dictionary(Of String, String)
         Public Property VrAntiAliasing As String
+        Public Property VrFovWidth As Integer?
+        Public Property VrFovHeight As Integer?
     End Class
+
+    ' The VR field of view a session recorded as "WxH": "100x100" for older sessions; "" when it isn't valid.
+    Private Shared Function ReadVrFov(folder As String) As String
+        Dim info = Path.Combine(folder, "session.json")
+        If Not File.Exists(info) Then Return "100x100"
+        Try
+            Dim recorded = SafeFiles.ReadJson(Of SessionQuality)(info)
+            Dim w = If(recorded?.VrFovWidth, 100), h = If(recorded?.VrFovHeight, 100)
+            If w < LauncherSettings.MinimumVrFieldOfView OrElse w > 100 OrElse h < LauncherSettings.MinimumVrFieldOfView OrElse h > 100 Then Return ""
+            Return FovKey(w, h)
+        Catch ex As Exception When TypeOf ex Is System.Text.Json.JsonException OrElse TypeOf ex Is IOException OrElse TypeOf ex Is UnauthorizedAccessException
+            Return ""
+        End Try
+    End Function
+
+    Public Shared Function FovKey(width As Integer, height As Integer) As String
+        Return width.ToString(CultureInfo.InvariantCulture) & "x" & height.ToString(CultureInfo.InvariantCulture)
+    End Function
 
     ' The VR anti-aliasing a session recorded: "off" for older sessions; Nothing when the value isn't valid.
     Private Shared Function ReadVrAntiAliasing(folder As String) As String
