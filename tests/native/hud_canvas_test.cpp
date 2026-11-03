@@ -17,6 +17,12 @@ constexpr uint64_t Colour=0xe057d253ecd4296eull,Image=0x5c571e5a5daa0ce4ull,Text
 constexpr uint64_t Solid=0xcf2fe246cd20d277ull;
 constexpr unsigned Width=320,Height=340;
 void Check(bool value,const char* message) { if(!value) throw std::runtime_error(message); }
+std::array<uint8_t,320> Bytes(std::string_view hex) {
+    std::array<uint8_t,320> camera{};
+    const auto digit=[](char v) { return v<='9' ? v-'0' : v-'a'+10; };
+    for(size_t i=0;i<camera.size();++i) camera[i]=uint8_t(digit(hex[2*i])*16+digit(hex[2*i+1]));
+    return camera;
+}
 std::array<uint8_t,320> Camera() {
     // Captured camera from hud-probe-32868-1396 draw2; its actual lens aspect is
     // 3072/3264 == 320/340. All non-lens bytes belong to DiRT3, not GRID2.
@@ -32,20 +38,47 @@ std::array<uint8_t,320> Camera() {
         "000000802c48804000000080000000800000008000000080ff3f9cc600000080"
         "0000008000000080ff3f1c46feff7f3f01000000000000000000000000000000";
     static_assert(hex.size()==640);
-    std::array<uint8_t,320> camera{};
-    const auto digit=[](char v) { return v<='9' ? v-'0' : v-'a'+10; };
-    for(size_t i=0;i<camera.size();++i) camera[i]=uint8_t(digit(hex[2*i])*16+digit(hex[2*i+1]));
-    return camera;
+    return Bytes(hex);
+}
+std::array<uint8_t,320> SteamVrCamera() {
+    // The same menu camera at 3024x3360 (iztok's SteamVR session 20996, draw 3245): an ulp
+    // apart in py (20, 84), 1/py (260), far (280, 296) and w (300), and other padding.
+    constexpr std::string_view hex=
+        "dfe88d3e00000000000000000000000000000000f86f7f3e0000000000000000"
+        "000000000000000017b751b80000000000000080000000800000003f0000803f"
+        "dfe88d3e00000000000000000000000000000000f86f7f3e0000000000000000"
+        "000000000000000017b751b8000000000000000000000000be32003f0000803f"
+        "0000803f000000000000000000000000000000000000803f0000000000000000"
+        "00000000000000000000803f90c277c1ffff7f3f000000000000000000000000"
+        "000000000000803f00000000000000000000000000000000ffff7f3f8fc27741"
+        "00000000000000008fc277410000803f50e86640000000800000008000000080"
+        "000000802d4880400000008000000080000000800000008001409cc600000080"
+        "000000800000008001401c460000803f01000000485047c12a69ef420000803f";
+    static_assert(hex.size()==640);
+    return Bytes(hex);
 }
 void Put(std::array<uint8_t,320>& camera,size_t offset,float value) { std::memcpy(camera.data()+offset,&value,4); }
+float Get(const std::array<uint8_t,320>& camera,size_t offset) { float value; std::memcpy(&value,camera.data()+offset,4); return value; }
 void TestIdentity() {
     const auto observed=Camera(); float scale=-1;
     Check(hud_canvas_detail::CameraScale(observed,3072,3264,scale) && std::abs(scale-9.f/17.f)<1e-6,"Observed DiRT3 camera not recognized");
     Check(hud_canvas_detail::CameraScale(observed,Width,Height,scale),"Resolution-relative camera not recognized");
-    for(size_t i=0;i<308;++i) {
-        if(i<4 || (i>=64 && i<68) || (i>=240 && i<244)) continue;
+    scale=-1;
+    Check(hud_canvas_detail::CameraScale(SteamVrCamera(),3024,3360,scale) && std::abs(scale-.50625f)<1e-6,"Another headset size's rounding rejected");
+    for(size_t offset=4;offset<304;offset+=4) {
+        if(offset==64 || offset==240) continue;
+        const float value=Get(observed,offset);
+        auto rounded=observed; Put(rounded,offset,std::nextafter(value,value<0 ? -1e9f : 1e9f));
+        Check(hud_canvas_detail::CameraScale(rounded,Width,Height,scale),"An ulp of rounding rejected");
+        const float delta=std::max(1e-4f,std::abs(value)*1e-3f);
+        for(const float changed:{value+delta,value-delta,std::numeric_limits<float>::infinity()}) {
+            auto altered=observed; Put(altered,offset,changed); scale=-1;
+            Check(!hud_canvas_detail::CameraScale(altered,Width,Height,scale) && scale==-1,"Unknown camera field accepted or failure changed output");
+        }
+    }
+    for(size_t i=304;i<308;++i) {
         auto altered=observed; altered[i]^=1; scale=-1;
-        Check(!hud_canvas_detail::CameraScale(altered,Width,Height,scale) && scale==-1,"Unknown camera field accepted or failure changed output");
+        Check(!hud_canvas_detail::CameraScale(altered,Width,Height,scale) && scale==-1,"Camera integer field accepted");
     }
     auto padding=observed; for(size_t i=308;i<320;++i) padding[i]^=0xff;
     Check(hud_canvas_detail::CameraScale(padding,Width,Height,scale),"Uninitialized padding became camera identity");
@@ -192,7 +225,7 @@ void TestGraphics() {
     ComPtr<ID3D11GeometryShader> geometry; context->GSGetShader(&geometry,nullptr,nullptr);
     Check(!geometry && restored.Get()==original.Get() && restoredFirst==first && restoredCount==count,"GS/CB range not restored");
     Check(canvas.Apply(context.Get(),1,Solid,camera,Width,Height)==HudCanvas::Result::Unchanged,"Unknown shader modified");
-    auto altered=camera; altered[176]^=1; Check(canvas.Apply(context.Get(),Colour,Solid,altered,Width,Height)==HudCanvas::Result::Unchanged,"World camera modified");
+    auto altered=camera; Put(altered,176,.9f); Check(canvas.Apply(context.Get(),Colour,Solid,altered,Width,Height)==HudCanvas::Result::Unchanged,"World camera modified");
     auto gs=Compile("gs","gs_5_0"); Check(SUCCEEDED(device->CreateGeometryShader(gs->GetBufferPointer(),gs->GetBufferSize(),nullptr,&geometry)),"Existing GS");
     context->GSSetShader(geometry.Get(),nullptr,0);
     Check(canvas.Apply(context.Get(),Colour,Solid,camera,Width,Height)==HudCanvas::Result::Unchanged,"Active native GS replaced");

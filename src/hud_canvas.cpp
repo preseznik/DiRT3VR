@@ -52,6 +52,14 @@ void main(triangle Vertex input[3],inout TriangleStream<Vertex> output) {
 }
 )";
 }
+// The menu camera of captures 32868 frames 147/518/1396 (3072x3264) without its X lens (0, 64)
+// and inverse (240): each nonzero float up to 304; every other one is zero, and 304 holds the
+// integer 1. The last twelve padding bytes are uninitialized.
+struct CameraField { uint16_t offset; float value; };
+constexpr CameraField MenuCamera[]={
+    {20,.24945055f},{40,-5e-5f},{56,.5f},{60,1},{84,.24945055f},{104,-5e-5f},{120,.50077426f},{124,1},
+    {128,1},{148,1},{168,1},{172,-15.485f},{176,1},{196,1},{216,1},{220,15.485f},{232,15.485f},{236,1},
+    {260,4.00881f},{280,-20000},{296,10000},{300,1}};
 bool hud_canvas_detail::CameraScale(std::span<const uint8_t> camera,unsigned width,unsigned height,float& scale) noexcept {
     if(camera.size()!=320 || !width || !height || width>4096 || height>4096) return false;
     const auto value=[&](size_t offset) { float result; std::memcpy(&result,camera.data()+offset,4); return result; };
@@ -59,15 +67,20 @@ bool hud_canvas_detail::CameraScale(std::span<const uint8_t> camera,unsigned wid
     if(!std::isfinite(px) || !std::isfinite(py) || !std::isfinite(inverseX) || px<=.01f || px>16 || py<=.01f || py>16 ||
        value(64)!=px || std::abs(double(py)/px-double(width)/height)>1e-5 ||
        std::abs(double(inverseX)*px-1.)>2e-6) return false;
-    // Captures 32868 frames147/518/1396 have this full normalized fingerprint.
-    // The last twelve padding bytes are uninitialized. No other camera fields
-    // are ignored, including the native Y lens, view, near/far and leftEye.
-    uint64_t hash=14695981039346656037ull;
-    for(size_t i=0;i<308;++i) {
-        const bool lens=(i<4) || (i>=64 && i<68) || (i>=240 && i<244);
-        hash=(hash^(lens ? uint8_t{} : camera[i]))*1099511628211ull;
+    // No other camera field is ignored, including the native Y lens, view, near/far and leftEye.
+    // Other headset sizes round a few of them by an ulp (3024x3360: py 0.2494506, far 10000
+    // instead of 9999.999), so the fields agree within 1e-5 rather than byte for byte (#7d2ac4d9).
+    const auto field=[&](size_t offset) {
+        for(const auto& known:MenuCamera) if(known.offset==offset) return known.value;
+        return 0.f;
+    };
+    for(size_t offset=4;offset<304;offset+=4) {
+        if(offset==64 || offset==240) continue;
+        const float actual=value(offset),expected=field(offset);
+        if(!std::isfinite(actual) || std::abs(double(actual)-expected)>(expected ? 1e-5*std::abs(double(expected)) : 1e-6)) return false;
     }
-    if(hash!=0x41be88f2d87c2b12ull) return false;
+    uint32_t tail{}; std::memcpy(&tail,camera.data()+304,4);
+    if(tail!=1) return false;
     const float result=(py/hud_canvas_detail::Aspect(width,height))/px;
     if(!std::isfinite(result) || result<=0) return false;
     scale=result; return true;

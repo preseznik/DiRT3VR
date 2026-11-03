@@ -22,8 +22,8 @@ inline float Aspect(unsigned width,unsigned height) noexcept {
     const float native=height ? float(width)/height : 1.f;
     return native>16.f/9.f ? native : 16.f/9.f;
 }
-// Exact DiRT3 camera identity with only the aspect-dependent X lens and its
-// inverse normalized. On refusal, scale is unchanged.
+// DiRT3's menu camera identity, every field within float rounding, with only the
+// aspect-dependent X lens and its inverse normalized. On refusal, scale is unchanged.
 bool CameraScale(std::span<const uint8_t> camera,unsigned width,unsigned height,float& scale) noexcept;
 }
 
