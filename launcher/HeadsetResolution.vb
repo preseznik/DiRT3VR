@@ -12,7 +12,7 @@ Public Class HeadsetResolution
     Public Const MaximumDimension As Integer = 4096
 
     Public Sub New(mode As String, name As String, w As Integer, h As Integer)
-        If (mode <> "vdxr" AndAlso mode <> "steamvr") OrElse String.IsNullOrWhiteSpace(name) OrElse name.Length > 256 Then Throw New IOException("Invalid headset identity.")
+        If Not VrRuntime.Modes.Contains(mode) OrElse String.IsNullOrWhiteSpace(name) OrElse name.Length > 256 Then Throw New IOException("Invalid headset identity.")
         ValidateSceneSize(w, h)
         RuntimeMode = mode : Headset = name : Width = w : Height = h
     End Sub
@@ -48,7 +48,7 @@ Public Class HeadsetResolution
     End Function
 
     Public Function Summary(scale As Integer) As String
-        Dim text = $"{Headset} · {If(RuntimeMode = "vdxr", "VDXR", "SteamVR")}" & Environment.NewLine &
+        Dim text = $"{Headset} · {If(RuntimeMode = "other", VrRuntime.OtherName, VrRuntime.Label(RuntimeMode))}" & Environment.NewLine &
             $"Output: {Width} × {Height} per eye (100% baseline)." & Environment.NewLine
         Try
             Dim used = EffectiveScale(scale)
@@ -65,7 +65,8 @@ Public Class HeadsetResolution
             If report.GetProperty("sessionCreated").ValueKind <> JsonValueKind.False Then Throw New IOException("The headset query must not create a VR session.")
             Dim runtime = report.GetProperty("runtimeName").GetString()
             If (mode = "vdxr" AndAlso runtime <> "VirtualDesktopXR") OrElse
-               (mode = "steamvr" AndAlso (runtime Is Nothing OrElse Not runtime.StartsWith("SteamVR/", StringComparison.Ordinal))) Then Throw New IOException("Headset query returned a different OpenXR runtime.")
+               (mode = "steamvr" AndAlso (runtime Is Nothing OrElse Not runtime.StartsWith("SteamVR/", StringComparison.Ordinal))) OrElse
+               (mode = "other" AndAlso String.IsNullOrWhiteSpace(runtime)) Then Throw New IOException("Headset query returned a different OpenXR runtime.")
             Dim views = report.GetProperty("views")
             If views.GetArrayLength() <> 2 Then Throw New IOException("Headset query must report both eyes.")
             Dim w = views(0).GetProperty("width").GetInt32(), h = views(0).GetProperty("height").GetInt32()

@@ -49,6 +49,7 @@ Module Program
             GraphicsRecommendationTests.Run(root, AddressOf Check)
             MonitorSeatMenuTests.Run(root, AddressOf Check)
             AnisotropyTests.Run(root, AddressOf Check)
+            OtherRuntimeTests.Run(root, AddressOf Check)
             StartupTests.Run(root, AddressOf Check)
             InstallerTests.Run(root, AddressOf Check)
             TestHeadsetResolution(root)
@@ -561,6 +562,7 @@ Module Program
         GraphicsRecommendationTests.RunUi(root, AddressOf Check)
         MonitorSeatMenuTests.RunUi(root, AddressOf Check)
         AnisotropyTests.RunUi(root, AddressOf Check)
+        OtherRuntimeTests.RunUi(root, AddressOf Check)
         WheelGuardTests.Run(root, AddressOf Check)
         InstallerTests.RunUi(AddressOf Check)
         SectionCollapseTests.Run(root, AddressOf Check)
@@ -607,7 +609,7 @@ Module Program
             outputScale.Value = 75
             Dim notice = form.Controls.Find("Notice", True).Single()
             notice.Text = "DiRT 3 exited before its game window appeared (exit code 0xC0000005). Open logs for details."
-            Check(choice.Items.Cast(Of String)().SequenceEqual({"VDXR", "SteamVR"}), "runtime choices are explicit")
+            Check(choice.Items.Cast(Of String)().SequenceEqual({"VDXR", "SteamVR", "Other OpenXR runtime"}), "runtime choices are explicit")
             Check(tabs.TabPages.Cast(Of TabPage)().Select(Function(p) p.Text).SequenceEqual({"Launcher", "Graphics", "Controls", "Settings", "Advanced"}), "familiar tab order")
             runtimePath.Text = "Unsaved runtime"
             vdxrPath.Text = "Unsaved VDXR runtime"

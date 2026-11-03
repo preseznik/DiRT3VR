@@ -22,6 +22,7 @@ Public NotInheritable Class LauncherDefaults
     Public Shared Function All(current As LauncherSettings) As LauncherSettings
         Return New LauncherSettings With {
             .SteamRuntimeManifest = current.SteamRuntimeManifest,
+            .OtherRuntimeManifest = current.OtherRuntimeManifest,
             .VdxrRuntimeManifest = current.VdxrRuntimeManifest,
             .ExperimentalVrEnabled = current.ExperimentalVrEnabled,
             .SeatOffsets = If(current.SeatOffsets, New Dictionary(Of String, SeatOffset)).ToDictionary(Function(pair) pair.Key, Function(pair) pair.Value.Copy()),

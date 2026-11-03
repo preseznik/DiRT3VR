@@ -58,6 +58,7 @@ Public Class MainForm
     Private ReadOnly runtime As New ComboBox With {.Name = "RuntimeChoice", .DropDownStyle = ComboBoxStyle.DropDownList}
     Private ReadOnly manifest As New TextBox With {.Name = "RuntimePath"}
     Private ReadOnly vdxrManifest As New TextBox With {.Name = "VdxrRuntimePath"}
+    Private ReadOnly otherManifest As New TextBox With {.Name = "OtherRuntimePath"}
     Private ReadOnly modern As New AppearanceSwitch()
     Private ReadOnly logging As New CheckBox With {.Name = "DiagnosticLogging", .Text = "On", .AutoSize = True}
     Private ReadOnly renderScale As New ValueSlider("VrRenderScale", 50, 300, 100, "%", recommendedValue:=100)
@@ -261,7 +262,7 @@ Public Class MainForm
         AddHandler probe.Click, Async Sub() Await RefreshHeadsetAsync()
         AddHandler refreshHeadset.Click, Async Sub() Await RefreshHeadsetAsync()
         AddHandler renderScale.ValueChanged, Sub() UpdateResolutionLabels()
-        For Each input As TextBox In {manifest, vdxrManifest, gameFolder}
+        For Each input As TextBox In {manifest, vdxrManifest, otherManifest, gameFolder}
             AddHandler input.TextChanged, Sub() InvalidateHeadset()
         Next
         AddHandler modern.CheckedChanged, Sub()
@@ -271,6 +272,7 @@ Public Class MainForm
         AddHandler runtime.SelectedIndexChanged, Sub()
                                                      manifest.Enabled = runtime.SelectedIndex = 1 AndAlso Not busy
                                                      vdxrManifest.Enabled = runtime.SelectedIndex = 0 AndAlso Not busy
+                                                     otherManifest.Enabled = runtime.SelectedIndex = 2 AndAlso Not busy
                                                      InvalidateHeadset()
                                                      RefreshState()
                                                  End Sub
@@ -921,22 +923,28 @@ Public Class MainForm
                                                     End Using
                                                 End Sub)
         Dim runtimes = Section(content, "VR runtime")
-        runtime.Items.AddRange({"VDXR", "SteamVR"})
+        runtime.Items.AddRange({"VDXR", "SteamVR", VrRuntime.OtherName})
         StyleChoice(runtime, Me)
         Field(runtimes, "Runtime", runtime)
         Field(runtimes, "VDXR x86 manifest", vdxrManifest)
         Field(runtimes, "SteamVR x86 manifest", manifest)
+        Field(runtimes, "Other OpenXR x86 manifest", otherManifest)
         Dim browseRuntime As New Button With {.Name = "BrowseRuntime", .Text = "Browse selected runtime…", .AutoSize = True}
         runtimes.Controls.Add(browseRuntime)
         AddHandler browseRuntime.Click, Sub()
-                                            Dim filename = If(runtime.SelectedIndex = 1, "steamxr_win32.json", "virtualdesktop-openxr-32.json")
-                                            Using picker As New OpenFileDialog With {.Filter = "32-bit runtime|" & filename, .FileName = filename}
+                                            Dim filename = If(runtime.SelectedIndex = 1, "steamxr_win32.json", If(runtime.SelectedIndex = 2, "*.json", "virtualdesktop-openxr-32.json"))
+                                            Using picker As New OpenFileDialog With {.Filter = If(runtime.SelectedIndex = 2, "OpenXR runtime manifest|*.json", "32-bit runtime|" & filename), .FileName = If(runtime.SelectedIndex = 2, "", filename)}
                                                 If picker.ShowDialog(Me) = DialogResult.OK Then
-                                                    If runtime.SelectedIndex = 1 Then manifest.Text = picker.FileName Else vdxrManifest.Text = picker.FileName
+                                                    Select Case runtime.SelectedIndex
+                                                        Case 1 : manifest.Text = picker.FileName
+                                                        Case 2 : otherManifest.Text = picker.FileName
+                                                        Case Else : vdxrManifest.Text = picker.FileName
+                                                    End Select
                                                 End If
                                             End Using
                                         End Sub
         runtimes.Controls.Add(Info("For VDXR, connect through Virtual Desktop; for SteamVR, start SteamVR with your headset connected. The selected 32-bit runtime is used only by the launched process; your system OpenXR default stays unchanged."))
+        runtimes.Controls.Add(Info("Other OpenXR runtime: for a headset with its own OpenXR runtime, browse to that runtime's .json file. DiRT 3 is a 32-bit game, so the runtime must include a 32-bit part; Check runtime and headset tells whether it works. Only VDXR and SteamVR have been tried with DiRT3VR so far."))
         runtimes.Controls.Add(probe) : runtimes.Controls.Add(probeStatus)
         Dim addOns As New Button With {.Name = "VrCompatibility", .Text = "OpenXR add-ons…", .AutoSize = True}
         runtimes.Controls.Add(addOns) : runtimes.Controls.Add(layerSummary)
@@ -975,10 +983,11 @@ Public Class MainForm
     Private Sub ApplySettings()
         gameFolder.Text = context.GameRoot : graphicsPath.Text = context.GraphicsPath
         modern.Checked = settings.ModernInterface
-        runtime.SelectedIndex = If(settings.RuntimeMode = "steamvr", 1, 0)
+        runtime.SelectedIndex = Math.Max(0, Array.IndexOf(VrRuntime.Modes, settings.RuntimeMode))
         manifest.Text = settings.SteamRuntimeManifest : manifest.Enabled = runtime.SelectedIndex = 1
         vdxrManifest.Text = If(String.IsNullOrWhiteSpace(settings.VdxrRuntimeManifest), Discovery.VdxrRuntime(), settings.VdxrRuntimeManifest)
         vdxrManifest.Enabled = runtime.SelectedIndex = 0
+        otherManifest.Text = settings.OtherRuntimeManifest : otherManifest.Enabled = runtime.SelectedIndex = 2
         logging.Checked = settings.DiagnosticLogging
         experimental.Checked = settings.ExperimentalVrEnabled
         skipStartupMovies.Checked = settings.SkipStartupMovies
@@ -1017,7 +1026,7 @@ Public Class MainForm
 
     Public Function CurrentSettings() As LauncherSettings
         Dim resolution = TryCast(desktopResolution.SelectedItem, DesktopResolutionChoice)
-        Return New LauncherSettings With {.ModernInterface = modern.Checked, .RuntimeMode = If(runtime.SelectedIndex = 1, "steamvr", "vdxr"), .SteamRuntimeManifest = manifest.Text, .VdxrRuntimeManifest = vdxrManifest.Text, .DiagnosticLogging = logging.Checked, .ExperimentalVrEnabled = experimental.Checked, .VrRenderScale = renderScale.Value, .HudDistance = hudDistance.Value / 2D, .HudFollowView = hudFollow.Checked, .PerfDisplay = perfDisplay.Checked, .PerfFollowView = perfFollow.Checked,
+        Return New LauncherSettings With {.ModernInterface = modern.Checked, .RuntimeMode = VrRuntime.Modes(Math.Max(0, runtime.SelectedIndex)), .SteamRuntimeManifest = manifest.Text, .VdxrRuntimeManifest = vdxrManifest.Text, .OtherRuntimeManifest = otherManifest.Text, .DiagnosticLogging = logging.Checked, .ExperimentalVrEnabled = experimental.Checked, .VrRenderScale = renderScale.Value, .HudDistance = hudDistance.Value / 2D, .HudFollowView = hudFollow.Checked, .PerfDisplay = perfDisplay.Checked, .PerfFollowView = perfFollow.Checked,
             .DesktopAnisotropy = LauncherSettings.AnisotropyLevels(Math.Max(0, desktopAnisotropy.SelectedIndex)), .VrAnisotropy = LauncherSettings.AnisotropyLevels(Math.Max(0, vrAnisotropy.SelectedIndex)),
             .DesktopWidth = If(resolution Is Nothing, 0, resolution.Size.Width), .DesktopHeight = If(resolution Is Nothing, 0, resolution.Size.Height),
             .DesktopDisplayMode = {"game", "windowed", "fullscreen", "borderless"}(Math.Max(0, desktopMode.SelectedIndex)), .DesktopVSync = {"game", "off", "on"}(Math.Max(0, desktopVSync.SelectedIndex)), .SkipStartupMovies = skipStartupMovies.Checked,
@@ -1438,6 +1447,7 @@ Public Class MainForm
             New HelpTopic(HelpRuntime,
                 "Settings → Check runtime and headset runs a small 32-bit OpenXR check without starting the game. A successful check does not mean VR driving is ready." & vbCrLf & vbCrLf &
                 "Choose VDXR or SteamVR explicitly. The selected runtime is used only by DiRT3VR's own processes; your system OpenXR default stays unchanged. VDXR and SteamVR need separate checks. Browse to the selected runtime file if it is installed elsewhere." & vbCrLf & vbCrLf &
+                "Other OpenXR runtime is for headsets with their own OpenXR runtime instead of Virtual Desktop or SteamVR. Browse to that runtime's .json manifest. DiRT 3 is a 32-bit game, so the runtime must include a 32-bit part; the launcher refuses a 64-bit-only runtime. Check runtime and headset shows whether the headset answers. Only VDXR and SteamVR have been tried with DiRT3VR so far, so please report how another runtime works." & vbCrLf & vbCrLf &
                 "OpenXR add-ons… lists the add-ons turned off for DiRT 3 and turns them back on."),
             New HelpTopic(HelpSettings,
                 "Modern / Classic follows Windows light, dark and high-contrast preferences." & vbCrLf & vbCrLf &

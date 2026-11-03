@@ -40,6 +40,8 @@ Public Module Program
                 settings.Validate()
                 If settings.RuntimeMode = "steamvr" Then
                     settings.SteamRuntimeManifest = Argument(arguments, "--manifest", settings.SteamRuntimeManifest)
+                ElseIf settings.RuntimeMode = "other" Then
+                    settings.OtherRuntimeManifest = Argument(arguments, "--manifest", settings.OtherRuntimeManifest)
                 Else
                     settings.VdxrRuntimeManifest = Argument(arguments, "--manifest", settings.VdxrRuntimeManifest)
                 End If
