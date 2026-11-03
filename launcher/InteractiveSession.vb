@@ -65,6 +65,13 @@ Public Class InteractiveSession
         start.Environment("DIRT3VR_PERF_FOLLOW") = If(settings.PerfFollowView, "1", "0")
         ' Anisotropic filtering (#15714dd2, Wrench's contract): only a choice other than the game's.
         Anisotropy.Configure(start, settings.VrAnisotropy)
+        ' Start in the cockpit (#cd56379b, Wrench's contract): the renderer keeps the race in the first view, which
+        ' the session's camera files make the cockpit, instead of DiRT 3's switch to chase_close.
+        If settings.StartInCockpit Then
+            start.Environment("DIRT3VR_START_IN_COCKPIT") = "1"
+        Else
+            start.Environment.Remove("DIRT3VR_START_IN_COCKPIT")
+        End If
         start.Environment("DIRT3VR_HEADSET_WIDTH") = headset.Width.ToString(Globalization.CultureInfo.InvariantCulture)
         start.Environment("DIRT3VR_HEADSET_HEIGHT") = headset.Height.ToString(Globalization.CultureInfo.InvariantCulture)
         start.Environment("DIRT3VR_LOG_DIR") = directory

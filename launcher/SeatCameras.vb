@@ -302,8 +302,24 @@ Public NotInheritable Class SeatCameras
         Return ViewParameters(document, found(0)).ToDictionary(Function(pair) pair.Key, Function(pair) GetValue(document.AttributesOf(pair.Value), "value"), StringComparer.Ordinal)
     End Function
 
-    ' Wrench's start_in_cockpit: DiRT 3 starts a race with the first visible view, so hiding the visible
-    ' views listed before head-cam starts it in the cockpit (they can't be chosen while hidden).
+    ' Wrench's cockpit_first (iztok: start in the cockpit, hide nothing): head-cam's record moves to the front of
+    ' the view list. The Views are sibling records, each pointing at its own attributes and children, so rotating
+    ' them reorders the list and leaves every subtree, string and attribute where it was; twice changes nothing.
+    ' DiRT3VR's renderer (DIRT3VR_START_IN_COCKPIT) keeps the race in that first view instead of DiRT 3's chase_close.
+    Public Shared Function CockpitFirst(data As Byte()) As Byte()
+        Dim document = Decode(data)
+        Dim order = Views(document)
+        Dim cockpit = HeadCam(document)
+        Dim first = order(0)
+        If Not order.Take(order.IndexOf(cockpit) + 1).SequenceEqual(Enumerable.Range(first, cockpit - first + 1)) Then Throw New IOException("The camera file's views before the cockpit view are not in one block.")
+        Dim record = document.Elements(cockpit)
+        document.Elements.RemoveAt(cockpit)
+        document.Elements.Insert(first, record)
+        Return Encode(document)
+    End Function
+
+    ' Wrench's start_in_cockpit, the earlier cockpit start, kept to recover its sessions: DiRT 3 starts a race with
+    ' the first visible view, so hiding the visible views listed before head-cam starts it in the cockpit.
     Public Shared Function StartInCockpit(data As Byte()) As Byte()
         Dim document = Decode(data)
         Dim cockpit = HeadCam(document)
