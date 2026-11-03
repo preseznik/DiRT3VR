@@ -198,6 +198,19 @@ int main() {
             down={F11}; clock.Frame(menu); down.clear(); clock.Frame(menu); down={VK_PRIOR}; clock.Frame(menu);
             Require(!menu.Desktop() && menu.Fov()==0 && !menu.BlocksKey(VK_PRIOR),"VR menu changed the FOV or took PgUp");
         }
+        { // #bd820b32: the DirectInput filter missing. The keyboard and Xbox pad work; a wheel is ignored.
+            down.clear(); auto bytes=Launcher(); Channel c(bytes.data()); Clock clock;
+            Menu menu(c,false,KeyDown); menu.SetInputReady(true,true,false); menu.Select(1); clock.Frame(menu);
+            Require(c.Read<uint32_t>(84)==Ready,"Menu reported no input with the keyboard filter in place");
+            c.Write(36,2u); c.Write(20,unsigned(Open)); clock.Frame(menu); c.Write(20,0u); clock.Frame(menu);
+            Require(!menu.PanelOpen(),"An unfiltered wheel opened the menu");
+            c.Write(36,1u); c.Write(20,unsigned(Open)); clock.Frame(menu); c.Write(20,0u); clock.Frame(menu);
+            Require(menu.PanelOpen(),"The filtered Xbox pad did not open the menu");
+            down={F11}; clock.Frame(menu); down.clear(); clock.Frame(menu); down={F11}; clock.Frame(menu);
+            Require(menu.PanelOpen(),"Keyboard did not reopen the menu");
+            menu.SetInputReady(false,true,true); down.clear(); clock.Frame(menu);
+            Require(c.Read<uint32_t>(84)==InputUnavailable,"Missing keyboard filter not reported");
+        }
         { // One position for every car.
             down.clear(); auto bytes=Launcher(true); Channel c(bytes.data()); Clock clock;
             Menu menu(c,true,KeyDown); clock.Frame(menu);

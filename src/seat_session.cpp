@@ -35,10 +35,13 @@ seat::Menu* OpenSeatMenu(void (*log)(const char*,...)) noexcept {
             policy.filterXbox=[&open](unsigned slot,WORD& buttons) { open.FilterXbox(slot,buttons); };
             policy.blocksButton=[&open](const GUID& device,unsigned button,bool pressed) { return open.BlocksButton(device,button,pressed); };
             policy.blocksHat=[&open](const GUID& device,unsigned hat,bool centred) { return open.BlocksHat(device,hat,centred); };
-            const bool filtering=log && seatinput::Install(std::move(policy),log);
-            open.SetInputReady(filtering);
-            if(log) log("Seat menu channel open cars=%u every_car=%u monitor=%u input_filtering=%u",
-                open.View().Cars(),unsigned(open.View().Universal()),unsigned(open.Desktop()),unsigned(filtering));
+            // With the keyboard filter the menu opens; a controller type without its filter is ignored.
+            if(log) seatinput::Install(std::move(policy),log);
+            const auto filters=log ? seatinput::Installed() : seatinput::Filters{};
+            open.SetInputReady(filters.keyboard,filters.xinput,filters.directInput);
+            if(log) log("Seat menu channel open cars=%u every_car=%u monitor=%u input_filtering=%u (pad=%u wheel=%u)",
+                open.View().Cars(),unsigned(open.View().Universal()),unsigned(open.Desktop()),unsigned(filters.keyboard),
+                unsigned(filters.xinput),unsigned(filters.directInput));
         });
     } catch(...) { return nullptr; }
     return menu && menu->has_value() ? &**menu : nullptr;

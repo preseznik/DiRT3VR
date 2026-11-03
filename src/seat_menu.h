@@ -161,8 +161,12 @@ public:
     Menu& operator=(const Menu&)=delete;
     // The identified car's table index, or -1 when it isn't known.
     void Select(int index) { Lock lock(mutex_); selected_=index>=0 && unsigned(index)<channel_.Cars() ? index : -1; }
-    // Once the input filters are installed: the menu opens only when its inputs can be kept from the game.
-    void SetInputReady(bool ready) { Lock lock(mutex_); inputReady_=ready; }
+    // Once the input filters are installed. The menu opens when its keys can be kept from the game (the
+    // keyboard filter); a controller type whose filter is missing is ignored, so its buttons neither
+    // drive the menu nor reach the game while it's open (#bd820b32).
+    void SetInputReady(bool keyboard,bool xinput=true,bool directInput=true) {
+        Lock lock(mutex_); inputReady_=keyboard; xinputReady_=xinput; directInputReady_=directInput;
+    }
     // One rendered frame. now: milliseconds; tick: GetTickCount() for the launcher's heartbeat.
     void Update(uint64_t now,uint32_t tick,bool foreground) {
         Lock lock(mutex_);
@@ -174,6 +178,7 @@ public:
             previousHeld_=~0u;
         }
         channel_.ReadInput(input_);
+        if((input_.source==1 && !xinputReady_) || (input_.source==2 && !directInputReady_)) input_={};
         if(uint32_t(tick-channel_.Heartbeat())>1000) { CancelPanel(); input_={}; } // The launcher is gone or stuck.
         if(!foreground) { CancelPanel(); previousHeld_=~0u; Publish(); return; }
         const unsigned held=input_.held|HeldKeys(),pressed=held&~previousHeld_; previousHeld_=held;
@@ -331,7 +336,7 @@ private:
     void CancelPanel() { if(panel_) { current_=opening_; fov_=openingFov_; } panel_=false; movement_.Reset(); fovDirection_=0; }
 
     Channel channel_;
-    bool inputReady_;
+    bool inputReady_,xinputReady_=true,directInputReady_=true;
     KeyDown keyDown_;
     Channel::Input input_{};
     Movement movement_;
