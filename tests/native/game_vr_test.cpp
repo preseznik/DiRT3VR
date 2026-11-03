@@ -118,6 +118,28 @@ int main() {
         } catch(int) { }
         float restoredNear{}; std::memcpy(&restoredNear,renderer.data()+0x40,sizeof(float));
         Require(restoredNear==nativeNear && renderer[0x60]==42,"Foreground near plane or unrelated state not restored correctly");
+        {   // Toggle VR from a controller button's request file; a rejected key means no key.
+            wchar_t folder[MAX_PATH]{}; GetTempPathW(MAX_PATH,folder);
+            const std::wstring toggleFile=std::wstring(folder)+L"DiRT3VR.toggle-test.request";
+            DeleteFileW(toggleFile.c_str());
+            SetEnvironmentVariableW(L"DIRT3VR_TOGGLE_REQUEST_FILE",toggleFile.c_str());
+            SetEnvironmentVariableW(L"DIRT3VR_TOGGLE_KEY",L"9 2"); // Alt+Tab stays with Windows.
+            Require(!dirt3vr::ConfiguredToggle().has_value(),"Reserved toggle key accepted");
+            const auto pressButton=[&] { CloseHandle(CreateFileW(toggleFile.c_str(),GENERIC_WRITE,0,nullptr,CREATE_ALWAYS,0,nullptr)); };
+            dirt3vr::PrototypeState state;
+            dirt3vr::ToggleKey(state);
+            Require(!state.flat,"Toggled without a request");
+            pressButton(); dirt3vr::ToggleKey(state);
+            Require(state.flat && GetFileAttributesW(toggleFile.c_str())==INVALID_FILE_ATTRIBUTES,"Button request did not switch to the flat screen, or stayed");
+            dirt3vr::ToggleKey(state);
+            Require(state.flat,"One request toggled twice");
+            pressButton(); dirt3vr::ToggleKey(state);
+            Require(!state.flat,"Second request did not switch back to stereo");
+            SetEnvironmentVariableW(L"DIRT3VR_TOGGLE_KEY",L"117 0");
+            Require(dirt3vr::ConfiguredToggle().has_value() && dirt3vr::ConfiguredToggle()->key==117,"F6 toggle key not read");
+            SetEnvironmentVariableW(L"DIRT3VR_TOGGLE_KEY",nullptr);
+            Require(!dirt3vr::ConfiguredToggle().has_value(),"No key setting gave a key");
+        }
         {   // The seat menu panel opens 1 m ahead of the head, 10 cm lower, upright even when the head is tilted.
             const float s=std::sin(.25f),c=std::cos(.25f); // 30° yaw left plus a 20° roll.
             const XrQuaternionf yaw{0,s,0,c},roll{0,0,std::sin(.1745f),std::cos(.1745f)};
