@@ -20,10 +20,12 @@ Public NotInheritable Class RecenterDeviceBinding
         End Get
     End Property
 
-    Public Sub Validate()
+    ' purpose names the binding in the message ("recenter", "seat menu").
+    Public Sub Validate(Optional purpose As String = "recenter")
+        Dim invalid = "The controller or wheel " & purpose & " binding is invalid. Bind the button again."
         Dim parsed As Guid
         Dim device = If(Xbox, Regex.IsMatch(If(DeviceId, ""), "\Axinput:[0-3]\z"), If(DeviceId, "").Length = 38 AndAlso Guid.TryParseExact(DeviceId, "B", parsed) AndAlso If(Product, "").Length = 38 AndAlso Guid.TryParseExact(Product, "B", parsed))
-        If Not device OrElse DeviceName Is Nothing OrElse DeviceName.Length > 260 Then Throw New IOException("The controller or wheel recenter binding is invalid. Bind the button again.")
+        If Not device OrElse DeviceName Is Nothing OrElse DeviceName.Length > 260 Then Throw New IOException(invalid)
         Dim button = Regex.Match(If(Input, ""), "\Abutton:(?<index>[0-9]{1,3})\z")
         If button.Success Then
             Dim index = Integer.Parse(button.Groups("index").Value, Globalization.CultureInfo.InvariantCulture)
@@ -31,14 +33,24 @@ Public NotInheritable Class RecenterDeviceBinding
         ElseIf Not Xbox AndAlso Regex.IsMatch(If(Input, ""), "\Ahat:[0-3]:(up|right|down|left)\z") Then
             Return
         End If
-        Throw New IOException("The controller or wheel recenter binding is invalid. Bind the button again.")
+        Throw New IOException(invalid)
     End Sub
 
     Public Function Describe() As String
+        Return Control() & " on " & DeviceName
+    End Function
+
+    ' The button or hat direction alone, e.g. "Y" or "Button 5".
+    Public Function Control() As String
         Dim parts = Input.Split(":"c)
-        Dim control = If(parts(0) = "hat", "Hat " & parts(1) & " " & parts(2),
-                         If(Xbox, DrivingInput.XboxButtonNames(Integer.Parse(parts(1), Globalization.CultureInfo.InvariantCulture)), "Button " & parts(1)))
-        Return control & " on " & DeviceName
+        Return If(parts(0) = "hat", "Hat " & parts(1) & " " & parts(2),
+                  If(Xbox, DrivingInput.XboxButtonNames(Integer.Parse(parts(1), Globalization.CultureInfo.InvariantCulture)), "Button " & parts(1)))
+    End Function
+
+    ' Whether two bindings are the same button or hat direction on the same device.
+    Public Function SameInput(other As RecenterDeviceBinding) As Boolean
+        Return other IsNot Nothing AndAlso String.Equals(DeviceId, other.DeviceId, StringComparison.OrdinalIgnoreCase) AndAlso
+               String.Equals(Product, other.Product, StringComparison.OrdinalIgnoreCase) AndAlso Input = other.Input
     End Function
 
     ' Whether the bound button or hat direction is held in this sample.
@@ -158,6 +170,13 @@ Public NotInheritable Class RecenterDeviceWatcher
     <DllImport("user32.dll")> Private Shared Function GetWindowThreadProcessId(window As IntPtr, ByRef process As UInteger) As UInteger
     End Function
 
+    ' Whether the game's window is the foreground window.
+    Public Shared Function InFront(gameProcessId As Integer) As Boolean
+        Dim owner As UInteger
+        GetWindowThreadProcessId(GetForegroundWindow(), owner)
+        Return owner = CUInt(gameProcessId)
+    End Function
+
     ' Watches the real device through driving_input.dll, re-finding it every two seconds if it is unplugged.
     Public Shared Function ForSession(libraryPath As String, window As IntPtr, binding As RecenterDeviceBinding, gameProcessId As Integer, requestPath As String) As RecenterDeviceWatcher
         Dim input As DrivingInput = Nothing, device As DrivingInput.Device = Nothing
@@ -174,12 +193,7 @@ Public NotInheritable Class RecenterDeviceWatcher
                        If sample.Connected = 0UI Then device = Nothing
                        Return sample
                    End Function
-        Dim foreground = Function() As Boolean
-                             Dim owner As UInteger
-                             GetWindowThreadProcessId(GetForegroundWindow(), owner)
-                             Return owner = CUInt(gameProcessId)
-                         End Function
-        Return New RecenterDeviceWatcher(binding, requestPath, read, foreground, Sub() input?.Dispose())
+        Return New RecenterDeviceWatcher(binding, requestPath, read, Function() InFront(gameProcessId), Sub() input?.Dispose())
     End Function
 
     ' Stops watching and records what happened in the session logs.
@@ -206,14 +220,15 @@ Public NotInheritable Class RecenterDeviceForm
     Private input As DrivingInput
     Public ReadOnly Property Binding As RecenterDeviceBinding
 
-    Public Sub New(libraryPath As String)
+    Public Sub New(libraryPath As String, Optional title As String = "Recenter button",
+                   Optional prompt As String = "Press the button, or the D-pad / hat direction, on your controller, wheel or button box that should recenter the view.")
         Me.libraryPath = libraryPath
-        Text = "Recenter button"
+        Text = title
         Font = New Drawing.Font("Segoe UI", 10) : AutoScaleMode = AutoScaleMode.Dpi
         AutoSize = True : AutoSizeMode = AutoSizeMode.GrowAndShrink
         FormBorderStyle = FormBorderStyle.FixedDialog : StartPosition = FormStartPosition.CenterParent : MinimizeBox = False : MaximizeBox = False
         Dim layout As New TableLayoutPanel With {.AutoSize = True, .Padding = New Padding(20), .ColumnCount = 1}
-        layout.Controls.Add(New Label With {.Text = "Press the button, or the D-pad / hat direction, on your controller, wheel or button box that should recenter the view.", .AutoSize = True, .MaximumSize = New Drawing.Size(460, 0)})
+        layout.Controls.Add(New Label With {.Text = prompt, .AutoSize = True, .MaximumSize = New Drawing.Size(460, 0)})
         status.Text = "Looking for controllers…"
         layout.Controls.Add(status)
         Dim cancel As New Button With {.Name = "CancelRecenterDevice", .Text = "Cancel", .AutoSize = True, .DialogResult = DialogResult.Cancel, .Anchor = AnchorStyles.Right}

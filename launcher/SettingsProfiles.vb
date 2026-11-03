@@ -57,7 +57,7 @@ Public Class ProfileValues
             .RecenterKeepLevel = local.RecenterKeepLevel,
             .SeatOffsets = If(local.SeatOffsets, New Dictionary(Of String, SeatOffset)).ToDictionary(Function(pair) pair.Key, Function(pair) pair.Value.Copy()),
             .SeatSameForAll = local.SeatSameForAll, .SeatAllCars = If(local.SeatAllCars, New SeatOffset).Copy(), .StartInCockpit = local.StartInCockpit, .SeatOnDesktop = local.SeatOnDesktop,
-            .SeatMenuKey = local.SeatMenuKey, .SeatMenuModifiers = local.SeatMenuModifiers,
+            .SeatMenuKey = local.SeatMenuKey, .SeatMenuModifiers = local.SeatMenuModifiers, .SeatMenuButton = local.SeatMenuButton,
             .DiagnosticLogging = DiagnosticLogging, .ExperimentalVrEnabled = ExperimentalVrEnabled,
             .VrRenderScale = VrRenderScale, .DesktopWidth = DesktopWidth, .DesktopHeight = DesktopHeight,
             .DesktopDisplayMode = DesktopDisplayMode, .DesktopVSync = DesktopVSync, .SkipStartupMovies = SkipStartupMovies,

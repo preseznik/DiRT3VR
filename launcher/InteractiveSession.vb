@@ -19,7 +19,7 @@ Public Class InteractiveSession
     Public Property TheaterNote As String = ""
     ' The SteamVR folder whose theater setting this session turned off, or Nothing.
     Private steamVrFolder As String
-    ' The in-game seat menu's shared memory for this session (#bd820b32), or Nothing without a menu key.
+    ' The in-game seat menu's shared memory for this session (#bd820b32), or Nothing without a menu key or button.
     Public Property SeatMenu As SeatChannel
     ' A seat position saved from the in-game menu just before DiRT 3 closed, for the window to show.
     Public Property FinalSeatCommit As SeatCommit
@@ -139,7 +139,7 @@ Public Class InteractiveSession
             theaterNote = SteamVrTheater.Suppress(context, runtime)
             If SteamVrTheater.Pending(context) Then theaterFolder = Path.GetDirectoryName(runtime.ManifestPath)
             ' The in-game seat menu (#bd820b32): its shared memory lives as long as this session.
-            If settings.SeatMenuKey <> 0 Then seatMenu = New SeatChannel(settings, seats.Offsets)
+            If settings.SeatMenuKey <> 0 OrElse settings.SeatMenuButton IsNot Nothing Then seatMenu = New SeatChannel(settings, seats.Offsets)
             game = Process.Start(StartInfo(context, runtime, directory, settings, headset, preflight.Bypasses, seatMenu?.Name))
             If game Is Nothing Then Throw New IOException("DiRT 3 could not start.")
             Dim result As New InteractiveSession(context, game, directory, lease) With {.SeatsSkipped = seats.Skipped, .MotionBlurNote = blurNote, .DrivingNote = actionMaps.Note, .TheaterNote = theaterNote, .steamVrFolder = theaterFolder, .SeatMenu = seatMenu}

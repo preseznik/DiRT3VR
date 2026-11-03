@@ -202,8 +202,18 @@ Public Class LauncherSettings
     Public Const DefaultSeatMenuKey As Integer = 122
     Public Property SeatMenuKey As Integer = DefaultSeatMenuKey
     Public Property SeatMenuModifiers As Integer
+    ' A controller or wheel button that also opens the seat menu (#c137c681); machine-specific like RecenterDevice.
+    Public Property SeatMenuButton As RecenterDeviceBinding
     ' Optional controller/wheel button; machine-specific, so never part of settings profiles.
     Public Property RecenterDevice As RecenterDeviceBinding
+
+    ' Why a key can't open the seat menu, or "" when it can (0 = no key).
+    Public Shared Function SeatMenuKeyProblem(key As Integer, modifiers As Integer, recenterKey As Integer, recenterModifiers As Integer) As String
+        If key = 0 Then Return ""
+        If Not RecenterShortcut.Valid(key, modifiers) OrElse (key >= 37 AndAlso key <= 40) OrElse key = 13 Then Return "Choose another seat menu key. The arrows and Enter move and save in the menu, and Windows shortcuts are reserved."
+        If key = recenterKey AndAlso modifiers = recenterModifiers Then Return "The seat menu and recentering need different keys."
+        Return ""
+    End Function
 
     Public Sub Validate()
         If Version <> 1 Then Throw New IOException("Unsupported launcher settings version. The existing settings were preserved.")
@@ -213,10 +223,16 @@ Public Class LauncherSettings
         If VdxrRuntimeManifest Is Nothing OrElse VdxrRuntimeManifest.Length > 32768 Then Throw New IOException("Invalid VDXR runtime path.")
         If VrRenderScale < 50 OrElse VrRenderScale > 300 Then Throw New IOException("Choose a VR render scale between 50% and 300%.")
         If Not RecenterShortcut.Valid(RecenterKey, RecenterModifiers) Then Throw New IOException("Choose another recenter key. Windows shortcuts such as Alt+Tab are reserved.")
-        If SeatMenuKey <> 0 AndAlso (Not RecenterShortcut.Valid(SeatMenuKey, SeatMenuModifiers) OrElse (SeatMenuKey >= 37 AndAlso SeatMenuKey <= 40) OrElse SeatMenuKey = 13) Then Throw New IOException("Choose another seat menu key. The arrows and Enter move and save in the menu, and Windows shortcuts are reserved.")
-        If SeatMenuKey <> 0 AndAlso SeatMenuKey = RecenterKey AndAlso SeatMenuModifiers = RecenterModifiers Then Throw New IOException("The seat menu and recentering need different keys.")
+        Dim seatKey = SeatMenuKeyProblem(SeatMenuKey, SeatMenuModifiers, RecenterKey, RecenterModifiers)
+        If seatKey <> "" Then Throw New IOException(seatKey)
         If SeatMenuKey = 0 Then SeatMenuModifiers = 0
         RecenterDevice?.Validate()
+        If SeatMenuButton IsNot Nothing Then
+            SeatMenuButton.Validate("seat menu")
+            Dim reserved = SeatMenuInput.Reserved(SeatMenuButton)
+            If reserved <> "" Then Throw New IOException(reserved)
+            If SeatMenuButton.SameInput(RecenterDevice) Then Throw New IOException("The seat menu and recentering need different controller buttons.")
+        End If
         DesktopGraphics.Validate(Me)
         GraphicsQuality = GraphicsCatalog.Current.Normalize(GraphicsQuality)
         VrGraphicsQuality = GraphicsCatalog.Current.Normalize(VrGraphicsQuality)

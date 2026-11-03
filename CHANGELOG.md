@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- An in-game seat menu for VR (#bd820b32): during Launch VR, press **F11** to move your seat in the headset with the arrow keys (hold Shift to move sideways), then Enter to save or Esc to cancel. An Xbox controller's D-pad, A, B and X work too, and a wheel's hat moves the seat. Under **Controls → Seat** you can change the key or add a controller or wheel button that opens the menu (#c137c681).
 - In Controls → Driving controls, a row now lights up in the launcher's accent colour while its button, d-pad direction, axis or key is held, so you can see what each input does (#9ff647cf).
 - SteamVR's desktop theater no longer opens over the game during SteamVR sessions (#24867b69, as in GRID2VR). The launcher turns that SteamVR setting off for the session and puts your own setting back afterwards; Restore original files does it too if a session ended unexpectedly. SteamVR must already be running for this.
 - SteamVR works with Launch VR again (#da2bcde1). It was switched off after one upside-down report from a session with another VR game open; it is new and still being checked, so please report any upside-down, tilted or mirrored picture with the session logs.
