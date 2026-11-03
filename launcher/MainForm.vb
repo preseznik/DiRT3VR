@@ -70,6 +70,9 @@ Public Class MainForm
     Private ReadOnly desktopResolution As New ComboBox With {.Name = "DesktopResolution", .DropDownStyle = ComboBoxStyle.DropDownList}
     Private ReadOnly desktopMode As New ComboBox With {.Name = "DesktopDisplayMode", .DropDownStyle = ComboBoxStyle.DropDownList}
     Private ReadOnly desktopVSync As New ComboBox With {.Name = "DesktopVSync", .DropDownStyle = ComboBoxStyle.DropDownList}
+    ' Anisotropic filtering (#15714dd2), LauncherSettings.AnisotropyLevels order.
+    Private ReadOnly desktopAnisotropy As New ComboBox With {.Name = "DesktopAnisotropy", .DropDownStyle = ComboBoxStyle.DropDownList}
+    Private ReadOnly vrAnisotropy As New ComboBox With {.Name = "VrAnisotropy", .DropDownStyle = ComboBoxStyle.DropDownList}
     Private headsetResolution As HeadsetResolution
     Private ReadOnly resolutionSummary As New Label With {.Name = "VrResolutionSummary", .AutoSize = True}
     Private ReadOnly lastSessionSummary As New Label With {.Name = "LastVrSession", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12)}
@@ -381,15 +384,20 @@ Public Class MainForm
         Field(desktopSettings, "Display mode", desktopMode)
         Field(desktopSettings, "Resolution", desktopResolution)
         Field(desktopSettings, "VSync", desktopVSync)
-        For Each box In {desktopMode, desktopResolution, desktopVSync}
+        desktopAnisotropy.Items.AddRange(Anisotropy.Names) : vrAnisotropy.Items.AddRange(Anisotropy.Names)
+        Field(desktopSettings, "Anisotropic filtering", desktopAnisotropy)
+        For Each box In {desktopMode, desktopResolution, desktopVSync, desktopAnisotropy}
             StyleChoice(box, desktopSettings)
         Next
         AddHandler desktopMode.SelectedIndexChanged, Sub() desktopResolution.Enabled = desktopMode.SelectedIndex <> 3
         desktopSettings.Controls.Add(Info("Applies when you click Launch. Use game setting leaves that option unchanged. Desktop changes stay in the game's graphics file; a backup is saved before each change. Save settings only saves launcher preferences."))
         desktopSettings.Controls.Add(Info("Borderless fills the main display at its current resolution. Keep this launcher open until startup finishes. VR uses its own resolution, window mode and VSync settings."))
+        desktopSettings.Controls.Add(Info("DiRT 3 has no anisotropic filtering option of its own. A choice other than Use game setting installs DiRT3VR's renderer for that Launch session, without VR, and removes it after DiRT 3 closes."))
         Dim vrSettings = Section(columns.Second, "VR rendering")
         vrSettings.Controls.Add(Info(ExperimentalFiles.ProfileDescription))
         Field(vrSettings, "VR render scale", renderScale)
+        Field(vrSettings, "Anisotropic filtering", vrAnisotropy)
+        StyleChoice(vrAnisotropy, vrSettings)
         vrSettings.Controls.Add(Info("100% renders at the connected headset's recommended resolution per eye. Output stays at that recommendation; this slider changes scene detail. Applies on the next VR launch. Unsupported sizes are refused, and original game settings are restored afterward."))
         vrSettings.Controls.Add(resolutionSummary)
         vrSettings.Controls.Add(refreshHeadset)
@@ -994,6 +1002,8 @@ Public Class MainForm
         ClearPresetUndo()
         desktopMode.SelectedIndex = Array.IndexOf({"game", "windowed", "fullscreen", "borderless"}, settings.DesktopDisplayMode)
         desktopVSync.SelectedIndex = Array.IndexOf({"game", "off", "on"}, settings.DesktopVSync)
+        desktopAnisotropy.SelectedIndex = Math.Max(0, Array.IndexOf(LauncherSettings.AnisotropyLevels, settings.DesktopAnisotropy))
+        vrAnisotropy.SelectedIndex = Math.Max(0, Array.IndexOf(LauncherSettings.AnisotropyLevels, settings.VrAnisotropy))
         desktopResolution.Items.Clear()
         Dim chosen = New Size(settings.DesktopWidth, settings.DesktopHeight)
         Dim sizes = DesktopDisplay.Resolutions().Append(chosen).Append(Size.Empty).Distinct().OrderBy(Function(s) s.Width).ThenBy(Function(s) s.Height)
@@ -1008,6 +1018,7 @@ Public Class MainForm
     Public Function CurrentSettings() As LauncherSettings
         Dim resolution = TryCast(desktopResolution.SelectedItem, DesktopResolutionChoice)
         Return New LauncherSettings With {.ModernInterface = modern.Checked, .RuntimeMode = If(runtime.SelectedIndex = 1, "steamvr", "vdxr"), .SteamRuntimeManifest = manifest.Text, .VdxrRuntimeManifest = vdxrManifest.Text, .DiagnosticLogging = logging.Checked, .ExperimentalVrEnabled = experimental.Checked, .VrRenderScale = renderScale.Value, .HudDistance = hudDistance.Value / 2D, .HudFollowView = hudFollow.Checked, .PerfDisplay = perfDisplay.Checked, .PerfFollowView = perfFollow.Checked,
+            .DesktopAnisotropy = LauncherSettings.AnisotropyLevels(Math.Max(0, desktopAnisotropy.SelectedIndex)), .VrAnisotropy = LauncherSettings.AnisotropyLevels(Math.Max(0, vrAnisotropy.SelectedIndex)),
             .DesktopWidth = If(resolution Is Nothing, 0, resolution.Size.Width), .DesktopHeight = If(resolution Is Nothing, 0, resolution.Size.Height),
             .DesktopDisplayMode = {"game", "windowed", "fullscreen", "borderless"}(Math.Max(0, desktopMode.SelectedIndex)), .DesktopVSync = {"game", "off", "on"}(Math.Max(0, desktopVSync.SelectedIndex)), .SkipStartupMovies = skipStartupMovies.Checked,
             .RecenterKey = recenterKey, .RecenterModifiers = recenterModifiers, .RecenterDevice = recenterDevice, .RecenterKeepLevel = recenterKeepLevel.Checked,
@@ -1050,7 +1061,7 @@ Public Class MainForm
             Return False
         End If
         Dim question = If(graphicsOnly,
-                      "Set desktop display mode, resolution, VSync and every desktop quality option to Use game setting, every VR quality option to Same as desktop, and VR render scale to 100%?",
+                      "Set desktop display mode, resolution, VSync, anisotropic filtering and every desktop quality option to Use game setting, every VR quality option to Same as desktop, VR anisotropic filtering to Use game setting and VR render scale to 100%?",
                       "Reset every launcher choice to its default: appearance, VR runtime, logging, startup, graphics, recenter key and controller button? VR runtime locations, the experimental VR opt-in and seat positions are kept.") &
                    If(HasUnsavedSettings(), " Your unsaved changes in the launcher controls are replaced.", "") &
                    " Nothing is saved until you choose Save settings or Launch; game files and settings profiles are not changed."
@@ -1405,11 +1416,12 @@ Public Class MainForm
             New HelpTopic(HelpGraphics,
                 "Desktop: display mode, resolution and VSync for Launch. Use game setting leaves that option unchanged. Borderless fills the main display at its current resolution. Desktop choices stay in the game's graphics file; an exact backup is saved under desktop-backups in the preferences folder before each change." & vbCrLf & vbCrLf &
                 "VR rendering: one VR render scale from 50% to 300%. At 100% the scene matches the connected headset's recommended resolution per eye; output stays at that recommendation while the slider changes scene detail. Refresh headset resolution shows the detected sizes. The launcher checks the headset again before every VR launch and refuses unsupported sizes." & vbCrLf & vbCrLf &
+                "Anisotropic filtering, under Desktop and under VR rendering, sharpens road and ground textures seen at an angle. DiRT 3 has no option for it, so a choice other than Use game setting is applied by DiRT3VR's renderer: Off is plain trilinear filtering, 2× to 16× are stronger. On the monitor this installs the renderer for that Launch session, without VR, and removes it after DiRT 3 closes." & vbCrLf & vbCrLf &
                 "Below it, Last VR session shows the headset refresh rate (when the runtime reports it) and whether DiRT 3 rendered the scene size DiRT3VR asked for, read from that session's log." & vbCrLf & vbCrLf &
                 "Quality has separate Desktop and VR columns. Choose one of DiRT 3's presets or set each option; the preset shows Custom when the options match none of them. The values are DiRT 3's DirectX 11 options; Medium is the game's default." & vbCrLf & vbCrLf &
                 "Desktop quality is written into DiRT 3's graphics file at every launch, so options not set to Use game setting replace changes made in the game's own menu. VR quality is applied only while a VR session runs, with DiRT3VR's other temporary changes, and undone afterwards; options on Same as desktop use the desktop choice." & vbCrLf & vbCrLf &
                 "Quick VR presets: Potato / Low-End sets VR quality to Ultra Low and VR render scale to 70%; VR Balanced keeps High's look with the crowd one step lower. Undo preset brings back the controls from before the last preset, until you change an option or the render scale yourself." & vbCrLf & vbCrLf &
-                "Restore graphics defaults sets the desktop and quality choices to Use game setting and the render scale to 100%. It asks first and changes only the controls until Save settings or Launch."),
+                "Restore graphics defaults sets the desktop, anisotropic filtering and quality choices to Use game setting and the render scale to 100%. It asks first and changes only the controls until Save settings or Launch."),
             New HelpTopic(HelpControls,
                 "Use your existing keyboard, controller or wheel bindings in DiRT 3." & vbCrLf & vbCrLf &
                 "Driving controls… binds your wheel, pedals, shifter, controller and keys for direct practice, with Launch and Launch VR. A direct start doesn't load your DiRT 3 profile, so DiRT 3 would otherwise use its default preset for each device. It also skips the Press Start screen, where DiRT 3 normally picks your controller, so DiRT3VR gives the player the device you bound steering to (or the one with most bindings); without bindings here DiRT 3 picks the keyboard. The Binding wizard asks for the essentials (steering, pedals, clutch, handbrake, gear up and down, change view, look back and pause), then offers the H-pattern shifter, flashback and replays, menus, and look and horn; Skip keeps an action's current binding, and only finished groups are kept. Key… and Device… rebind one action, Calibrate… sets an axis's direction, dead zone and saturation, Wheel rotation… sets how far you turn your wheel for full steering lock (your wheel's rotation and the rotation you want in DiRT 3 set the steering saturation), and Xbox preset loads DiRT 3's own Xbox controller layout. Presets save and load whole binding sets. For each bound device the session writes a complete action map (DiRT 3's own map for that device with your bindings in place) and lists it in actionmap\actionMapPaths.xml; both are removed after exit, like DiRT3VR's other temporary changes. Two identical devices share one map, as DiRT 3 tells devices apart by name." & vbCrLf & vbCrLf &

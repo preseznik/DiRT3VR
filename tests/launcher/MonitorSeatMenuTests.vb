@@ -98,7 +98,7 @@ Module MonitorSeatMenuTests
         Dim changes = DesktopStartupSession.Changes(ctx, withSeat, Nothing, seats.Files)
         check(changes.ContainsKey("proxy") AndAlso Not changes.ContainsKey("direct") AndAlso changes.ContainsKey("seat/mex"), "the session installs the renderer, without direct practice, with the seat")
         Dim transaction As New OwnedFileTransaction(ctx)
-        transaction.Prepare(changes, apply:=False, seats:=seats.Offsets, seatMenu:=True)
+        transaction.Prepare(changes, apply:=False, seats:=seats.Offsets, monitorRenderer:=True)
         Dim journal = SafeFiles.ReadJson(Of RecoveryJournal)(transaction.JournalPath)
         check(journal.Schema = 10 AndAlso journal.Seats("mex").Up = 2 AndAlso journal.Seats("mex").Fov = 10, "a monitor seat menu session writes a schema 10 journal (older launchers refuse it)")
         Dim journalText = File.ReadAllText(transaction.JournalPath)
@@ -112,11 +112,11 @@ Module MonitorSeatMenuTests
         check(transaction.Recover() AndAlso Not File.Exists(Path.Combine(ctx.GameRoot, "d3d11.dll")) AndAlso SeatCameras.ViewValues(File.ReadAllBytes(SeatPositions.CameraPath(ctx, "mex")), "head-cam")("fov") = "50.0000",
               "after the session the renderer is gone and the camera file is back")
         Dim plain As New OwnedFileTransaction(Context(root, "menu-only"))
-        plain.Prepare(New Dictionary(Of String, Byte()) From {{"proxy", Text.Encoding.UTF8.GetBytes("owned test payload")}}, apply:=False, seatMenu:=True)
+        plain.Prepare(New Dictionary(Of String, Byte()) From {{"proxy", Text.Encoding.UTF8.GetBytes("owned test payload")}}, apply:=False, monitorRenderer:=True)
         check(SafeFiles.ReadJson(Of RecoveryJournal)(plain.JournalPath).Schema = 10 AndAlso SafeFiles.ReadJson(Of RecoveryJournal)(plain.JournalPath).Seats Is Nothing, "the renderer alone is a schema 10 session too")
         check(plain.Recover(), "and it is restored")
         Dim vrMenu As New OwnedFileTransaction(Context(root, "vr-menu"))
-        check(Refused(Sub() vrMenu.Prepare(New Dictionary(Of String, Byte()) From {{"proxy", Text.Encoding.UTF8.GetBytes("owned test payload")}}, experimental:=True, apply:=False, seatMenu:=True)), "the monitor menu belongs to a desktop session")
+        check(Refused(Sub() vrMenu.Prepare(New Dictionary(Of String, Byte()) From {{"proxy", Text.Encoding.UTF8.GetBytes("owned test payload")}}, experimental:=True, apply:=False, monitorRenderer:=True)), "the monitor menu belongs to a desktop session")
 
         ' The game's environment: the channel and the log folder; not direct practice.
         Dim logs = Path.Combine(ctx.UserRoot, "logs", "session-fixture")
