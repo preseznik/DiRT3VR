@@ -78,6 +78,20 @@ still present with bloom off:
 - `LensFlares` (`multiplierAndThreshold_*`, `multiplier` 2.0, `threshold` 0.1) — the flare chain.
 
 Both are screen-space effects; in VR each eye would draw its own flare and streak position, which
-is the likely "sun bloom" complaint from DiRT2VR. Whether the option should also turn these off is
-iztok's call (asked on #3c6d6ffa). Night tracks, finish and flashback effects (higher mixes, e.g.
+is the likely "sun bloom" complaint from DiRT2VR. iztok chose two options (2026-11-03): bloom, and
+streaks + flares.
+
+## Light streaks and lens flares off
+
+`tools/glare.py` `disable_glare(data)` zeroes the Streaks `multiplier_0..2` (50 effects, race_base
+among them at 0.4 / 0.4 / 1.5) and the LensFlares `multiplier` (61 effects, 55 non-zero) in
+`postprocess\effects.xml`, by the same appended-string rule; thresholds, colours, `upperLimit`
+and the per-element `multiplierAndThreshold_*` vectors stay. race_base's `upperLimit` is 0
+with non-zero multipliers, so `upperLimit` 0 alone doesn't mean "off". The generic track files
+have neither group. Bloom and glare edits touch different elements and give the same bytes in
+either order (`tests/test_glare.py`). `run_benchmark.py --no-glare` (alone or with `--no-bloom`)
+applies it for one journaled run. For the launcher: a second option, journaling the same
+`postprocess\effects.xml` target as bloom and motion blur and writing whichever edits are on.
+Not yet seen in the game: a run with the sun in view settles whether `multiplier` alone turns
+the flare chain off. Night tracks, finish and flashback effects (higher mixes, e.g.
 finish_fx_green mixLarge 1.5954) weren't run.

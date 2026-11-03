@@ -346,6 +346,27 @@ class BloomTransactionTests(unittest.TestCase):
             self.assertEqual((self.game / name).read_bytes(), data)
         self.assertFalse((self.game / "d3d11.dll").exists())
 
+    def test_glare_and_both_edits_of_the_effects_file_restore_byte_exact(self):
+        import glare
+        import seat_cameras
+        from seat_cameras import Node
+        flare = Node("ParameterGroup", None, [("name", "LensFlares")], [Node("Param", "\r\n\t\t\t2.000000\r\n\t\t", [("name", "multiplier")], [])])
+        bloom_group = Node("ParameterGroup", None, [("name", "BloomFromDsX4")], [Node("Param", "\r\n\t\t\t1.999800\r\n\t\t", [("name", "mixHuge")], [])])
+        effects = seat_cameras.encode(seat_cameras.from_tree(
+            Node("PostProcessEffects", None, [], [Node("Effect", None, [("name", "t~a~b")], [flare, bloom_group])]), [""]))
+        (self.game / df.EFFECTS_NAME).write_bytes(effects)
+        for edits, expected in ((("glare",), glare.disable_glare(effects)),
+                                (("bloom", "glare"), glare.disable_glare(df.bloom.disable_bloom(effects)))):
+            with self.subTest(edits=edits), patch.object(df, "EFFECTS_SHA256", hashlib.sha256(effects).hexdigest()), \
+                    patch.object(df, "EFFECTS_EDITS", edits):
+                journal = self.root / f"deployment-{len(edits)}.json"
+                transaction = df.DiagnosticFiles(self.game, journal, self.run_id)
+                transaction.apply_replacement(df.EFFECTS_NAME, effects)
+                self.assertEqual((self.game / df.EFFECTS_NAME).read_bytes(), expected)
+                self.assertEqual(df.DiagnosticFiles.recover(journal, self.game), [])
+                self.assertEqual((self.game / df.EFFECTS_NAME).read_bytes(), effects)
+                (self.root / f"effects-original-{self.run_id}.bin").unlink()
+
     def test_unexpected_effects_file_is_refused_before_any_change(self):
         (self.game / df.EFFECTS_NAME).write_bytes(binary_effects("0.500000"))
         with self.assertRaises(ValueError):
