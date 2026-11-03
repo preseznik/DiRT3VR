@@ -292,7 +292,22 @@ More of the input library (static, for porting GRID2VR's claim):
   id in a direct start and a game-thread hook point (the controller update `0xb29f80`, already
   used by direct practice, is a candidate).
 
-Next: a research renderer probe that, in a direct start, logs the devices bound to the
+**A direct start binds devices itself (runs 20261103-102350, -102909).** `0x56e070` runs
+only with the benchmark flags (`0xf9cef0`/`0xf9cef1`) and is the direct start's own Press
+Start: it lists the connected devices through the input service's `0xb04cf0` (12-byte
+descriptors), takes the first valid one for player 1 and the next for player 2, and binds
+each through `0xb31c70(map, &descriptor)` (call sites `0x56e214`/`0x56e254`). Run -102909
+(`--devices --device-first xinput_pad`) on PC4080S listed one device, the keyboard (family =
+the interned "keyboard" id), and bound it to map 0; the Bluetooth pad was off, so it wasn't
+listed. So with a keyboard first in that list, a wheel is never bound: iztok's G920. Fix
+candidate: in that one call (return address `0x56e150`), move the launcher's bound device to
+the front of the list, and the game binds it to player 1 as Press Start would. Still to
+check: the move with a connected pad here, and the G920's family name on PC4090 (expected:
+its DirectInput product name, the deviceName the launcher writes in the session map).
+The research switch: `DIRT3VR_RESEARCH_DEVICES=1`, `DIRT3VR_RESEARCH_DEVICE_FIRST=<family>`
+(`run_benchmark.py --devices --device-first NAME`).
+
+Earlier plan: a research renderer probe that, in a direct start, logs the devices bound to the
 player's map and calls `0xb31c70` for a launcher-bound device (on this PC, the Bluetooth
 Xbox pad, checked by reading the map back rather than by pressing anything). The G920 itself
 is on PC4090.

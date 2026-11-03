@@ -2,6 +2,8 @@
 #include <windows.h>
 #include <tlhelp32.h>
 #include <MinHook.h>
+#include <intrin.h>
+#include <algorithm>
 #include <atomic>
 #include <cstdarg>
 #include <cstdio>
@@ -335,6 +337,77 @@ void InstallVehicleNames(void (*log)(const char*,...)) {
     }).detach();
     log("Research vehicles: reading at %u time(s)",static_cast<unsigned>(seconds.size()));
 }
+// The direct start's own Press Start (0x56e070, only with the benchmark flags 0xf9cef0/1): it
+// lists the connected devices through the input service's 0xb04cf0 (12-byte descriptors
+// {backend, family, index}), takes the first valid one for player 1 and the next for player 2,
+// and binds each through 0xb31c70(map, &descriptor) as ScreenPressStart does (#16fa2aa3).
+// DIRT3VR_RESEARCH_DEVICES=1 logs each list (with the ids of "keyboard" and "xinput_pad") and
+// every bind; DIRT3VR_RESEARCH_DEVICE_FIRST=<family name> moves that device to the front of the
+// list the direct start binds from (call site 0x56e14b).
+struct InputDevice { uint32_t backend,family,index; };
+using DeviceListFn=int(__thiscall*)(void*,void*);
+using BindFn=int(__thiscall*)(void*,uint32_t,const InputDevice*);
+DeviceListFn realDeviceList{};
+BindFn realBind{};
+char firstDeviceName[160]{};
+std::atomic<unsigned> deviceLogs{};
+uint32_t Intern(const char* name) {
+    auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+    using InternFn=void*(__thiscall*)(void*,const char*);
+    uint32_t id{};
+    reinterpret_cast<InternFn>(image+(0xccfe30-0x400000))(&id,name);
+    return id;
+}
+int __fastcall DeviceList(void* self,void*,void* out) {
+    const auto result=realDeviceList(self,out);
+    auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+    const bool directStart=_ReturnAddress()==image+(0x56e150-0x400000);
+    auto** range=static_cast<InputDevice**>(out);
+    if(result!=0 || !range || !Readable(range,8)) return result;
+    auto* first=range[0];
+    const auto count=range[1]>=first ? static_cast<size_t>(range[1]-first) : 0;
+    if(count>32 || (count && !Readable(first,count*sizeof(InputDevice)))) return result;
+    static const uint32_t keyboard=Intern("keyboard"),pad=Intern("xinput_pad");
+    if(traceLog && deviceLogs.fetch_add(1)<40) {
+        traceLog("Research devices: %u listed for %s (keyboard id 0x%x, xinput_pad id 0x%x)",static_cast<unsigned>(count),
+                 directStart ? "the direct start's bind" : "another caller",keyboard,pad);
+        for(size_t i=0;i<count;++i) traceLog("Research devices:  %u backend=0x%x family=0x%x index=%u",static_cast<unsigned>(i),
+                                             first[i].backend,first[i].family,first[i].index);
+    }
+    if(directStart && firstDeviceName[0]) {
+        const auto wanted=Intern(firstDeviceName);
+        const auto found=std::find_if(first,first+count,[&](const InputDevice& d) { return d.family==wanted; });
+        if(found!=first+count && found!=first) std::rotate(first,found,found+1);
+        if(traceLog) traceLog("Research devices: '%s' (id 0x%x) %s",firstDeviceName,wanted,
+                              found==first+count ? "not listed" : found==first ? "already first" : "moved to the front");
+    }
+    return result;
+}
+int __fastcall Bind(void* self,void*,uint32_t map,const InputDevice* device) {
+    if(traceLog && device && Readable(device,sizeof(*device)))
+        traceLog("Research bind: map 0x%x device backend=0x%x family=0x%x index=%u (from %p)",map,device->backend,device->family,
+                 device->index,_ReturnAddress());
+    return realBind(self,map,device);
+}
+void InstallDevices(void (*log)(const char*,...)) {
+    char text[4]{};
+    if(GetEnvironmentVariableA("DIRT3VR_RESEARCH_DEVICES",text,sizeof(text))!=1 || text[0]!='1') return;
+    const auto nameLength=GetEnvironmentVariableA("DIRT3VR_RESEARCH_DEVICE_FIRST",firstDeviceName,sizeof(firstDeviceName));
+    if(nameLength>=sizeof(firstDeviceName)) firstDeviceName[0]=0;
+    auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+    static const uint8_t listEntry[]{0x55,0x8b,0xec,0x83,0xc1,0x78,0x5d,0xe9};
+    static const uint8_t bindEntry[]{0x55,0x8b,0xec,0x6a,0xff,0x68};
+    auto* list=image+(0xb04cf0-0x400000);
+    auto* bind=image+(0xb31c70-0x400000);
+    if(std::memcmp(list,listEntry,sizeof(listEntry)) || std::memcmp(bind,bindEntry,sizeof(bindEntry))) { log("Research devices refused: instructions differ"); return; }
+    traceLog=log;
+    const auto initialized=MH_Initialize();
+    if(initialized!=MH_OK && initialized!=MH_ERROR_ALREADY_INITIALIZED) return;
+    const auto a=MH_CreateHook(list,reinterpret_cast<void*>(&DeviceList),reinterpret_cast<void**>(&realDeviceList));
+    const auto b=MH_CreateHook(bind,reinterpret_cast<void*>(&Bind),reinterpret_cast<void**>(&realBind));
+    const auto c=a==MH_OK && b==MH_OK ? MH_EnableHook(MH_ALL_HOOKS) : MH_ERROR_NOT_CREATED;
+    log("Research devices: list hook=%d bind hook=%d enabled=%d first='%s'",a,b,c,firstDeviceName);
+}
 int* __fastcall WaitUpdate(void* self,void*,int* out) {
     auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
     InstallSaveSink(image);
@@ -666,6 +739,7 @@ void Apply(void (*log)(const char*,...)) {
         InstallStackSampler(log);
         InstallGameLog(log);
         InstallVehicleNames(log);
+        InstallDevices(log);
         char text[513]{};
         const auto length=GetEnvironmentVariableA("DIRT3VR_RESEARCH_PATCH",text,sizeof(text));
         if(!length) return;
