@@ -319,7 +319,7 @@ def documents_dir() -> Path:
 
 
 FOCUS_KEYS = {"esc": (0x01, False), "enter": (0x1C, False), "up": (0x48, True), "down": (0x50, True),
-              "left": (0x4B, True), "right": (0x4D, True), "space": (0x39, False)}
+              "left": (0x4B, True), "right": (0x4D, True), "space": (0x39, False), "c": (0x2E, False)}  # c: Change View
 
 
 def parse_focus_keys(text: str) -> list[tuple[float, str]]:
@@ -534,6 +534,9 @@ def main() -> int:
     parser.add_argument("--seat-test", type=parse_seat_offset, metavar="SIDE,UP,FORWARD",
                         help="Research: journaled change of cars/models/frx/cameras.xml that starts the car in its cockpit "
                              "view with the eye point moved by these metres (0,0,0 = cockpit start only)")
+    parser.add_argument("--seat-cockpit", choices=("hide", "first"), default="hide",
+                        help="With --seat-test: hide the views before head-cam (the default), or move head-cam to the front of the "
+                             "view list and hide nothing (seat_cameras.cockpit_first); a --recover needs the same choice")
     parser.add_argument("--player-copies", type=int, choices=range(1, 9), default=1, metavar="K",
                         help="number= on the first <car>: the player's car plus K-1 AI copies of it")
     parser.add_argument("--direct-difficulty", type=int, choices=range(0, 6), metavar="N",
@@ -653,6 +656,7 @@ def main() -> int:
         if "frx" not in scene["cars"][:1]:
             parser.error("--seat-test changes the frx camera file; use the frx as the (first) car")
         diagnostic_files.SEAT_TEST_OFFSET = args.seat_test
+        diagnostic_files.SEAT_TEST_COCKPIT = args.seat_cockpit
     seat = preflight_replacement(game, SEAT_NAME) if args.seat_test is not None else None
     if args.load_profile:
         diagnostic_files.PROFILE_LOAD_STEPS = args.load_profile
@@ -668,7 +672,7 @@ def main() -> int:
                  "stereo": False, "sceneObserver": args.scene_observer,
                  "serialRender": args.serial_render, "replayPair": args.replay_pair,
                  "xrRuntime": xr_runtime, "backgroundPlay": args.background_play, "researchPatch": args.research_patch,
-                 "spectatorHumanSwitch": args.spectator_human_switch, "noBloom": args.no_bloom, "anisotropy": args.anisotropy, "multisampling": args.msaa, "directPractice": args.direct_practice,
+                 "spectatorHumanSwitch": args.spectator_human_switch, "noBloom": args.no_bloom, "seatCockpit": args.seat_cockpit if args.seat_test is not None else None,"anisotropy": args.anisotropy, "multisampling": args.msaa, "directPractice": args.direct_practice,
                  "playerHardwareSettings": args.player_hardware_settings, "directLaps": args.direct_laps, "directReturn": args.direct_return, "scene": scene,
                  "durationSeconds": args.seconds}
     if restrictions:

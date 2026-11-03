@@ -246,6 +246,24 @@ def offset_seat(data: bytes, sideways: float, up: float, forward: float) -> byte
     return encode(document)
 
 
+def cockpit_first(data: bytes) -> bytes:
+    """Move head-cam to the front of the view list, hiding nothing: the race starts in the
+    cockpit and Change View still reaches every other view (iztok, 2026-11-03).
+
+    The Views are sibling records under the ViewManager, each pointing at its own attributes
+    and children, so rotating those records reorders the list and leaves every subtree, string
+    and attribute where it was. Applying it twice gives the same bytes."""
+    document = decode(data)
+    order = views(document)
+    cockpit = head_cam(document)
+    first = order[0]
+    if order[:order.index(cockpit) + 1] != list(range(first, cockpit + 1)):
+        raise ValueError("Views before head-cam are not consecutive records")
+    records = document.elements
+    records[first:cockpit + 1] = [records[cockpit]] + records[first:cockpit]
+    return encode(document)
+
+
 def start_in_cockpit(data: bytes) -> bytes:
     """Research: hide the views listed before head-cam, so the car starts in the cockpit view."""
     document = decode(data)
