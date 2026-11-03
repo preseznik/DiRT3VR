@@ -61,6 +61,8 @@ struct PrototypeState {
     uintptr_t previousCameraOwner{};
     bool previousStereoEligible{}, cameraReported{};
     RecenterPoll recenter;
+    RecenterPoll toggle;
+    bool flat{}; // Toggle VR: the player switched to the flat virtual screen.
     bool basisPending=true;
     unsigned basisSamples{};
     bool rendering{}, windowReported{};
@@ -406,22 +408,56 @@ RecenterShortcut ConfiguredRecenter() {
     RuntimeLog(("XR recenter key="+value.Describe()).c_str());
     return value;
 }
-// The launcher creates this file when a bound controller/wheel button is pressed with DiRT 3 in front.
-const std::wstring& RecenterRequestPath() {
-    static const std::wstring path=[] {
-        const DWORD size=GetEnvironmentVariableW(L"DIRT3VR_RECENTER_REQUEST_FILE",nullptr,0);
-        if(!size || size>32768) return std::wstring{};
-        std::wstring value(size,L'\0');
-        const DWORD copied=GetEnvironmentVariableW(L"DIRT3VR_RECENTER_REQUEST_FILE",value.data(),size);
-        if(!copied || copied>=size) return std::wstring{};
-        value.resize(copied);
-        return std::filesystem::path(value).is_absolute() ? value : std::wstring{};
-    }();
-    return path;
+// The toggle VR key the launcher passes ("key modifiers", F6 by default there). The launcher leaves
+// the variable out for "No key", so a missing or rejected value means no key.
+std::optional<RecenterShortcut> ConfiguredToggle() {
+    char text[32]{};
+    const DWORD length=GetEnvironmentVariableA("DIRT3VR_TOGGLE_KEY",text,sizeof(text));
+    RecenterShortcut value;
+    if(!length) { RuntimeLog("XR toggle VR key=none"); return std::nullopt; }
+    if(length>=sizeof(text) || !RecenterShortcut::Parse(std::string_view(text,length),value)) {
+        RuntimeLog("XR toggle VR key setting rejected; no key"); return std::nullopt;
+    }
+    RuntimeLog(("XR toggle VR key="+value.Describe()).c_str());
+    return value;
 }
+// An absolute path from the launcher, or empty.
+std::wstring EnvironmentPath(const wchar_t* variable) {
+    const DWORD size=GetEnvironmentVariableW(variable,nullptr,0);
+    if(!size || size>32768) return {};
+    std::wstring value(size,L'\0');
+    const DWORD copied=GetEnvironmentVariableW(variable,value.data(),size);
+    if(!copied || copied>=size) return {};
+    value.resize(copied);
+    return std::filesystem::path(value).is_absolute() ? value : std::wstring{};
+}
+// The launcher creates such a file when a bound controller/wheel button is pressed with DiRT 3 in
+// front; taking the request deletes it.
+bool TakeRequest(const std::wstring& path) { return !path.empty() && DeleteFileW(path.c_str())!=FALSE; }
 bool DeviceRecenterRequested() {
-    const auto& path=RecenterRequestPath();
-    return !path.empty() && DeleteFileW(path.c_str())!=FALSE;
+    static const std::wstring path=EnvironmentPath(L"DIRT3VR_RECENTER_REQUEST_FILE");
+    return TakeRequest(path);
+}
+unsigned HeldModifiers() {
+    return (GetAsyncKeyState(VK_CONTROL)<0?1u:0u)|(GetAsyncKeyState(VK_MENU)<0?2u:0u)|(GetAsyncKeyState(VK_SHIFT)<0?4u:0u);
+}
+bool GameInFront() {
+    DWORD process{};
+    GetWindowThreadProcessId(GetForegroundWindow(),&process);
+    return process==GetCurrentProcessId();
+}
+// Toggle VR (#288ceec1): the bound key (DIRT3VR_TOGGLE_KEY) or a controller button
+// (DIRT3VR_TOGGLE_REQUEST_FILE) switches between stereo and the flat virtual screen while playing.
+// Every session starts in stereo.
+void ToggleKey(PrototypeState& state) {
+    static const auto binding=ConfiguredToggle();
+    static const std::wstring request=EnvironmentPath(L"DIRT3VR_TOGGLE_REQUEST_FILE");
+    const bool keyPressed=binding && state.toggle.Update(*binding,GetAsyncKeyState(static_cast<int>(binding->key))<0,HeldModifiers(),GameInFront());
+    const bool devicePressed=TakeRequest(request);
+    if(!keyPressed && !devicePressed) return;
+    state.flat=!state.flat;
+    state.history.Reset(); // The next stereo pair starts without history from before the switch.
+    RuntimeLog(state.flat ? "XR view toggled flat=1 (virtual screen)" : "XR view toggled flat=0 (stereo)");
 }
 // DIRT3VR_RECENTER_TILT=1: the player chose to include pitch and roll when recentering.
 bool ConfiguredRecenterTilt() {
@@ -431,12 +467,9 @@ bool ConfiguredRecenterTilt() {
 void RecenterKey(PrototypeState& state) {
     static const RecenterShortcut binding=ConfiguredRecenter();
     static const bool tilt=ConfiguredRecenterTilt();
-    DWORD process{};
-    GetWindowThreadProcessId(GetForegroundWindow(),&process);
-    const unsigned modifiers=(GetAsyncKeyState(VK_CONTROL)<0?1u:0u)|(GetAsyncKeyState(VK_MENU)<0?2u:0u)|(GetAsyncKeyState(VK_SHIFT)<0?4u:0u);
     const bool keyDown=GetAsyncKeyState(static_cast<int>(binding.key))<0;
     // Consume a button request every frame, so a key press in the same frame can't leave it for a second recenter.
-    const bool keyPressed=state.recenter.Update(binding,keyDown,modifiers,process==GetCurrentProcessId());
+    const bool keyPressed=state.recenter.Update(binding,keyDown,HeldModifiers(),GameInFront());
     const bool devicePressed=DeviceRecenterRequested();
     if(keyPressed || devicePressed) {
         state.xr.RequestRecenter(tilt);
@@ -480,6 +513,7 @@ void VrBeforePresent(IDXGISwapChain* chain) noexcept {
         if(StopRequested(*state)) return;
         RenderingScope rendering(*state);
         RecenterKey(*state);
+        if(InteractiveVrEnabled()) ToggleKey(*state);
         if(state->pendingFrame) {
             // Native intro playback draws after RenderVrScene. End exactly the
             // existing XR frame here, after all game draws, never a second frame.
@@ -564,6 +598,7 @@ bool RenderVrScene(void* renderer,void* lists,void* a,void* b,void* context,void
             }
             if(!camera.stereoEligible) return false;
             cockpit=camera.kind==CameraKind::Cockpit;
+            if(state->flat) return false; // Toggle VR: the engine's own pass goes to the virtual screen.
         }
         if(!NativeStereoDisabled(renderer)) { Stop(*state,"native-driver-stereo-contract"); return false; }
         const auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
