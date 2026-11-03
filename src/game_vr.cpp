@@ -409,7 +409,8 @@ bool Prepare(PrototypeState& state,ID3D11Texture2D* back) {
     if(!state.presenter.Initialize(device.Get()) ||
        (state.resolution.width && !state.hudPresenter.Initialize(device.Get())) ||
        !state.xr.Initialize(device.Get(),state.resolution.width ? 1.f : .5f,state.resolution.width,state.resolution.height,state.resolution.width!=0,
-                            state.seat!=nullptr,state.perfDisplay)) {
+                            state.seat!=nullptr,state.perfDisplay) ||
+       !state.xr.CropFieldOfView(state.resolution.fovWidth/100.f,state.resolution.fovHeight/100.f)) {
         Stop(state,"initialization"); return false;
     }
     state.device=device;
@@ -419,8 +420,9 @@ bool Prepare(PrototypeState& state,ID3D11Texture2D* back) {
         const bool timing=!folder.empty() && frametiming::Start(device.Get(),folder,state.resolution.width,state.resolution.height,state.resolution.scale);
         RuntimeLog(timing ? "XR performance summary on" : "XR performance summary unavailable");
     }
-    if(state.log) state.log("XR prototype enabled headset=%ux%u render_scale=%u scene=%ux%u game_units_per_metre=1; first tracked focused frame required",
-        state.resolution.width,state.resolution.height,state.resolution.scale,state.resolution.sceneWidth,state.resolution.sceneHeight);
+    if(state.log) state.log("XR prototype enabled headset=%ux%u render_scale=%u fov=%u/%u scene=%ux%u game_units_per_metre=1; first tracked focused frame required",
+        state.resolution.width,state.resolution.height,state.resolution.scale,state.resolution.fovWidth,state.resolution.fovHeight,
+        state.resolution.sceneWidth,state.resolution.sceneHeight);
     return true;
 }
 RecenterShortcut ConfiguredRecenter() {

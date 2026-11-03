@@ -254,6 +254,8 @@ bool XrRuntime::StartFrame(uint64_t sequence,FrameMode mode) noexcept {
             if(!math::Finite(view.pose.position) || !math::ValidFov(view.fov)) throw std::invalid_argument("Invalid XR view");
             view.pose.orientation=math::Normalize(view.pose.orientation);
         }
+        if(frameMode_==FrameMode::Stereo && (fovWidth_<1.f || fovHeight_<1.f))
+            for(auto& view:views_) view.fov=math::CropFov(view.fov,fovWidth_,fovHeight_);
         canRecenter_=focused_ && (tracking.viewStateFlags&tracked)==tracked;
         bool recentered=false;
         if(recenterPending_ && canRecenter_) {
@@ -389,6 +391,12 @@ bool XrRuntime::EndFrame(uint64_t generation,bool submit,FrameMode mode,float as
         else ++screenSubmitted_;
     }
     return complete && ended;
+}
+bool XrRuntime::CropFieldOfView(float width,float height) noexcept {
+    if(!std::isfinite(width) || !std::isfinite(height) || width<.7f || width>1.f || height<.7f || height>1.f) return false;
+    fovWidth_=width; fovHeight_=height;
+    if(width<1.f || height<1.f) Report("XR field of view cropped to %.0f%% wide, %.0f%% high",width*100.f,height*100.f);
+    return true;
 }
 void XrRuntime::Shutdown() noexcept {
     if(ownerThread_ && GetCurrentThreadId()!=ownerThread_) { Report("XR Shutdown requires the owning render thread"); return; }

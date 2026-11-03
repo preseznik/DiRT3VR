@@ -59,6 +59,12 @@ int main() {
         Require(!request.Configure(2400,2600,200) && !request.width,"Unsafe scene dimensions accepted or stale plan retained");
         Require(!request.Configure(UINT32_MAX,2600,100),"Headset dimensions overflowed");
         Require(!request.Configure(2400,2600,49) && !request.Configure(2400,2600,301),"Invalid render scale accepted");
+        // FOV crop (#16a86c75, #47d16d40): the scene shrinks after the render scale; a helmet view crops only the height.
+        Require(request.Configure(2400,2600,100,80,100) && request.sceneWidth==1920 && request.sceneHeight==2600 && request.fovWidth==80,"Width crop size differs");
+        Require(request.Configure(2400,2600,150,100,75) && request.sceneWidth==3600 && request.sceneHeight==2925 && request.fovHeight==75,"Helmet crop size differs");
+        Require(request.Configure(3072,3264,125,70,70) && request.sceneWidth==2688 && request.sceneHeight==2856,"Crop after the render scale differs");
+        Require(!request.Configure(2400,2600,100,69,100) && !request.Configure(2400,2600,100,100,101) && !request.width,"Invalid crop accepted");
+        Require(request.Configure(2400,2600,100) && request.fovWidth==100 && request.fovHeight==100,"No crop is not 100%");
         SetEnvironmentVariableW(L"DIRT3VR_HEADSET_WIDTH",L"2400");
         SetEnvironmentVariableW(L"DIRT3VR_HEADSET_HEIGHT",L"2600");
         for(unsigned value : {50u,75u,100u,150u}) {
@@ -71,6 +77,15 @@ int main() {
             Require(!dirt3vr::ReadResolution(request),"Invalid resolution request accepted");
         }
         SetEnvironmentVariableW(L"DIRT3VR_VR_RENDER_SCALE",L"100");
+        SetEnvironmentVariableW(L"DIRT3VR_VR_FOV_HEIGHT",L"85");
+        Require(dirt3vr::ReadResolution(request) && request.fovWidth==100 && request.fovHeight==85 && request.sceneHeight==2210,"Helmet crop not read");
+        for(const auto* text : {L"69",L"101",L"85%",L"0",L"x"}) {
+            SetEnvironmentVariableW(L"DIRT3VR_VR_FOV_WIDTH",text);
+            Require(!dirt3vr::ReadResolution(request),"Invalid FOV crop accepted");
+        }
+        SetEnvironmentVariableW(L"DIRT3VR_VR_FOV_WIDTH",nullptr);
+        SetEnvironmentVariableW(L"DIRT3VR_VR_FOV_HEIGHT",nullptr);
+        Require(dirt3vr::ReadResolution(request) && request.fovWidth==100 && request.fovHeight==100,"Missing FOV crop is not 100%");
         SetEnvironmentVariableW(L"DIRT3VR_HEADSET_WIDTH",nullptr);
         Require(!dirt3vr::ReadResolution(request),"Partial resolution request accepted");
         SetEnvironmentVariableW(L"DIRT3VR_HEADSET_HEIGHT",nullptr);

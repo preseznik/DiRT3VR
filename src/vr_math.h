@@ -27,6 +27,12 @@ inline bool ValidFov(XrFovf fov) {
     return std::tan(fov.angleRight)-std::tan(fov.angleLeft) >= .01f &&
            std::tan(fov.angleUp)-std::tan(fov.angleDown) >= .01f;
 }
+// Each edge's tangent scaled about the optical axis (DIRT2VR's crop): asymmetric views stay
+// asymmetric, and a crop of one keeps that direction's angles exactly.
+inline XrFovf CropFov(XrFovf fov,float width,float height) {
+    const auto crop=[](float angle,float factor) { return factor>=1.f ? angle : std::atan(std::tan(angle)*factor); };
+    return {crop(fov.angleLeft,width),crop(fov.angleRight,width),crop(fov.angleUp,height),crop(fov.angleDown,height)};
+}
 inline XrPosef CenterPose(const std::array<XrView,2>& views) {
     const auto& a=views[0].pose; const auto& b=views[1].pose;
     if(!Finite(a.position) || !Finite(b.position)) throw std::invalid_argument("Invalid XR position");
