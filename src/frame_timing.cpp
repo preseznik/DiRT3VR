@@ -2,6 +2,7 @@
 #include "gpu_usage.h"
 #include "performance_summary.h"
 #include <dxgi.h>
+#include <psapi.h>
 #include <wrl/client.h>
 #include <array>
 #include <fstream>
@@ -37,7 +38,14 @@ struct State {
 State* state{};
 bool Owner() {return state && state->thread==GetCurrentThreadId();}
 double Milliseconds(LONGLONG ticks) {return 1000.*double(ticks)/double(state->frequency);}
+void SampleMemory() {
+    PROCESS_MEMORY_COUNTERS counters{};MEMORYSTATUSEX status{};status.dwLength=sizeof(status);
+    if (!GetProcessMemoryInfo(GetCurrentProcess(),&counters,sizeof(counters)) || !GlobalMemoryStatusEx(&status)) return;
+    constexpr uint64_t mb=1024*1024;
+    state->summary.Memory(counters.PeakPagefileUsage/mb,(status.ullTotalVirtual-status.ullAvailVirtual)/mb,status.ullTotalVirtual/mb);
+}
 void Write(bool final) {
+    SampleMemory();
     const auto text=state->summary.Json(final);
     const auto target=state->output/L"performance-summary.json",temporary=state->output/L"performance-summary.json.tmp";
     {
