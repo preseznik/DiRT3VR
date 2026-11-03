@@ -175,6 +175,31 @@ Module DrivingControlsTests
                                                                                                                 b.DeadZone = 0.05D : b.Saturation = 0.9D
                                                                                                             End Sub)}}.SaveFile(presetFile)
         check(DrivingControls.LoadFile(presetFile).Bindings.Single().Saturation = 0.9D, "a calibrated clutch keeps its calibration")
+
+        ' Wheel rotation… (#a72b44ea, as DiRT2VR 0.18): steering saturation = DiRT 3's rotation / the wheel's.
+        Const G920 As String = "Logitech G HUB G920 Driving Force Racing Wheel USB"
+        check(DrivingControls.SuggestedWheelRotation(G920) = 900 AndAlso DrivingControls.SuggestedWheelRotation("Logitech G PRO Racing Wheel") = 1080 AndAlso
+              DrivingControls.SuggestedWheelRotation("Thrustmaster T300RS Racing wheel") = 1080 AndAlso DrivingControls.SuggestedWheelRotation("FANATEC CSL DD") = 0 AndAlso
+              DrivingControls.SuggestedWheelRotation(Nothing) = 0, "wheels with a fixed range get their maximum suggested; others none")
+        Dim steer = Function(action As String, calibration As String) New DrivingBinding With {.Action = action, .Device = G920, .DeviceId = WheelId, .DeviceType = WheelProduct, .Input = "di_x_axis", .Calibration = calibration}
+        Dim rotation As New DrivingControls With {.Bindings = New List(Of DrivingBinding) From {steer("Steer Right", "biDirectionalUpper"), steer("Steer Left", "biDirectionalLower"), wheelThrottle.Copy()}}
+        check(If(rotation.SteeringWheel()?.Length, 0) = 2 AndAlso rotation.SteeringWheel()(0).Action = "Steer Left", "the wheel with Steer Left and Steer Right is the steering wheel")
+        check(New DrivingControls With {.Bindings = New List(Of DrivingBinding) From {steer("Steer Left", "biDirectionalLower")}}.SteeringWheel() Is Nothing AndAlso
+              New DrivingControls With {.Bindings = DrivingControls.XboxPreset()}.SteeringWheel() Is Nothing, "one steering direction, or an Xbox controller, is no steering wheel")
+        rotation.ApplyWheelRotation(900, 540)
+        check(rotation.SteeringWheel().All(Function(b) b.Saturation = 0.6D) AndAlso rotation.WheelRotation = 900 AndAlso rotation.Bindings.Single(Function(b) b.Action = "Accelerate").Saturation = 1D,
+              "540° of a 900° wheel: steering saturation 60%, the wheel's rotation kept, pedals unchanged")
+        check(SessionActionMaps.AxisOf(rotation.SteeringWheel()(0)).Saturation = "0.6", "and the session map writes it")
+        check(Refused(Sub() rotation.ApplyWheelRotation(900, 1080)) AndAlso Refused(Sub() rotation.ApplyWheelRotation(100, 90)) AndAlso Refused(Sub() rotation.ApplyWheelRotation(2520, 90)),
+              "more than the wheel, a wheel under 180°, or under a tenth of the wheel is refused")
+        rotation.SteeringWheel()(0).DeadZone = 0.5D
+        check(Refused(Sub() rotation.ApplyWheelRotation(900, 360)) AndAlso rotation.SteeringWheel().All(Function(b) b.Saturation = 0.6D), "a saturation at or under the dead zone is refused and nothing changes")
+        check(Refused(Sub() Call New DrivingControls().ApplyWheelRotation(900, 540)), "without a steering wheel it's refused")
+        rotation.SteeringWheel()(0).DeadZone = 0D
+        rotation.SaveFile(presetFile)
+        check(DrivingControls.LoadFile(presetFile).WheelRotation = 900, "the wheel's rotation is saved with the controls and presets")
+        File.WriteAllText(presetFile, "{""Version"":1,""WheelRotation"":50,""Bindings"":[]}")
+        check(Refused(Sub() DrivingControls.LoadFile(presetFile)), "an impossible wheel rotation is refused")
         check(File.ReadAllText(DrivingControls.SettingsPath(ctx)) = saved, "loading presets doesn't touch the saved controls")
     End Sub
 
@@ -427,6 +452,7 @@ Module DrivingControlsTests
             form.Show() : Application.DoEvents()
             Dim rows = DirectCast(form.Controls.Find("DrivingRows", True).Single(), ListView)
             check(rows.Items.Count = DrivingControls.Actions.Length AndAlso rows.Items.Cast(Of ListViewItem)().All(Function(r) r.SubItems(1).Text = "DiRT 3's binding"), "every action starts on DiRT 3's binding")
+            check(form.Controls.Find("DrivingWheelRotation", True).Single().Text = "Wheel rotation…", "Setup has Wheel rotation…")
             DirectCast(form.Controls.Find("DrivingXboxPreset", True).Single(), Button).PerformClick() : Application.DoEvents()
             check(form.Current.Enabled AndAlso form.Current.Bindings.Count = DrivingControls.XboxPreset().Count AndAlso
                   rows.Items.Cast(Of ListViewItem)().First(Function(r) r.Text = "Accelerate").SubItems(2).Text = "right trigger", "the Xbox preset fills the list and switches the bindings on")
@@ -489,6 +515,24 @@ Module DrivingControlsTests
             reset.PerformClick()
             check(calibration.Binding.DeadZone = 0.1D AndAlso calibration.Binding.Saturation = 0.8D, "and resets to it (" & calibration.Binding.DeadZone & " / " & calibration.Binding.Saturation & ")")
             calibration.Close()
+        End Using
+        Dim steering As New DrivingControls With {.Bindings = New List(Of DrivingBinding) From {
+            New DrivingBinding With {.Action = "Steer Left", .Device = "Logitech G HUB G920 Driving Force Racing Wheel USB", .DeviceId = WheelId, .DeviceType = WheelProduct, .Input = "di_x_axis", .Calibration = "biDirectionalLower"},
+            New DrivingBinding With {.Action = "Steer Right", .Device = "Logitech G HUB G920 Driving Force Racing Wheel USB", .DeviceId = WheelId, .DeviceType = WheelProduct, .Input = "di_x_axis", .Calibration = "biDirectionalUpper"}}}
+        Using rotationForm As New WheelRotationForm(steering)
+            Dim hardware = DirectCast(rotationForm.Controls.Find("WheelRotationHardware", True).Single(), NumericUpDown)
+            Dim inGame = DirectCast(rotationForm.Controls.Find("WheelRotationGame", True).Single(), NumericUpDown)
+            check(hardware.Value = 900 AndAlso inGame.Value = 900 AndAlso inGame.Maximum = 900, "the G920 starts at its 900°, and DiRT 3's rotation at the current saturation")
+            inGame.Value = 540
+            check(rotationForm.Controls.Find("WheelRotationResult", True).Single().Text.Contains("540°"), "the result line follows the rotation")
+            rotationForm.ApplyRotation()
+            check(steering.Bindings.All(Function(b) b.Saturation = 0.6D) AndAlso steering.WheelRotation = 900 AndAlso rotationForm.DialogResult = DialogResult.OK, "Apply sets the steering saturation")
+        End Using
+        Using rotationForm As New WheelRotationForm(steering)
+            Dim hardware = DirectCast(rotationForm.Controls.Find("WheelRotationHardware", True).Single(), NumericUpDown)
+            check(hardware.Value = 900 AndAlso DirectCast(rotationForm.Controls.Find("WheelRotationGame", True).Single(), NumericUpDown).Value = 540, "it reopens with the saved rotations")
+            hardware.Value = 360
+            check(DirectCast(rotationForm.Controls.Find("WheelRotationGame", True).Single(), NumericUpDown).Value <= 360, "DiRT 3's rotation can't exceed the wheel's")
         End Using
     End Sub
 End Module

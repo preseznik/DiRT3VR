@@ -58,7 +58,12 @@ Public NotInheritable Class DrivingControls
     Public Property Version As Integer = 1
     Public Property Enabled As Boolean
     Public Property ListenAllDevices As Boolean = True
+    ' The steering wheel's own rotation lock to lock, as set in its software (#a72b44ea, as DiRT2VR 0.18);
+    ' 0 until set with Wheel rotation…. Only used to show and apply the steering saturation.
+    Public Property WheelRotation As Integer
     Public Property Bindings As New List(Of DrivingBinding)
+
+    Public Const MinimumWheelRotation As Integer = 180, MaximumWheelRotation As Integer = 2520, MinimumGameRotation As Integer = 90
 
     ' DiRT 3's driving, menu and replay actions (its action maps hold 72; the rest are
     ' YouTube, spectator, front-end camera and test actions).
@@ -145,13 +150,14 @@ Public NotInheritable Class DrivingControls
         Validate()
         Dim found = Problems()
         If Enabled AndAlso found.Count > 0 Then Throw New IOException(String.Join(Environment.NewLine, found))
-        Dim bytes = JsonSerializer.SerializeToUtf8Bytes(New DrivingControls With {.Enabled = Enabled, .ListenAllDevices = ListenAllDevices, .Bindings = Bindings.Select(Function(b) b.Copy()).ToList()}, SafeFiles.JsonOptions)
+        Dim bytes = JsonSerializer.SerializeToUtf8Bytes(New DrivingControls With {.Enabled = Enabled, .ListenAllDevices = ListenAllDevices, .WheelRotation = WheelRotation, .Bindings = Bindings.Select(Function(b) b.Copy()).ToList()}, SafeFiles.JsonOptions)
         If bytes.Length > MaxFileBytes Then Throw New IOException("The driving controls file is too large.")
         SafeFiles.WriteAtomic(Path.GetFullPath(file), bytes)
     End Sub
 
     Public Sub Validate()
         If Version <> 1 OrElse Bindings Is Nothing OrElse Bindings.Count > Actions.Length * MaxDevices Then Throw New IOException("The driving controls are invalid.")
+        If WheelRotation <> 0 AndAlso (WheelRotation < MinimumWheelRotation OrElse WheelRotation > MaximumWheelRotation) Then Throw New IOException("The wheel rotation is invalid.")
         Dim slots As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
         Dim families As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
         For Each binding In Bindings
@@ -204,6 +210,51 @@ Public NotInheritable Class DrivingControls
         Next
         Return result
     End Function
+
+    ' Steer Left and Steer Right on axes of one DirectInput wheel (Steer Left first), or Nothing when no
+    ' wheel, or more than one, has both.
+    Public Function SteeringWheel() As DrivingBinding()
+        Dim wheels = Bindings.Where(Function(b) (b.Action = "Steer Left" OrElse b.Action = "Steer Right") AndAlso Not b.Keyboard AndAlso b.DeviceType <> "xinput_pad" AndAlso DrivingCapture.IsAxis(b)).
+            GroupBy(Function(b) b.DeviceId, StringComparer.OrdinalIgnoreCase).Where(Function(g) g.Count() = 2).ToArray()
+        Return If(wheels.Length = 1, wheels(0).OrderBy(Function(b) b.Action, StringComparer.Ordinal).ToArray(), Nothing)
+    End Function
+
+    ' The hardware maximum of wheels with a fixed range, from the DirectInput product name, or 0 when the
+    ' rotation depends on the wheel's own settings (DiRT2VR's list).
+    Public Shared Function SuggestedWheelRotation(device As String) As Integer
+        Dim name = If(device, "").ToUpperInvariant()
+        If name.Contains("LOGITECH") AndAlso name.Contains("G PRO") Then Return 1080
+        For Each model In {"G25", "G27", "G29", "G920", "G923", "DRIVING FORCE GT"}
+            If name.Contains(model) Then Return 900
+        Next
+        If name.Contains("THRUSTMASTER") OrElse name.StartsWith("T", StringComparison.Ordinal) Then
+            For Each model In {"T248", "T128", "TMX", "TX RACING", "TX GIP"}
+                If name.Contains(model) Then Return 900
+            Next
+            For Each model In {"T300", "T150", "T500", "T-GT", "TS-PC", "TS-XW"}
+                If name.Contains(model) Then Return 1080
+            Next
+        End If
+        Return 0
+    End Function
+
+    ' DiRT 3 reaches full steering lock at the steering bindings' saturation, a share of each half of the
+    ' wheel's travel, so full lock at gameRotation needs saturation = gameRotation / wheelRotation.
+    Public Sub ApplyWheelRotation(wheelRotation As Integer, gameRotation As Integer)
+        Dim steering = SteeringWheel()
+        If steering Is Nothing Then Throw New IOException("Bind Steer Left and Steer Right to your wheel first, with the Binding wizard or Device….")
+        If wheelRotation < MinimumWheelRotation OrElse wheelRotation > MaximumWheelRotation Then
+            Throw New IOException("Your wheel's rotation must be " & MinimumWheelRotation.ToString(CultureInfo.CurrentCulture) & "–" & MaximumWheelRotation.ToString(CultureInfo.CurrentCulture) & "°.")
+        End If
+        If gameRotation > wheelRotation Then Throw New IOException("DiRT 3's rotation can't be more than your wheel's rotation.")
+        Dim saturation = Math.Round(CDec(gameRotation) / wheelRotation, 2)
+        If gameRotation < MinimumGameRotation OrElse saturation < 0.1D Then Throw New IOException("DiRT 3's rotation must be at least " & MinimumGameRotation.ToString(CultureInfo.CurrentCulture) & "° and a tenth of your wheel's rotation.")
+        If steering.Any(Function(b) b.DeadZone >= saturation) Then Throw New IOException("Lower the steering dead zone below " & saturation.ToString("P0", CultureInfo.CurrentCulture) & " first.")
+        For Each binding In steering
+            binding.Saturation = saturation
+        Next
+        Me.WheelRotation = wheelRotation
+    End Sub
 
     ' One binding per action and device: replaces that device's binding for the action and
     ' keeps the action's bindings on other devices.
