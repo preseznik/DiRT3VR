@@ -9,6 +9,14 @@ bool Near(float a,float b) { return std::abs(a-b)<.00001f; }
 }
 int main() {
     try {
+        { // FOV crop: tangents scale about the optical axis, a factor of one keeps the angles.
+            const XrFovf fov{-.9f,.7f,.8f,-.6f};
+            const auto helmet=dirt3vr::math::CropFov(fov,1.f,.8f);
+            Require(helmet.angleLeft==fov.angleLeft && helmet.angleRight==fov.angleRight,"Helmet crop changed the width");
+            Require(Near(std::tan(helmet.angleUp),std::tan(.8f)*.8f) && Near(std::tan(helmet.angleDown),std::tan(-.6f)*.8f),"Height not cropped in tangent space");
+            const auto narrow=dirt3vr::math::CropFov(fov,.7f,.7f);
+            Require(Near(std::tan(narrow.angleLeft),std::tan(-.9f)*.7f) && narrow.angleLeft<0 && narrow.angleRight>0 && dirt3vr::math::ValidFov(narrow),"Asymmetric crop lost its shape");
+        }
         using namespace dirt3vr::math;
         std::array<XrView,2> views{{{XR_TYPE_VIEW},{XR_TYPE_VIEW}}};
         views[0].pose={{0,0,0,1},{-.032f,1.4f,0}};

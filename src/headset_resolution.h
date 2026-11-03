@@ -7,14 +7,17 @@ namespace dirt3vr {
 inline bool ValidHeadsetSize(uint32_t width,uint32_t height) noexcept {
     return width>=320 && height>=180 && width<=4096 && height<=4096;
 }
+// A VR field-of-view crop (#16a86c75, #47d16d40) narrows each eye's view to fovWidth / fovHeight
+// percent in tangent space (70-100; a helmet view crops only the height), so the scene shrinks with it.
+inline bool ValidFovCrop(uint32_t percent) noexcept { return percent>=70 && percent<=100; }
 struct HeadsetResolutionRequest {
-    uint32_t width{},height{},scale{},sceneWidth{},sceneHeight{};
-    bool Configure(uint32_t w,uint32_t h,uint32_t percent) noexcept {
+    uint32_t width{},height{},scale{},sceneWidth{},sceneHeight{},fovWidth=100,fovHeight=100;
+    bool Configure(uint32_t w,uint32_t h,uint32_t percent,uint32_t fovW=100,uint32_t fovH=100) noexcept {
         *this={};
-        if(!ValidHeadsetSize(w,h) || percent<50 || percent>300) return false;
-        const auto sw=w*percent/100,sh=h*percent/100;
+        if(!ValidHeadsetSize(w,h) || percent<50 || percent>300 || !ValidFovCrop(fovW) || !ValidFovCrop(fovH)) return false;
+        const auto sw=w*percent/100*fovW/100,sh=h*percent/100*fovH/100;
         if(!ValidHeadsetSize(sw,sh)) return false;
-        width=w; height=h; scale=percent; sceneWidth=sw; sceneHeight=sh;
+        width=w; height=h; scale=percent; sceneWidth=sw; sceneHeight=sh; fovWidth=fovW; fovHeight=fovH;
         return true;
     }
 };
@@ -30,6 +33,9 @@ inline bool ReadResolution(HeadsetResolutionRequest& request) noexcept {
         }
         return result;
     };
-    return request.Configure(number(L"DIRT3VR_HEADSET_WIDTH"),number(L"DIRT3VR_HEADSET_HEIGHT"),number(L"DIRT3VR_VR_RENDER_SCALE"));
+    // No crop is 100; a crop that is set but invalid refuses the whole request.
+    const auto crop=[&](const wchar_t* name) { return GetEnvironmentVariableW(name,nullptr,0) ? number(name) : 100u; };
+    return request.Configure(number(L"DIRT3VR_HEADSET_WIDTH"),number(L"DIRT3VR_HEADSET_HEIGHT"),number(L"DIRT3VR_VR_RENDER_SCALE"),
+                             crop(L"DIRT3VR_VR_FOV_WIDTH"),crop(L"DIRT3VR_VR_FOV_HEIGHT"));
 }
 }

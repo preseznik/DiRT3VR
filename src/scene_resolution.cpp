@@ -67,7 +67,7 @@ void Restore(const Change& change) noexcept {
 Change Binding::PrepareCreate(uintptr_t base,uintptr_t caller,IUnknown* device,DXGI_SWAP_CHAIN_DESC* desc,
                              IDXGISwapChain** output,const HeadsetResolutionRequest& request,DiagnosticLogger log) noexcept {
     HeadsetResolutionRequest checked;
-    if(!base || !checked.Configure(request.width,request.height,request.scale) ||
+    if(!base || !checked.Configure(request.width,request.height,request.scale,request.fovWidth,request.fovHeight) ||
        checked.sceneWidth!=request.sceneWidth || checked.sceneHeight!=request.sceneHeight) return {};
     const bool initial=caller==base+CreateReturnRva, recreation=caller==base+RecreateReturnRva;
     if((!initial && !recreation) || (initial && renderer_) ||

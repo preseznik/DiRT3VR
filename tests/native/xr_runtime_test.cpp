@@ -1,4 +1,5 @@
 #include "xr_runtime.h"
+#include "vr_math.h"
 #include <dxgi.h>
 #include <algorithm>
 #include <cmath>
@@ -26,6 +27,8 @@ std::array<bool,5> acquired{},waited{};
 XrSwapchain seatChain{},perfChain{};
 XrCompositionLayerQuad lastSeat{XR_TYPE_COMPOSITION_LAYER_QUAD},lastPerf{XR_TYPE_COMPOSITION_LAYER_QUAD};
 bool shouldRender=true,validTracking=true,fullTracking=true,badLuid=false,zeroLuid=false,badPose=false,timeoutForever=false;
+constexpr XrFovf RuntimeFov{-.9f,.7f,.8f,-.6f};
+XrFovf expectedFov=RuntimeFov; // What both eyes must submit (a crop narrows it).
 unsigned chainCount{},imageCount=2,timeoutCount{},layers{},endFrames{},sessions{},destroyedSessions{},destroyedInstances{},destroyedChains{};
 int failAcquire=-1,failChain=-1;
 uint32_t imageIndex{};
@@ -42,7 +45,7 @@ unsigned Eye(XrSwapchain handle) { return unsigned(uint64_t(handle)-10); }
 void Reset() {
     calls.clear(); diagnosticMessages.clear(); events={XR_SESSION_STATE_READY,XR_SESSION_STATE_FOCUSED};
     textures={}; acquired={}; waited={};
-    shouldRender=validTracking=fullTracking=true; badLuid=zeroLuid=badPose=timeoutForever=false;
+    shouldRender=validTracking=fullTracking=true; badLuid=zeroLuid=badPose=timeoutForever=false; expectedFov=RuntimeFov;
     chainCount=timeoutCount=layers=endFrames=sessions=destroyedSessions=destroyedInstances=destroyedChains=imageIndex=0;
     imageCount=2; failAcquire=failChain=-1; headHeight=1.4f; headX=headZ=0;
     recommendedWidth=64; recommendedHeight=48;
@@ -138,7 +141,7 @@ XRAPI_ATTR XrResult XRAPI_CALL xrLocateViews(XrSession,const XrViewLocateInfo* i
     for(unsigned i=0;i<2;++i) {
         views[i].pose={headOrientation,{headX+(i ? .032f : -.032f),headHeight,headZ}};
         if(badPose) views[i].pose.position.x=std::numeric_limits<float>::quiet_NaN();
-        views[i].fov={-.9f,.7f,.8f,-.6f};
+        views[i].fov=RuntimeFov;
     }
     return XR_SUCCESS;
 }
@@ -199,7 +202,11 @@ XRAPI_ATTR XrResult XRAPI_CALL xrEndFrame(XrSession,const XrFrameEndInfo* info) 
             const auto* projection=reinterpret_cast<const XrCompositionLayerProjection*>(info->layers[0]);
             Require(projection->viewCount==2 && projection->space==XrSpace(3),"Projection pair/space incorrect");
             Require(projection->views[0].pose.position.x<0 && projection->views[1].pose.position.x>0,"Submitted eyes lost independent IPD");
-            Require(projection->views[0].fov.angleLeft==-.9f && projection->views[1].fov.angleRight==.7f,"Submitted FOV differs from render FOV");
+            for(unsigned i=0;i<2;++i) {
+                const auto& fov=projection->views[i].fov;
+                Require(fov.angleLeft==expectedFov.angleLeft && fov.angleRight==expectedFov.angleRight &&
+                        fov.angleUp==expectedFov.angleUp && fov.angleDown==expectedFov.angleDown,"Submitted FOV differs from render FOV");
+            }
         }
     }
     return XR_SUCCESS;
@@ -536,6 +543,16 @@ int main() {
             frame.Abort(); Require(layers==0 && std::count(calls.begin(),calls.end(),"release0")==1,"Session loss failed to release/abort without a layer");
         }
         Reset(); badLuid=true; { XrRuntime runtime; Require(!runtime.Initialize(device.Get()) && sessions==0,"Mismatched adapter created session"); }
+        Reset(); { // FOV crop (#16a86c75, #47d16d40): the game renders and the runtime shows the same narrower view.
+            XrRuntime runtime(CaptureDiagnostic); Require(runtime.Initialize(device.Get()),"Init failed");
+            const float nan=std::numeric_limits<float>::quiet_NaN();
+            Require(!runtime.CropFieldOfView(.69f,1.f) && !runtime.CropFieldOfView(1.f,1.01f) && !runtime.CropFieldOfView(nan,1.f),"Invalid FOV crop accepted");
+            Require(runtime.CropFieldOfView(.8f,.9f) && std::count(diagnosticMessages.begin(),diagnosticMessages.end(),"XR field of view cropped to 80% wide, 90% high")==1,"FOV crop not logged");
+            expectedFov=dirt3vr::math::CropFov(RuntimeFov,.8f,.9f);
+            auto frame=runtime.BeginFrame(1); Require(bool(frame),"Cropped frame failed");
+            for(const auto& view:frame.Views()) Require(view.fov.angleLeft==expectedFov.angleLeft && view.fov.angleUp==expectedFov.angleUp,"Render FOV not cropped");
+            CompletePair(frame); Require(frame.Submit(),"Cropped frame not submitted");
+        }
         Reset(); zeroLuid=true; { XrRuntime runtime(CaptureDiagnostic); Require(runtime.Initialize(device.Get()) && sessions==1 &&
             std::count(diagnosticMessages.begin(),diagnosticMessages.end(),"XR runtime names no graphics adapter; using the game's")==1,
             "A runtime naming no adapter (SteamVR's null headset) was refused or not logged"); }

@@ -89,6 +89,9 @@ public:
     Frame BeginFrame(uint64_t monotonicGameSequence) noexcept { return Frame(*this,monotonicGameSequence,FrameMode::Stereo); }
     Frame BeginScreenFrame(uint64_t monotonicGameSequence) noexcept { return Frame(*this,monotonicGameSequence,FrameMode::Screen); }
     void Shutdown() noexcept;
+    // Narrows each stereo eye's field of view to width / height (0.7-1) of the runtime's, in tangent
+    // space: the game renders and the runtime shows the same narrower view (#16a86c75, #47d16d40).
+    bool CropFieldOfView(float width,float height) noexcept;
     // includeTilt also resets pitch and roll (the player's choice); automatic centering never does.
     void RequestRecenter(bool includeTilt=false) noexcept { recenterPending_=true; recenterTilt_=includeTilt; }
     bool Initialized() const noexcept { return session_!=XR_NULL_HANDLE && !failed_; }
@@ -143,6 +146,7 @@ private:
     XrPosef seatPose_{{0,0,0,1},{0,0,0}};
     XrExtent2Df seatSize_{};
     std::array<XrView,2> views_{{{XR_TYPE_VIEW},{XR_TYPE_VIEW}}};
+    float fovWidth_=1.f,fovHeight_=1.f;
     XrPosef reference_{{0,0,0,1},{0,0,0}};
     XrTime displayTime_{};
     XrDuration displayPeriod_{};
