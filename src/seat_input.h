@@ -83,5 +83,9 @@ private:
 bool Install(Policy policy,void (*log)(const char*,...));
 // Whether Install succeeded.
 bool Ready();
+// Which input paths are filtered after Install: the menu can open with the keyboard's and ignore
+// a controller type whose filter is missing (#bd820b32).
+struct Filters { bool keyboard{},directInput{},xinput{}; };
+Filters Installed();
 
 }

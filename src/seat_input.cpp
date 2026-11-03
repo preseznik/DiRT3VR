@@ -24,12 +24,14 @@ bool GameCaller(void* caller) {
     const auto address=reinterpret_cast<uintptr_t>(caller);
     return address>=base && address<base+size;
 }
-bool Hook(void* target,void* replacement,void** original) {
-    if(!target) return false;
+// MinHook's status, for the install log.
+MH_STATUS Hook(void* target,void* replacement,void** original) {
+    if(!target) return MH_ERROR_FUNCTION_NOT_FOUND;
     const auto created=MH_CreateHook(target,replacement,original);
-    if(created!=MH_OK) return false;
-    if(MH_EnableHook(target)!=MH_OK) { MH_RemoveHook(target); return false; }
-    return true;
+    if(created!=MH_OK) return created;
+    const auto enabled=MH_EnableHook(target);
+    if(enabled!=MH_OK) MH_RemoveHook(target);
+    return enabled;
 }
 
 // Keyboard: Raw Input.
@@ -168,9 +170,9 @@ template<bool Unicode> HRESULT STDMETHODCALLTYPE CreateDevice(IDirectInput8W* se
     // ANSI and Unicode devices share one implementation, so one set of hooks covers both.
     if(!deviceHooks) {
         auto** table=*reinterpret_cast<void***>(*out);
-        deviceHooks=Hook(table[9],reinterpret_cast<void*>(State),reinterpret_cast<void**>(&state)) &&
-                    Hook(table[10],reinterpret_cast<void*>(Data),reinterpret_cast<void**>(&data)) &&
-                    Hook(table[11],reinterpret_cast<void*>(Format),reinterpret_cast<void**>(&format));
+        deviceHooks=Hook(table[9],reinterpret_cast<void*>(State),reinterpret_cast<void**>(&state))==MH_OK &&
+                    Hook(table[10],reinterpret_cast<void*>(Data),reinterpret_cast<void**>(&data))==MH_OK &&
+                    Hook(table[11],reinterpret_cast<void*>(Format),reinterpret_cast<void**>(&format))==MH_OK;
     }
     return hr;
 }
@@ -186,41 +188,56 @@ DWORD WINAPI Xbox(DWORD slot,XINPUT_STATE* output) {
     return result;
 }
 
+Filters installed;
 bool InstallHooks() {
     const auto initialized=MH_Initialize();
     if(initialized!=MH_OK && initialized!=MH_ERROR_ALREADY_INITIALIZED) return false;
     auto* user=GetModuleHandleW(L"user32.dll");
-    const bool keys=user && Hook(reinterpret_cast<void*>(GetProcAddress(user,"GetRawInputData")),reinterpret_cast<void*>(RawData),reinterpret_cast<void**>(&rawData));
+    const auto keys=user ? Hook(reinterpret_cast<void*>(GetProcAddress(user,"GetRawInputData")),reinterpret_cast<void*>(RawData),reinterpret_cast<void**>(&rawData)) : MH_ERROR_MODULE_NOT_FOUND;
 
-    // A throwaway DirectInput object exposes the factory and device tables the game's share.
-    bool sticks=false;
+    // DirectInput (#bd820b32): the device reads, shared by ANSI and Unicode devices, filter every
+    // device, including those the game opened earlier (Known learns them when first read). Their
+    // addresses come from a throwaway keyboard made before any hook, so they don't depend on the
+    // factory hooks, which only register new devices early and may fail without harm (in the game
+    // they failed where this standalone install succeeds, so each status is logged).
+    MH_STATUS reads[3]{MH_UNKNOWN,MH_UNKNOWN,MH_UNKNOWN},factoryW=MH_UNKNOWN,factoryA=MH_UNKNOWN;
+    HRESULT probed=E_FAIL;
     if(auto* module=LoadLibraryExW(L"dinput8.dll",nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32)) {
         using Factory=HRESULT (WINAPI*)(HINSTANCE,DWORD,REFIID,void**,IUnknown*);
         const auto factory=reinterpret_cast<Factory>(GetProcAddress(module,"DirectInput8Create"));
         IDirectInput8W* wide{};
-        if(factory && SUCCEEDED(factory(GetModuleHandleW(nullptr),DIRECTINPUT_VERSION,IID_IDirectInput8W,reinterpret_cast<void**>(&wide),nullptr))) {
-            sticks=Hook((*reinterpret_cast<void***>(wide))[3],reinterpret_cast<void*>(CreateDevice<true>),reinterpret_cast<void**>(&create));
+        if(factory && SUCCEEDED(probed=factory(GetModuleHandleW(nullptr),DIRECTINPUT_VERSION,IID_IDirectInput8W,reinterpret_cast<void**>(&wide),nullptr))) {
             IDirectInputDevice8W* probe{};
-            if(sticks && SUCCEEDED(wide->CreateDevice(GUID_SysKeyboard,&probe,nullptr))) {
-                { std::lock_guard lock(deviceMutex); devices.erase(probe); }
+            if(SUCCEEDED(probed=wide->CreateDevice(GUID_SysKeyboard,&probe,nullptr)) && probe) {
+                auto** table=*reinterpret_cast<void***>(probe);
+                std::lock_guard lock(deviceMutex);
+                if(!deviceHooks) {
+                    reads[0]=Hook(table[9],reinterpret_cast<void*>(State),reinterpret_cast<void**>(&state));
+                    reads[1]=Hook(table[10],reinterpret_cast<void*>(Data),reinterpret_cast<void**>(&data));
+                    reads[2]=Hook(table[11],reinterpret_cast<void*>(Format),reinterpret_cast<void**>(&format));
+                    deviceHooks=reads[0]==MH_OK && reads[1]==MH_OK && reads[2]==MH_OK;
+                }
                 probe->Release();
             }
+            factoryW=Hook((*reinterpret_cast<void***>(wide))[3],reinterpret_cast<void*>(CreateDevice<true>),reinterpret_cast<void**>(&create));
             wide->Release();
             IDirectInput8A* ansi{};
             if(SUCCEEDED(factory(GetModuleHandleW(nullptr),DIRECTINPUT_VERSION,IID_IDirectInput8A,reinterpret_cast<void**>(&ansi),nullptr))) {
-                sticks=Hook((*reinterpret_cast<void***>(ansi))[3],reinterpret_cast<void*>(CreateDevice<false>),reinterpret_cast<void**>(&createA)) && sticks;
+                factoryA=Hook((*reinterpret_cast<void***>(ansi))[3],reinterpret_cast<void*>(CreateDevice<false>),reinterpret_cast<void**>(&createA));
                 ansi->Release();
-            } else sticks=false;
-            sticks=sticks && deviceHooks;
+            }
         }
     }
 
     // DiRT 3 links xinput1_3.dll (by ordinal), the same export as XInputGetState.
-    bool pads=false;
+    MH_STATUS pads=MH_ERROR_MODULE_NOT_FOUND;
     if(auto* library=LoadLibraryExW(L"xinput1_3.dll",nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32))
         pads=Hook(reinterpret_cast<void*>(GetProcAddress(library,"XInputGetState")),reinterpret_cast<void*>(Xbox),reinterpret_cast<void**>(&xbox));
-    if(logLine) logLine("Seat input filters: keyboard=%d directinput=%d xinput=%d",int(keys),int(sticks),int(pads));
-    return keys && sticks && pads;
+    installed={keys==MH_OK,deviceHooks,pads==MH_OK};
+    if(logLine) logLine("Seat input filters: keyboard=%d directinput=%d xinput=%d (raw=%s probe=0x%08lx reads=%s/%s/%s factory=%s/%s xinput=%s)",
+        int(installed.keyboard),int(installed.directInput),int(installed.xinput),MH_StatusToString(keys),static_cast<unsigned long>(probed),
+        MH_StatusToString(reads[0]),MH_StatusToString(reads[1]),MH_StatusToString(reads[2]),MH_StatusToString(factoryW),MH_StatusToString(factoryA),MH_StatusToString(pads));
+    return installed.keyboard && installed.directInput && installed.xinput;
 }
 }
 
@@ -232,5 +249,6 @@ bool Install(Policy next,void (*log)(const char*,...)) {
     return ready;
 }
 bool Ready() { return ready; }
+Filters Installed() { return installed; }
 
 }
