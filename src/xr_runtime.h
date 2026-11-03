@@ -33,6 +33,10 @@ public:
         // A completed panel needs ShowSeatPanel before Submit / SubmitOverlay, or nothing submits.
         Eye AcquireSeatPanel();
         bool ShowSeatPanel(const XrPosef& pose,float width,float height) noexcept;
+        // The FPS / GPU strip (PerfPanelWidth × PerfPanelHeight, opaque), after a complete stereo
+        // pair; ShowPerfPanel places it below the view (follow) or below the recentered HUD.
+        Eye AcquirePerfPanel();
+        bool ShowPerfPanel(bool follow) noexcept;
         bool Submit() noexcept;
         // follow: the panel stays ahead of the current view instead of the recentered reference.
         // Its angular size is bounded: width 0.25–2 × distance, height at most 0.9 × distance.
@@ -75,12 +79,12 @@ public:
         bool acquired_{};
     };
 
-    static constexpr uint32_t SeatPanelWidth=768,SeatPanelHeight=1024;
+    static constexpr uint32_t SeatPanelWidth=768,SeatPanelHeight=1024,PerfPanelWidth=512,PerfPanelHeight=64;
     explicit XrRuntime(Logger logger=nullptr) noexcept : logger_(logger) {}
     ~XrRuntime();
     XrRuntime(const XrRuntime&) = delete;
     XrRuntime& operator=(const XrRuntime&) = delete;
-    bool Initialize(ID3D11Device* device,float outputScale=1.f,uint32_t expectedWidth=0,uint32_t expectedHeight=0,bool overlay=false,bool seatPanel=false) noexcept;
+    bool Initialize(ID3D11Device* device,float outputScale=1.f,uint32_t expectedWidth=0,uint32_t expectedHeight=0,bool overlay=false,bool seatPanel=false,bool perfPanel=false) noexcept;
     bool PollEvents() noexcept;
     Frame BeginFrame(uint64_t monotonicGameSequence) noexcept { return Frame(*this,monotonicGameSequence,FrameMode::Stereo); }
     Frame BeginScreenFrame(uint64_t monotonicGameSequence) noexcept { return Frame(*this,monotonicGameSequence,FrameMode::Screen); }
@@ -115,6 +119,7 @@ private:
     bool InitializeResources(ID3D11Device*,float,uint32_t,uint32_t);
     bool CreateSwapchain(ID3D11Device*,unsigned index,uint64_t& textureBytes,bool limitImages);
     bool ShowSeat(uint64_t,const XrPosef&,float,float) noexcept;
+    bool ShowPerf(uint64_t,bool) noexcept;
     bool StartFrame(uint64_t,FrameMode) noexcept;
     bool Acquire(uint64_t,unsigned) noexcept;
     bool Release(uint64_t,unsigned,bool completed) noexcept;
@@ -133,8 +138,8 @@ private:
     XrSession session_{};
     XrSpace space_{};
     Microsoft::WRL::ComPtr<ID3D11Device> device_;
-    std::array<Swapchain,4> eyes_; // [2]: optional shared UI panel; [3]: optional seat menu panel.
-    bool overlayEnabled_{},seatPanelEnabled_{},seatShown_{};
+    std::array<Swapchain,5> eyes_; // [2]: optional shared UI panel; [3]: seat menu panel; [4]: FPS / GPU strip.
+    bool overlayEnabled_{},seatPanelEnabled_{},seatShown_{},perfPanelEnabled_{},perfShown_{},perfFollow_{};
     XrPosef seatPose_{{0,0,0,1},{0,0,0}};
     XrExtent2Df seatSize_{};
     std::array<XrView,2> views_{{{XR_TYPE_VIEW},{XR_TYPE_VIEW}}};

@@ -53,11 +53,11 @@ void XrRuntime::ReportRefreshRate(bool enabled) noexcept {
         Report("XR display refresh rate unavailable: query failed");
 }
 XrRuntime::~XrRuntime() { Shutdown(); }
-bool XrRuntime::Initialize(ID3D11Device* device,float scale,uint32_t expectedWidth,uint32_t expectedHeight,bool overlay,bool seatPanel) noexcept {
+bool XrRuntime::Initialize(ID3D11Device* device,float scale,uint32_t expectedWidth,uint32_t expectedHeight,bool overlay,bool seatPanel,bool perfPanel) noexcept {
     if((expectedWidth || expectedHeight) && (scale!=1.f || !ValidHeadsetSize(expectedWidth,expectedHeight))) return false;
     if(instance_ || !device || !std::isfinite(scale) || scale<.25f || scale>1.f) return false;
     ownerThread_=GetCurrentThreadId(); failed_=exiting_=false;
-    overlayEnabled_=overlay; seatPanelEnabled_=seatPanel;
+    overlayEnabled_=overlay; seatPanelEnabled_=seatPanel; perfPanelEnabled_=perfPanel;
     try {
         if(InitializeResources(device,scale,expectedWidth,expectedHeight)) return true;
     } catch(const std::exception& error) { Report("XR initialization exception: %s",error.what()); }
@@ -153,6 +153,10 @@ bool XrRuntime::InitializeResources(ID3D11Device* device,float scale,uint32_t ex
         eyes_[3].width=SeatPanelWidth; eyes_[3].height=SeatPanelHeight;
         if(!CreateSwapchain(device,3,textureBytes,true)) return false;
     }
+    if(perfPanelEnabled_) {
+        eyes_[4].width=PerfPanelWidth; eyes_[4].height=PerfPanelHeight;
+        if(!CreateSwapchain(device,4,textureBytes,true)) return false;
+    }
     Report("XR initialized with game D3D11 device; awaiting session focus and tracked recenter");
     return true;
 }
@@ -228,7 +232,7 @@ bool XrRuntime::StartFrame(uint64_t sequence,FrameMode mode) noexcept {
     if(!Check(xrWaitFrame(session_,&wait,&state),"wait frame")) return false;
     XrFrameBeginInfo begin{XR_TYPE_FRAME_BEGIN_INFO};
     if(!Check(xrBeginFrame(session_,&begin),"begin frame")) return false;
-    frameOpen_=true; frameFailed_=frameRenderable_=seatShown_=false; frameMode_=mode; ++generation_; displayTime_=state.predictedDisplayTime;
+    frameOpen_=true; frameFailed_=frameRenderable_=seatShown_=perfShown_=false; frameMode_=mode; ++generation_; displayTime_=state.predictedDisplayTime;
     if(state.predictedDisplayPeriod>0) displayPeriod_=state.predictedDisplayPeriod;
     for(auto& eye:eyes_) { eye.completed=false; eye.acquired=eye.waited=false; }
     if(!state.shouldRender) { EndFrame(generation_,false); return false; }
@@ -270,6 +274,7 @@ bool XrRuntime::Acquire(uint64_t generation,unsigned index) noexcept {
     if(frameMode_==FrameMode::Screen && index!=0) { frameFailed_=true; return false; }
     if(index==2 && (!overlayEnabled_ || !eyes_[0].completed || !eyes_[1].completed)) { frameFailed_=true; return false; }
     if(index==3 && (!seatPanelEnabled_ || frameMode_!=FrameMode::Stereo || !eyes_[0].completed || !eyes_[1].completed)) { frameFailed_=true; return false; }
+    if(index==4 && (!perfPanelEnabled_ || frameMode_!=FrameMode::Stereo || !eyes_[0].completed || !eyes_[1].completed)) { frameFailed_=true; return false; }
     auto& eye=eyes_[index];
     if(eye.completed || std::any_of(eyes_.begin(),eyes_.end(),[](const auto& image){return image.acquired;})) { frameFailed_=true; return false; }
     XrSwapchainImageAcquireInfo acquire{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
@@ -308,6 +313,7 @@ bool XrRuntime::EndFrame(uint64_t generation,bool submit,FrameMode mode,float as
     complete&=overlay ? (overlayEnabled_ && mode==FrameMode::Stereo && eyes_[2].completed) : !eyes_[2].completed;
     complete&=!video || (overlay && mode==FrameMode::Stereo);
     complete&=!eyes_[3].completed || (seatShown_ && mode==FrameMode::Stereo && !video);
+    complete&=!eyes_[4].completed || (perfShown_ && mode==FrameMode::Stereo && !video);
     std::array<XrCompositionLayerProjectionView,2> views{{{XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW},{XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW}}};
     for(unsigned i=0;i<2;++i) {
         views[i].pose=views_[i].pose; views[i].fov=views_[i].fov;
@@ -349,14 +355,28 @@ bool XrRuntime::EndFrame(uint64_t generation,bool submit,FrameMode mode,float as
     seat.layerFlags=XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT|XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT;
     seat.subImage.swapchain=eyes_[3].handle;
     seat.subImage.imageRect.extent={int32_t(eyes_[3].width),int32_t(eyes_[3].height)};
+    // GRID2VR's FPS / GPU strip: 1.5 m ahead and 45 cm below the view, or 60 cm below the
+    // recentered HUD position at 2 m.
+    XrCompositionLayerQuad perf{XR_TYPE_COMPOSITION_LAYER_QUAD};
+    perf.space=space_; perf.eyeVisibility=XR_EYE_VISIBILITY_BOTH;
+    perf.subImage.swapchain=eyes_[4].handle;
+    perf.subImage.imageRect.extent={int32_t(eyes_[4].width),int32_t(eyes_[4].height)};
+    perf.size=perfFollow_ ? XrExtent2Df{.6f,.075f} : XrExtent2Df{.8f,.1f};
+    if(complete && eyes_[4].completed) {
+        try {
+            perf.pose=perfFollow_ ? math::OffsetPose(math::CenterPose(views_),{0,-.45f,-1.5f}) : math::OffsetPose(reference_,{0,-.6f,-2.f});
+            complete&=math::Finite(perf.pose.position);
+        } catch(...) { complete=false; }
+    }
     XrFrameEndInfo end{XR_TYPE_FRAME_END_INFO}; end.displayTime=displayTime_; end.environmentBlendMode=XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
-    std::array<const XrCompositionLayerBaseHeader*,3> layers{layer};
+    std::array<const XrCompositionLayerBaseHeader*,4> layers{layer};
     uint32_t layerCount=1;
     if(overlay && !video) layers[layerCount++]=reinterpret_cast<const XrCompositionLayerBaseHeader*>(&screen);
+    if(eyes_[4].completed) layers[layerCount++]=reinterpret_cast<const XrCompositionLayerBaseHeader*>(&perf);
     if(eyes_[3].completed) layers[layerCount++]=reinterpret_cast<const XrCompositionLayerBaseHeader*>(&seat);
     if(complete) { end.layerCount=layerCount; end.layers=layers.data(); }
     const bool ended=Check(xrEndFrame(session_,&end),"end frame");
-    frameOpen_=frameRenderable_=seatShown_=false; canRecenter_=false;
+    frameOpen_=frameRenderable_=seatShown_=perfShown_=false; canRecenter_=false;
     if(complete && ended) {
         if(mode==FrameMode::Stereo && !video) ++submitted_;
         else ++screenSubmitted_;
@@ -380,7 +400,7 @@ void XrRuntime::Shutdown() noexcept {
     recenterPending_=true; recenterTilt_=false; haveGameSequence_=false; spaceChangeTime_=0;
     orientationModes_=0;
     referenceRevision_=0;
-    overlayEnabled_=seatPanelEnabled_=seatShown_=false;
+    overlayEnabled_=seatPanelEnabled_=seatShown_=perfPanelEnabled_=perfShown_=perfFollow_=false;
     reference_={{0,0,0,1},{0,0,0}}; ++generation_;
 }
 std::array<uint32_t,4> XrRuntime::EyeDimensions() const noexcept {
@@ -412,6 +432,16 @@ XrRuntime::Eye XrRuntime::Frame::AcquireOverlay() {
 XrRuntime::Eye XrRuntime::Frame::AcquireSeatPanel() {
     if(!owner_) throw std::logic_error("XR frame is not active");
     return Eye(*owner_,generation_,3);
+}
+XrRuntime::Eye XrRuntime::Frame::AcquirePerfPanel() {
+    if(!owner_) throw std::logic_error("XR frame is not active");
+    return Eye(*owner_,generation_,4);
+}
+bool XrRuntime::Frame::ShowPerfPanel(bool follow) noexcept { return owner_ && owner_->ShowPerf(generation_,follow); }
+bool XrRuntime::ShowPerf(uint64_t generation,bool follow) noexcept {
+    if(!Current(generation) || !eyes_[4].completed) return false;
+    perfShown_=true; perfFollow_=follow;
+    return true;
 }
 bool XrRuntime::Frame::ShowSeatPanel(const XrPosef& pose,float width,float height) noexcept {
     return owner_ && owner_->ShowSeat(generation_,pose,width,height);
