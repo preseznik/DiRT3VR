@@ -311,6 +311,16 @@ launcher writes in the session map).
 The research switch: `DIRT3VR_RESEARCH_DEVICES=1`, `DIRT3VR_RESEARCH_DEVICE_FIRST=<family>`
 (`run_benchmark.py --devices --device-first NAME`).
 
+**One active device per player (#1b46c373, iztok's test 2026-11-03 18:57 on PC4090).** With
+the G920 and the Xbox pad both bound in the launcher, only the first (the G920) drove; the pad
+went to no one. Statically a second `0xb31c70(map, &descriptor)` for player 1 adds the device
+rather than replacing it (`0xcc6280` adds an entry when the descriptor is missing), so a build
+bound the pad to player 1 right after the game's own G920 bind (the call returning to
+`0x56e219`). In the game the pad then drove and the wheel did nothing until "logitech" was
+picked in DiRT 3's own controller menu: the last bound device becomes the player's active
+controller, the same switch the menu makes. Both at once isn't possible through the bind, so
+that build was reverted; the launcher instead picks the one active device and lists it first.
+
 Earlier plan: a research renderer probe that, in a direct start, logs the devices bound to the
 player's map and calls `0xb31c70` for a launcher-bound device (on this PC, the Bluetooth
 Xbox pad, checked by reading the map back rather than by pressing anything). The G920 itself
