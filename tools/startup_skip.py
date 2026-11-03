@@ -14,6 +14,12 @@ Press Start stays: it binds the player's controller and loads the profile, and a
 it. The fade from white stays too (StatePostProcessTransition overlay=off): skipping it could leave
 the white overlay on, and it is short.
 
+In the game (2026-11-03, normal starts on PC4080S) only "movies" works. "legal" crashes DiRT 3 right
+after loading (access violation, runs 20261103-221042 and -230706): ScreenInitialLegal is a screen,
+not a state, and can't become a waypoint. "cutscene" leaves a black screen with no Press Start (run
+20261103-230726): the camera flight sets up the garage view Press Start draws on. Both parts stay
+here for research only; frontend/durations.xml's intro_part_1/2 (4 s and 3 s) are the next lead.
+
 Usage: python tools/startup_skip.py <states.bin>   (lists the skippable nodes and their types)
 """
 from __future__ import annotations
