@@ -14,6 +14,7 @@ from pathlib import Path
 import uuid
 import xml.etree.ElementTree as ET
 
+import bloom
 import seat_cameras
 
 RESTRICTIONS_NAME = "system/hardware_settings_restrictions.xml"
@@ -261,6 +262,24 @@ def paths_with_session_map(data: bytes) -> bytes:
     return _replace_once(data, keyboard, keyboard + added, "keyboard entry in actionMapPaths.xml")
 
 
+# Research bloom off (#3c6d6ffa): the three files with bloom mixes, zeroed by tools/bloom.py.
+EFFECTS_NAME = "postprocess/effects.xml"
+EFFECTS_SHA256 = "2e36423f9b184c1907505bd6f883e9a03fd4f26831be84d69c529829148cca55"
+GENERIC_EFFECTS_NAME = "tracks/generic/effects.xml"
+GENERIC_EFFECTS_SHA256 = "b8cc6d6f96a8a129da83555328912f62a7c6947ac80c38cc802622da43fc316a"
+NIGHT_EFFECTS_NAME = "tracks/generic/night_effects.xml"
+NIGHT_EFFECTS_SHA256 = "2a59da28ef98ea179f781f196e8386bc9c3c8e69ba7b1d867515d858940929a4"
+BLOOM_NAMES = (EFFECTS_NAME, GENERIC_EFFECTS_NAME, NIGHT_EFFECTS_NAME)
+
+
+def _bloom_off(pin: str):
+    def transform(data: bytes) -> bytes:
+        if hashlib.sha256(data).hexdigest() != globals()[pin]:
+            raise ValueError("Unexpected post-processing effects file")
+        return bloom.disable_bloom(data)
+    return transform
+
+
 # Every replaceable original: its pinned hash (looked up when used, so tests can pin
 # fixtures), backup prefix and exact applied transform.
 REPLACEMENTS = {
@@ -270,6 +289,9 @@ REPLACEMENTS = {
     FLOW_NAME: ("FLOW_SHA256", "flow-original", profile_load_redirect),
     KEYBOARD_NAME: ("KEYBOARD_SHA256", "keyboard-original", keyboard_pause_on_space),
     PATHS_NAME: ("PATHS_SHA256", "paths-original", paths_with_session_map),
+    EFFECTS_NAME: ("EFFECTS_SHA256", "effects-original", _bloom_off("EFFECTS_SHA256")),
+    GENERIC_EFFECTS_NAME: ("GENERIC_EFFECTS_SHA256", "generic-effects-original", _bloom_off("GENERIC_EFFECTS_SHA256")),
+    NIGHT_EFFECTS_NAME: ("NIGHT_EFFECTS_SHA256", "night-effects-original", _bloom_off("NIGHT_EFFECTS_SHA256")),
 }
 
 

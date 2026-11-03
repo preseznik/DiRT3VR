@@ -22,7 +22,7 @@ import xml.etree.ElementTree as ET
 import zlib
 
 import diagnostic_files
-from diagnostic_files import (DiagnosticFiles, FLOW_NAME, KEYBOARD_NAME, PATHS_NAME, SESSION_MAP, SESSION_MAP_NAME,
+from diagnostic_files import (BLOOM_NAMES, DiagnosticFiles, FLOW_NAME, KEYBOARD_NAME, PATHS_NAME, SESSION_MAP, SESSION_MAP_NAME,
                               RESTRICTIONS_NAME, SEAT_NAME, SPECTATOR_NAME, preflight_replacement, no_links,
                               preflight_serial_render, replace_verified, restore_xml_formatting, save_json, sha256)
 
@@ -474,7 +474,7 @@ def restore_player_hardware(target: Path, backup: Path, original_hash: str, reta
 def protected_state(game: Path) -> dict[str, str]:
     paths = [game / "dirt3_game.exe", game / "steam_api.dll",
              game / RESTRICTIONS_NAME, game / SPECTATOR_NAME, game / SEAT_NAME, game / FLOW_NAME,
-             game / KEYBOARD_NAME, game / PATHS_NAME,
+             game / KEYBOARD_NAME, game / PATHS_NAME, *(game / name for name in BLOOM_NAMES),
              game / "hardwaresettings/hardware_settings_config.xml",
              game / "hardwaresettings/hardware_settings_info.xml"]
     documents = documents_dir() / "My Games/DiRT3"
@@ -507,6 +507,8 @@ def main() -> int:
                         help="Keep the benchmark's car under player control (the renderer's direct-practice patch); no input is sent, so the car stays at the start and no result is written")
     parser.add_argument("--spectator-human-switch", action="store_true",
                         help="Research: temporarily add the normal race's 'Controller / Switch type=human' event to cutscene/spectator_startsequence.xml (journaled and restored)")
+    parser.add_argument("--no-bloom", action="store_true",
+                        help="Research: zero the BloomFromDsX4 mixes of postprocess/effects.xml and tracks/generic/(night_)effects.xml (tools/bloom.py; journaled and restored)")
     parser.add_argument("--research-patch", metavar="RVA:ORIGINAL:REPLACEMENT",
                         help="Research only: in-memory code change applied by the research proxy (build/native/bin/research/d3d11.dll, pass it with --proxy) after its original bytes match")
     parser.add_argument("--screenshots", metavar="SECONDS",
@@ -637,6 +639,7 @@ def main() -> int:
     restrictions = preflight_serial_render(game) if args.serial_render else None
     xr_runtime = preflight_xr_manifest(args.xr_runtime) if args.xr_runtime else None
     spectator = preflight_replacement(game, SPECTATOR_NAME) if args.spectator_human_switch else None
+    no_bloom = [(name, preflight_replacement(game, name)[0]) for name in BLOOM_NAMES] if args.no_bloom else []
     if args.seat_test is not None:
         if "frx" not in scene["cars"][:1]:
             parser.error("--seat-test changes the frx camera file; use the frx as the (first) car")
@@ -656,7 +659,7 @@ def main() -> int:
                  "stereo": False, "sceneObserver": args.scene_observer,
                  "serialRender": args.serial_render, "replayPair": args.replay_pair,
                  "xrRuntime": xr_runtime, "backgroundPlay": args.background_play, "researchPatch": args.research_patch,
-                 "spectatorHumanSwitch": args.spectator_human_switch, "directPractice": args.direct_practice,
+                 "spectatorHumanSwitch": args.spectator_human_switch, "noBloom": args.no_bloom, "directPractice": args.direct_practice,
                  "playerHardwareSettings": args.player_hardware_settings, "directLaps": args.direct_laps, "directReturn": args.direct_return, "scene": scene,
                  "durationSeconds": args.seconds}
     if restrictions:
@@ -694,6 +697,8 @@ def main() -> int:
             transaction.apply_serial_render(restrictions[0])
         if spectator:
             transaction.apply_replacement(SPECTATOR_NAME, spectator[0])
+        for name, original in no_bloom:
+            transaction.apply_replacement(name, original)
         if seat:
             transaction.apply_replacement(SEAT_NAME, seat[0])
         if profile_flow:

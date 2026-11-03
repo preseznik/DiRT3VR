@@ -269,5 +269,56 @@ class SpectatorSwitchTransactionTests(unittest.TestCase):
             self.assertEqual(self.target.read_bytes(), df.spectator_human_switch(SPECTATOR_FIXTURE))
 
 
+def binary_effects(mix: str) -> bytes:
+    import seat_cameras
+    from seat_cameras import Node
+    group = Node("ParameterGroup", None, [("name", "BloomFromDsX4")],
+                 [Node("Param", f"\r\n\t\t\t{mix}\r\n\t\t", [("name", "mixHuge")], [])])
+    root = Node("PostProcessEffects", None, [], [Node("Effect", None, [("name", "t~a~b")], [group])])
+    return seat_cameras.encode(seat_cameras.from_tree(root, [""]))
+
+
+GENERIC_FIXTURE = (b'<PostProcessEffects>\r\n\t<Effect name="Effect_0001">\r\n\t\t<ParameterGroup name="BloomFromDsX4">\r\n'
+                   b'\t\t\t<Param name="mixMedium">\r\n\t\t\t\t0.069400\r\n\t\t\t</Param>\r\n'
+                   b'\t\t</ParameterGroup>\r\n\t</Effect>\r\n</PostProcessEffects>\r\n')
+
+
+class BloomTransactionTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.game = self.root / "game"
+        (self.game / "postprocess").mkdir(parents=True)
+        (self.game / "tracks/generic").mkdir(parents=True)
+        self.originals = {df.EFFECTS_NAME: binary_effects("1.999800"), df.GENERIC_EFFECTS_NAME: GENERIC_FIXTURE,
+                          df.NIGHT_EFFECTS_NAME: binary_effects("0.606900")}
+        for (name, data), pin_name in zip(self.originals.items(), ("EFFECTS_SHA256", "GENERIC_EFFECTS_SHA256", "NIGHT_EFFECTS_SHA256")):
+            (self.game / name).write_bytes(data)
+            pin = patch.object(df, pin_name, hashlib.sha256(data).hexdigest())
+            pin.start()
+            self.addCleanup(pin.stop)
+        self.run_id = "d" * 32
+        self.journal = self.root / "deployment.json"
+
+    def test_bloom_files_are_zeroed_and_restored_byte_exact(self):
+        transaction = df.DiagnosticFiles(self.game, self.journal, self.run_id)
+        transaction.add("d3d11.dll", b"owned proxy")
+        for name in df.BLOOM_NAMES:
+            transaction.apply_replacement(name, self.originals[name])
+        self.assertEqual((self.game / df.GENERIC_EFFECTS_NAME).read_bytes(), GENERIC_FIXTURE.replace(b"0.069400", b"0.000000"))
+        for name in df.BLOOM_NAMES:
+            self.assertEqual((self.game / name).read_bytes(), df.bloom.disable_bloom(self.originals[name]))
+        self.assertEqual(df.DiagnosticFiles.recover(self.journal, self.game), [])
+        for name, data in self.originals.items():
+            self.assertEqual((self.game / name).read_bytes(), data)
+        self.assertFalse((self.game / "d3d11.dll").exists())
+
+    def test_unexpected_effects_file_is_refused_before_any_change(self):
+        (self.game / df.EFFECTS_NAME).write_bytes(binary_effects("0.500000"))
+        with self.assertRaises(ValueError):
+            df.preflight_replacement(self.game, df.EFFECTS_NAME)
+
+
 if __name__ == "__main__":
     unittest.main()
