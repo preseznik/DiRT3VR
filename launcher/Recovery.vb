@@ -83,7 +83,7 @@ Public Class OwnedFileTransaction
     End Function
 
     Public Sub Prepare(changes As IReadOnlyDictionary(Of String, Byte()), Optional experimental As Boolean = False, Optional apply As Boolean = True, Optional vrQuality As IDictionary(Of String, String) = Nothing,
-                       Optional seats As IReadOnlyDictionary(Of String, SeatOffset) = Nothing, Optional seatMenu As Boolean = False)
+                       Optional seats As IReadOnlyDictionary(Of String, SeatOffset) = Nothing, Optional monitorRenderer As Boolean = False)
         context.RequireClosed()
         If Pending Then Throw New IOException("File recovery is pending. Restore original files first.")
         If changes.Count = 0 Then Return
@@ -113,10 +113,11 @@ Public Class OwnedFileTransaction
         ' Schema 9: a desktop session (Launch) that moves seats, alone or with startup and/or direct practice (#b330cc4f).
         If hasSeats AndAlso Not experimental AndAlso seats IsNot Nothing AndAlso seats.Values.Any(Function(offset) offset IsNot Nothing AndAlso offset.VrOnly) Then Throw New IOException("The cockpit-only start and cockpit comfort belong to a VR session.")
         If hasSeats AndAlso experimental AndAlso seats IsNot Nothing AndAlso seats.Values.Any(Function(offset) offset IsNot Nothing AndAlso offset.Fov <> 0) Then Throw New IOException("The monitor's field of view belongs to a desktop session.")
-        ' Schema 10: a desktop session (Launch) that installs the renderer for the in-game seat menu without direct
-        ' practice: the renderer, optionally the startup change and the cars' camera files (#c137c681).
-        Dim menuOnly = seatMenu AndAlso Not experimental AndAlso Not hasDirect
-        If seatMenu AndAlso experimental Then Throw New IOException("The monitor seat menu belongs to a desktop session.")
+        ' Schema 10: a desktop session (Launch) that installs the renderer without direct practice, for the in-game
+        ' seat menu (#c137c681) and/or anisotropic filtering (#15714dd2): the renderer, optionally the startup change
+        ' and the cars' camera files.
+        Dim menuOnly = monitorRenderer AndAlso Not experimental AndAlso Not hasDirect
+        If monitorRenderer AndAlso experimental Then Throw New IOException("The monitor's renderer session belongs to a desktop session.")
         Dim journal As New RecoveryJournal With {.Schema = If(menuOnly, 10, If(hasSeats AndAlso Not experimental, 9, If(hasMaps, 8, If(hasEffects, 7, If(hasSeats, 6, If(hasDirect, If(experimental, 4, 5), If(hasStartup, 3, If(experimental, 2, 1)))))))), .InstallId = context.Id, .GraphicsPath = context.GraphicsPath, .GraphicsQuality = If(quality.Count > 0, quality, Nothing),
                                                  .Seats = If(hasSeats, seats.ToDictionary(Function(pair) pair.Key, Function(pair) pair.Value.Copy(), StringComparer.Ordinal), Nothing),
                                                  .ActionMaps = If(hasMaps, mapCount, CType(Nothing, Integer?))}
@@ -126,7 +127,7 @@ Public Class OwnedFileTransaction
             If Not fixedChanges.Order().SequenceEqual(required) Then Throw New IOException("The experimental session requires its complete set of fixed targets.")
         ElseIf menuOnly Then
             Dim required = {"proxy"}.Concat(If(hasStartup, {"startup"}, Array.Empty(Of String)())).Order().ToArray()
-            If Not fixedChanges.Order().SequenceEqual(required) Then Throw New IOException("A desktop seat menu session changes only DiRT3VR's renderer, optionally the startup movie definitions and the cars' camera files.")
+            If Not fixedChanges.Order().SequenceEqual(required) Then Throw New IOException("A desktop session with DiRT3VR's renderer changes only the renderer, optionally the startup movie definitions and the cars' camera files.")
         ElseIf hasDirect Then
             Dim required = {"direct", "proxy"}.Concat(If(hasStartup, {"startup"}, Array.Empty(Of String)())).Order().ToArray()
             If Not fixedChanges.Order().SequenceEqual(required) Then Throw New IOException("A desktop direct practice session changes only its config, DiRT3VR's renderer, optionally the startup movie definitions and the session action maps.")
@@ -294,11 +295,11 @@ Public Class OwnedFileTransaction
                 Dim hasMaps = journal.ActionMaps IsNot Nothing OrElse targets.Any(Function(target) SessionActionMaps.IsMapTarget(target) OrElse target = SessionActionMaps.PathsTarget)
                 If hasMaps AndAlso (Not fixedTargets.Contains("direct") OrElse Not CheckActionMaps(journal, targets)) Then Throw New IOException("Incomplete action map recovery journal.")
             Case 10
-                ' A desktop session (Launch) with DiRT3VR's renderer for the in-game seat menu, no direct practice:
+                ' A desktop session (Launch) with DiRT3VR's renderer (seat menu, anisotropic filtering), no direct practice:
                 ' the renderer, optionally the startup change, and one camera file per car with a seat or field of view.
                 Dim fixedTargets = targets.Where(Function(target) Not SeatPositions.IsTarget(target)).ToArray()
                 Dim seatCodes = targets.Where(AddressOf SeatPositions.IsTarget).Select(AddressOf SeatPositions.CodeOf).OrderBy(Function(code) code, StringComparer.Ordinal).ToArray()
-                If Not fixedTargets.SequenceEqual({"proxy"}) AndAlso Not fixedTargets.SequenceEqual({"proxy", "startup"}) Then Throw New IOException("Incomplete desktop seat menu recovery journal.")
+                If Not fixedTargets.SequenceEqual({"proxy"}) AndAlso Not fixedTargets.SequenceEqual({"proxy", "startup"}) Then Throw New IOException("Incomplete desktop renderer recovery journal.")
                 If seatCodes.Length > 0 Then
                     If journal.Seats Is Nothing OrElse Not journal.Seats.Keys.OrderBy(Function(code) code, StringComparer.Ordinal).SequenceEqual(seatCodes) OrElse
                        journal.Seats.Values.Any(Function(offset) offset Is Nothing OrElse offset.IsUnchanged OrElse offset.VrOnly) Then Throw New IOException("Incomplete seat recovery journal.")
