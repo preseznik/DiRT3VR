@@ -53,6 +53,31 @@ blur edit, so a VR session with bloom off writes `disable_bloom(disable_motion_b
 The two edits touch different elements, and on the installed file either order gives the
 same bytes.
 
-Not yet seen in the game. Expected: no glow around bright sky, snow, headlights and
-the finish effects; the next step is a screenshot pair of the same race start with and
-without the edit.
+## In the game (2026-11-03)
+
+`run_benchmark.py --no-bloom` applies the edit for one journaled run. DiRT 3 reads
+`postprocess\effects.xml` from disk at startup (file trace, runs of 2026-11-01).
+
+The benchmark's timeline moves with loading time (0.4–3 s between runs), so the comparison
+used 16 screenshots one second apart while the car drives (Aspen route_0, frx, 1280×720), paired by
+the HUD lap timer. The bloom-off run and a bloom-on run (the 16× anisotropic run) lined up within
+6–60 ms. Between them:
+
+- No glow structure. The low-frequency difference (12 px blur) averages −2 to +1 levels (of 255) per
+  frame, and its only local differences are the car's snow spray, not halos around bright snow or sky.
+- Dark and mid levels are the same. Medians per frame agree within 1–3 levels (164/164, 171/172,
+  167/169…). An earlier 11-level gap against another baseline was its 0.43 s timing offset.
+
+So in Aspen's daytime driving, BloomFromDsX4 adds almost nothing: Aspen's lowerThreshold is 0.7425
+with mediumBloomThreshold 1.2177, and little of the frame passes them. The strong sun glare in
+the pre-race views comes from two other groups of the same effect, untouched by this edit and
+still present with bloom off:
+
+- `Streaks` (multiplier_0..2 = 1.27, 1.16, 4.0, threshold 0.75; blue) — the horizontal blue streak
+  through the sun.
+- `LensFlares` (`multiplierAndThreshold_*`, `multiplier` 2.0, `threshold` 0.1) — the flare chain.
+
+Both are screen-space effects; in VR each eye would draw its own flare and streak position, which
+is the likely "sun bloom" complaint from DiRT2VR. Whether the option should also turn these off is
+iztok's call (asked on #3c6d6ffa). Night tracks, finish and flashback effects (higher mixes, e.g.
+finish_fx_green mixLarge 1.5954) weren't run.

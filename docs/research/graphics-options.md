@@ -157,6 +157,14 @@ override (`src/anisotropic_filter.cpp`); it cannot be done by writing the XML. #
 on/off) turned out to be data after all: the post-processing effect files carry the bloom mixes
 ([bloom](bloom.md)).
 
+In the game (2026-11-03, `run_benchmark.py --anisotropy 16`, Aspen): the log shows the level and
+its first 16 changed samplers (it logs no more), all accepted by the driver. DiRT 3 already creates some samplers anisotropic
+(4×, 6×, 8×) next to trilinear ones, so "Off" (1, trilinear) lowers those and 16× raises both.
+At 1280×720 in the moving chase view the difference is small: far-road detail energy changed by
+−2 to +2% in frames matched within 60 ms, inside the noise of motion blur and snow spray. A
+slow or stationary view at a grazing angle, or the headset's higher resolution, should show
+more; that's left to a visual check.
+
 ## Notes for the launcher graphics UI (#86b1ad13, #8df24f27)
 
 - Write only the quality attributes from the catalog, into the Documents file, with the same

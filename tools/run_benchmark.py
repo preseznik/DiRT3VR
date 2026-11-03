@@ -197,7 +197,8 @@ def diagnostic_environment(directory: Path, *, scene_observer: bool = False, rep
                  "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH", "DIRT3VR_RESEARCH_FILE_TRACE", "DIRT3VR_DIRECT_PRACTICE", "DIRT3VR_DIRECT_LAPS", "DIRT3VR_DIRECT_RETURN", "DIRT3VR_DIRECT_DIFFICULTY", "DIRT3VR_DIRECT_ASSISTS", "DIRT3VR_DIRECT_DEVICES", "DIRT3VR_RESEARCH_LAPS", "DIRT3VR_SCREENSHOT_SECONDS", "DIRT3VR_RESEARCH_SETTINGS_TRACE",
                 "DIRT3VR_RESEARCH_STACKS", "DIRT3VR_RESEARCH_COUNT", "DIRT3VR_RESEARCH_PRESS_START_USER",
                 "DIRT3VR_RESEARCH_AUTO_SAVE_CHOICE", "DIRT3VR_RESEARCH_STORE_TRACE",
-                "DIRT3VR_RESEARCH_DATA_WATCH", "DIRT3VR_RESEARCH_GAME_LOG", "DIRT3VR_RESEARCH_VEHICLES", "DIRT3VR_RESEARCH_DEVICES", "DIRT3VR_RESEARCH_DEVICE_FIRST", "DIRT3VR_RESEARCH_LIVE_SEAT"):
+                "DIRT3VR_RESEARCH_DATA_WATCH", "DIRT3VR_RESEARCH_GAME_LOG", "DIRT3VR_RESEARCH_VEHICLES", "DIRT3VR_RESEARCH_DEVICES", "DIRT3VR_RESEARCH_DEVICE_FIRST", "DIRT3VR_RESEARCH_LIVE_SEAT",
+                "DIRT3VR_ANISOTROPY"):
         env.pop(flag, None)
     if background_play:
         env["DIRT3VR_BACKGROUND_PLAY"] = "1"
@@ -509,6 +510,8 @@ def main() -> int:
                         help="Research: temporarily add the normal race's 'Controller / Switch type=human' event to cutscene/spectator_startsequence.xml (journaled and restored)")
     parser.add_argument("--no-bloom", action="store_true",
                         help="Research: zero the BloomFromDsX4 mixes of postprocess/effects.xml and tracks/generic/(night_)effects.xml (tools/bloom.py; journaled and restored)")
+    parser.add_argument("--anisotropy", type=int, choices=(0, 1, 2, 4, 8, 16),
+                        help="Anisotropic filtering level for the game's samplers (DIRT3VR_ANISOTROPY; 1 = trilinear); unset leaves them as the game made them")
     parser.add_argument("--research-patch", metavar="RVA:ORIGINAL:REPLACEMENT",
                         help="Research only: in-memory code change applied by the research proxy (build/native/bin/research/d3d11.dll, pass it with --proxy) after its original bytes match")
     parser.add_argument("--screenshots", metavar="SECONDS",
@@ -659,7 +662,7 @@ def main() -> int:
                  "stereo": False, "sceneObserver": args.scene_observer,
                  "serialRender": args.serial_render, "replayPair": args.replay_pair,
                  "xrRuntime": xr_runtime, "backgroundPlay": args.background_play, "researchPatch": args.research_patch,
-                 "spectatorHumanSwitch": args.spectator_human_switch, "noBloom": args.no_bloom, "directPractice": args.direct_practice,
+                 "spectatorHumanSwitch": args.spectator_human_switch, "noBloom": args.no_bloom, "anisotropy": args.anisotropy,"directPractice": args.direct_practice,
                  "playerHardwareSettings": args.player_hardware_settings, "directLaps": args.direct_laps, "directReturn": args.direct_return, "scene": scene,
                  "durationSeconds": args.seconds}
     if restrictions:
@@ -728,6 +731,8 @@ def main() -> int:
                                      xr_runtime=args.xr_runtime, background_play=args.background_play)
         if args.research_patch:
             env["DIRT3VR_RESEARCH_PATCH"] = args.research_patch
+        if args.anisotropy is not None:
+            env["DIRT3VR_ANISOTROPY"] = str(args.anisotropy)
         if args.file_trace:
             env["DIRT3VR_RESEARCH_FILE_TRACE"] = "1"
         if args.game_log:
