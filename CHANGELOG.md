@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- The README is now a short quickstart, like DiRT2VR's (iztok). The full launcher reference moved to [docs/launcher-guide.md](docs/launcher-guide.md).
+- The README is now a short quickstart, like DiRT2VR's (iztok). The launcher's **?** instructions cover every option.
+- The GitHub repository now holds only what builds the installer (iztok): development notes, tests and research tools stay with the developers. A fresh clone still builds the installer; `tools/build.ps1` skips the tests that aren't there.
 
 ## 0.1.22 — in-game seat menu, wheels in direct practice and VR image options (Experimental)
 

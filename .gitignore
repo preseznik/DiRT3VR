@@ -6,3 +6,19 @@ artifacts/
 __pycache__/
 *.user
 *.log
+
+# Only what builds the installer is published (iztok, 2026-11-04). Development notes, tests and
+# research or diagnostic tools stay in the local checkout.
+/docs/
+/tests/
+/tools/*
+!/tools/bootstrap.ps1
+!/tools/build.ps1
+!/tools/package.ps1
+!/tools/generate_exports.py
+!/tools/driving-input/
+/tools/driving-input/axes_test.cpp
+!/tools/data/
+/tools/data/*
+!/tools/data/graphics-options.json
+!/tools/data/event-catalog.json
