@@ -265,13 +265,23 @@ int main() {
               { auto hud=frame.AcquireOverlay(); Require(hud.Complete(),"HUD release failed"); }
               strip(frame);
               { auto seat=frame.AcquireSeatPanel(); Require(seat.Complete(),"Seat panel release failed"); }
-              Require(frame.ShowPerfPanel(false) && frame.ShowSeatPanel({{0,0,0,1},{0,1.3f,-1}},.6f,.8f) && frame.SubmitOverlay(4.f/3.f) && layers==4,"HUD, FPS strip and seat panel did not submit together"); }
-            { auto frame=runtime.BeginFrame(4); CompletePair(frame); strip(frame); Require(!frame.Submit() && layers==0,"FPS strip without ShowPerfPanel submitted"); }
+              Require(frame.ShowPerfPanel(false) && frame.ShowSeatPanel({{0,0,0,1},{0,1.3f,-1}},.6f,.8f) && frame.SubmitOverlay(4.f/3.f) && layers==4,"HUD, FPS strip and seat panel did not submit together");
+              // In front of the 2 m HUD, not in its plane, at the same angular size.
+              Require(Near(lastQuad.pose.position.z,-2.f) && Near(lastPerf.pose.position.z,-1.9f) && Near(lastPerf.pose.position.y,1.4f-.57f) &&
+                      Near(lastPerf.size.width,.76f) && Near(lastPerf.size.height,.095f),"FPS strip in the HUD's plane"); }
+            for(const float distance:{1.f,3.f}) {
+              auto frame=runtime.BeginFrame(distance<2 ? 4 : 5); CompletePair(frame);
+              { auto hud=frame.AcquireOverlay(); Require(hud.Complete(),"HUD release failed"); }
+              strip(frame);
+              const float expected=distance<2 ? -.95f : -2.f;
+              Require(frame.ShowPerfPanel(false) && frame.SubmitOverlay(4.f/3.f,distance,.8f*distance) && Near(lastPerf.pose.position.z,expected) &&
+                      Near(lastPerf.size.width,-.4f*expected),"FPS strip not in front of a near HUD, or moved for a far one"); }
+            { auto frame=runtime.BeginFrame(6); CompletePair(frame); strip(frame); Require(!frame.Submit() && layers==0,"FPS strip without ShowPerfPanel submitted"); }
             headOrientation={0,std::sin(.7853982f),0,std::cos(.7853982f)};
-            { auto frame=runtime.BeginFrame(5); CompletePair(frame); strip(frame);
+            { auto frame=runtime.BeginFrame(7); CompletePair(frame); strip(frame);
               Require(frame.ShowPerfPanel(true) && frame.Submit() && Near(lastPerf.pose.position.x,-1.5f) && Near(lastPerf.pose.position.y,.95f) && Near(lastPerf.pose.position.z,0) &&
                       Near(lastPerf.size.width,.6f),"Following FPS strip not below the view"); }
-            { auto frame=runtime.BeginScreenFrame(6); { auto image=frame.AcquirePerfPanel(); Require(!image,"Screen frame acquired the FPS strip"); } frame.Abort(); }
+            { auto frame=runtime.BeginScreenFrame(8); { auto image=frame.AcquirePerfPanel(); Require(!image,"Screen frame acquired the FPS strip"); } frame.Abort(); }
         }
         Reset(); { // HUD placement: distance at the same angular size, fixed or following the view.
             XrRuntime runtime; Require(runtime.Initialize(device.Get(),1.f,0,0,true),"HUD init failed");
