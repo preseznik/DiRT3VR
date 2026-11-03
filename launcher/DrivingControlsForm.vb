@@ -37,6 +37,16 @@ Public NotInheritable Class DrivingControlsForm
         enabledBox.Checked = model.Enabled
         rows.Columns.Add("Action", 170) : rows.Columns.Add("Device", 280) : rows.Columns.Add("Input", 230)
         rows.Columns.Add("Dead zone", 100) : rows.Columns.Add("Saturation", 110)
+        ' Drawn here so a lit row shows the accent even while selected: the list selects Steer Left when it opens,
+        ' and the system's selection colour hid its highlight (iztok, 2026-11-03).
+        rows.OwnerDraw = True
+        AddHandler rows.DrawColumnHeader, Sub(sender, e) e.DrawDefault = True
+        AddHandler rows.DrawItem, Sub(sender, e) e.DrawDefault = False
+        AddHandler rows.DrawSubItem, AddressOf DrawRowCell
+        AddHandler rows.MouseMove, Sub(sender, e)
+                                       Dim hovered = rows.GetItemAt(e.X, e.Y)
+                                       If hovered IsNot Nothing Then rows.Invalidate(hovered.Bounds)
+                                   End Sub
         Dim layout As New TableLayoutPanel With {.Dock = DockStyle.Fill, .Padding = New Padding(16), .RowCount = 6, .ColumnCount = 1}
         layout.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
         For i = 0 To 5
@@ -135,6 +145,27 @@ Public NotInheritable Class DrivingControlsForm
         Next
         rows.EndUpdate()
     End Sub
+
+    ' A lit row keeps the accent when selected; otherwise the selection colour, else the row's own colours.
+    Private Sub DrawRowCell(sender As Object, e As DrawListViewSubItemEventArgs)
+        Dim lit = e.Item.BackColor = LauncherAppearance.Accent AndAlso e.Item.Tag IsNot Nothing
+        Dim back = If(lit, e.Item.BackColor, If(e.Item.Selected, SystemColors.Highlight, rows.BackColor))
+        Dim fore = If(lit, e.Item.ForeColor, If(e.Item.Selected, SystemColors.HighlightText, rows.ForeColor))
+        Using brush As New SolidBrush(back)
+            e.Graphics.FillRectangle(brush, e.Bounds)
+        End Using
+        Dim text = If(e.SubItem IsNot Nothing, e.SubItem.Text, e.Item.Text)
+        Dim area = Rectangle.FromLTRB(e.Bounds.Left + 6, e.Bounds.Top, e.Bounds.Right - 2, e.Bounds.Bottom)
+        TextRenderer.DrawText(e.Graphics, text, rows.Font, area, fore, TextFormatFlags.Left Or TextFormatFlags.VerticalCenter Or TextFormatFlags.EndEllipsis Or TextFormatFlags.SingleLine Or TextFormatFlags.NoPrefix)
+        If e.ColumnIndex = 0 AndAlso e.Item.Focused AndAlso rows.Focused AndAlso e.Item.Selected Then ControlPaint.DrawFocusRectangle(e.Graphics, e.Item.Bounds, fore, back)
+    End Sub
+
+    ' The colours a row is drawn with now, for tests: (back, fore).
+    Public Function RowColors(action As String) As (Back As Color, Fore As Color)
+        Dim item = rows.Items.Cast(Of ListViewItem)().First(Function(row) row.Text = action)
+        Dim lit = item.BackColor = LauncherAppearance.Accent AndAlso item.Tag IsNot Nothing
+        Return If(lit, (item.BackColor, item.ForeColor), If(item.Selected, (SystemColors.Highlight, SystemColors.HighlightText), (rows.BackColor, rows.ForeColor)))
+    End Function
 
     ' Rows lit by the live highlight, for tests.
     Public ReadOnly Property HighlightedActions As IReadOnlyList(Of String)

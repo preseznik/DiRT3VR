@@ -2,6 +2,7 @@ Imports DiRT3VR
 Imports System.Globalization
 Imports System.IO
 Imports System.Reflection
+Imports System.Drawing
 Imports System.Windows.Forms
 
 ' Driving controls: the bindings model, input capture and the binding wizard (ported from
@@ -480,6 +481,18 @@ Module DrivingControlsTests
             check(form.HighlightedActions.OrderBy(Function(a) a).SequenceEqual({"Gear Up", "Pause"}), "a held wheel button and a held key light their rows (" & String.Join(", ", form.HighlightedActions) & ")")
             form.ShowActive(New Dictionary(Of String, DrivingInput.Sample) From {{WheelId, resting}}, Function(key) False)
             check(form.HighlightedActions.Count = 0, "released inputs go back to normal")
+            ' iztok: Steer Left never lit up. It's the row selected when the window opens, and the selection colour hid it.
+            form.UsePreset(New DrivingControls With {.Enabled = True, .Bindings = New List(Of DrivingBinding) From {
+                New DrivingBinding With {.Action = "Steer Left", .Device = "Wheel", .DeviceId = WheelId, .DeviceType = WheelProduct, .Input = "di_x_axis", .Calibration = "biDirectionalLower"},
+                New DrivingBinding With {.Action = "Steer Right", .Device = "Wheel", .DeviceId = WheelId, .DeviceType = WheelProduct, .Input = "di_x_axis", .Calibration = "biDirectionalUpper"}}})
+            check(form.RowColors("Steer Left").Back = SystemColors.Highlight, "Steer Left is selected when the list opens")
+            Dim left = DrivingCapture.Clone(resting) : left.Values(0) = -0.8F : left.Axes = 1UI
+            Dim centre = DrivingCapture.Clone(resting) : centre.Axes = 1UI
+            form.ShowActive(New Dictionary(Of String, DrivingInput.Sample) From {{WheelId, centre}}, Function(key) False)
+            form.ShowActive(New Dictionary(Of String, DrivingInput.Sample) From {{WheelId, left}}, Function(key) False)
+            check(form.HighlightedActions.SequenceEqual({"Steer Left"}) AndAlso form.RowColors("Steer Left").Back = LauncherAppearance.Accent, "turning left lights the selected Steer Left row in the accent")
+            form.ShowActive(New Dictionary(Of String, DrivingInput.Sample) From {{WheelId, centre}}, Function(key) False)
+            check(form.RowColors("Steer Left").Back = SystemColors.Highlight, "back at the centre it shows the selection again")
         End Using
         Using form As New DrivingControlsForm(ctx, noInput)
             check(form.Current.Enabled AndAlso form.Current.Bindings.Count = DrivingControls.XboxPreset().Count, "the window reopens with the saved bindings")
