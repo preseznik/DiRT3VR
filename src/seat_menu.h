@@ -7,6 +7,7 @@
 #include <functional>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace dirt3vr::seat {
@@ -47,6 +48,13 @@ public:
         return p!=old;
     }
 };
+
+// The car code in one of DiRT 3's race vehicle names, "<code>_<livery> <tag>" (e.g. "frx_00 sn"
+// is frx; docs/research/seat-adjustment.md); empty when the name has no code.
+inline std::string CarCodeFromVehicleName(std::string_view name) {
+    const auto end=name.find('_');
+    return end==std::string_view::npos || end==0 || end>15 ? std::string{} : std::string(name.substr(0,end));
+}
 
 // Held mask bits, written by the launcher (controllers) and added from the keyboard here.
 enum Held : unsigned {

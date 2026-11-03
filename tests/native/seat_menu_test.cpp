@@ -169,6 +169,13 @@ int main() {
             Require(Generation(c)==1 && c.Read<int>(120)==AllCars && Near(c.Read<Position>(192),{0,.025f,0}) && Near(c.Saved(1),{-.03f,.05f,.04f}),
                     "Every-car commit wrong");
         }
+        { // The player's car code from DiRT 3's vehicle names, matched to the launcher's car table.
+            Require(CarCodeFromVehicleName("frx_00 sn")=="frx" && CarCodeFromVehicleName("mini_cooper_01 sn")=="mini" &&
+                    CarCodeFromVehicleName("frx")=="" && CarCodeFromVehicleName("_00 sn")=="" && CarCodeFromVehicleName("")=="",
+                    "Car code misread from a vehicle name");
+            auto bytes=Launcher(); Channel c(bytes.data());
+            Require(c.FindCar(CarCodeFromVehicleName("ford_fiesta_00 sn"))==-1,"Car code matched past its underscore");
+        }
         { // Limits: the seat stays within ±0.5 m.
             Position p{0,.499f,0}; Movement movement;
             for(unsigned i=0;i<200;++i) movement.Update(p,Up,.1);
