@@ -231,6 +231,60 @@ Public NotInheritable Class SeatCameras
         Return value
     End Function
 
+    ' A steady cockpit camera for VR (#cd56379b; Wrench's head-cam inventory of the stock cars): DiRT 3's own
+    ' G-force head and body movement, acceleration shake, buffeting and impact distortion, which move the view
+    ' on top of head tracking. Values in the game's own format.
+    Public Shared ReadOnly SteadyParameters As (Name As String, Type As String, Value As String)() = {
+        ("maxHeadOffset", "scalar", "0.0000"), ("maxBodyOffset", "scalar", "0.0000"), ("headBuffeting", "bool", "false"),
+        ("shakeAngleScalingX", "scalar", "0.0000"), ("minShakeAngleX", "scalar", "0.0000"), ("maxShakeAngleX", "scalar", "0.0000"),
+        ("shakeAngleScalingY", "scalar", "0.0000"), ("minShakeAngleY", "scalar", "0.0000"), ("maxShakeAngleY", "scalar", "0.0000"),
+        ("cdEnabled", "bool", "false")}
+
+    ' The Parameter elements under a view (in its groups too), by name; a name that appears twice is refused.
+    Private Shared Function ViewParameters(document As BinXml, view As Integer) As Dictionary(Of String, Integer)
+        Dim result As New Dictionary(Of String, Integer)(StringComparer.Ordinal)
+        For Each item In Descendants(document, view, New HashSet(Of Integer) From {view})
+            If document.Name(item) <> "Parameter" Then Continue For
+            Dim name = GetValue(document.AttributesOf(item), "name")
+            If name Is Nothing Then Continue For
+            If result.ContainsKey(name) Then Throw New IOException("The cockpit view has two " & name & " parameters.")
+            result.Add(name, item)
+        Next
+        Return result
+    End Function
+
+    ' Cockpit comfort in the head-cam view: hide the driver and/or the co-driver, and a steady camera.
+    ' A parameter the car doesn't have stays absent; one of another type or shape is refused.
+    Public Shared Function Comfort(data As Byte(), hideDriver As Boolean, hideCoDriver As Boolean, steady As Boolean) As Byte()
+        Dim document = Decode(data)
+        Dim parameters = ViewParameters(document, HeadCam(document))
+        Dim change = Sub(name As String, type As String, value As String)
+                         Dim element As Integer
+                         If Not parameters.TryGetValue(name, element) Then Return
+                         Dim values = document.AttributesOf(element)
+                         If GetValue(values, "type") <> type OrElse Not values.Keys.OrderBy(Function(key) key, StringComparer.Ordinal).SequenceEqual({"name", "type", "value"}) Then
+                             Throw New IOException("Unexpected cockpit view parameter " & name & ".")
+                         End If
+                         document.SetAttribute(element, "value", value)
+                     End Sub
+        If hideDriver Then change("DisableDriver", "bool", "true")
+        If hideCoDriver Then change("DisableCoDriver", "bool", "true")
+        If steady Then
+            For Each parameter In SteadyParameters
+                change(parameter.Name, parameter.Type, parameter.Value)
+            Next
+        End If
+        Return Encode(document)
+    End Function
+
+    ' A view's parameter values by name (ident "head-cam" for the cockpit), for checks and the tests.
+    Public Shared Function ViewValues(data As Byte(), ident As String) As Dictionary(Of String, String)
+        Dim document = Decode(data)
+        Dim found = Views(document).Where(Function(view) GetValue(document.AttributesOf(view), "ident") = ident).ToList()
+        If found.Count <> 1 Then Throw New IOException("The camera file has no single " & ident & " view.")
+        Return ViewParameters(document, found(0)).ToDictionary(Function(pair) pair.Key, Function(pair) GetValue(document.AttributesOf(pair.Value), "value"), StringComparer.Ordinal)
+    End Function
+
     ' Wrench's start_in_cockpit: DiRT 3 starts a race with the first visible view, so hiding the visible
     ' views listed before head-cam starts it in the cockpit (they can't be chosen while hidden).
     Public Shared Function StartInCockpit(data As Byte()) As Byte()

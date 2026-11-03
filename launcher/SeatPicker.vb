@@ -18,6 +18,14 @@ Public NotInheritable Class SeatPicker
     Private ReadOnly cockpitStart As New CheckBox With {.Name = "SeatStartInCockpit", .Text = "Cockpit view only: start races in the cockpit", .AutoSize = True}
     Private ReadOnly cockpitNote As New Label With {.Name = "SeatStartInCockpitNote", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12),
         .Text = "DiRT 3 starts a race with the first view in each car's camera list: chase close, chase far, bumper, bonnet, then cockpit. This hides those four for the VR session, so races start in the cockpit and Change View stays there. Launch VR only."}
+    ' VR cockpit comfort (#cd56379b).
+    Private ReadOnly steadyBox As New CheckBox With {.Name = "SeatSteadyCamera", .Text = "Steady cockpit camera in VR", .AutoSize = True, .Checked = True}
+    Private ReadOnly steadyNote As New Label With {.Name = "SeatSteadyCameraNote", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12),
+        .Text = "DiRT 3 moves and shakes the cockpit camera by itself under braking, cornering and over bumps. In VR your head already moves the view, so Launch VR turns that off for the session (on by default). Turn this off to keep DiRT 3's own camera movement."}
+    Private ReadOnly hideDriverBox As New CheckBox With {.Name = "SeatHideDriver", .Text = "Hide the driver in VR", .AutoSize = True}
+    Private ReadOnly hideCoDriverBox As New CheckBox With {.Name = "SeatHideCoDriver", .Text = "Hide the co-driver in VR", .AutoSize = True}
+    Private ReadOnly hideNote As New Label With {.Name = "SeatHideDriverNote", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12),
+        .Text = "Hides the driver's body and arms, or the rally co-driver, in the cockpit view during Launch VR."}
     Private ReadOnly perCar As New Dictionary(Of String, SeatOffset)(StringComparer.Ordinal)
     Private everyCarOffset As New SeatOffset
     Private updating As Boolean
@@ -53,6 +61,14 @@ Public NotInheritable Class SeatPicker
         parent.Controls.Add(cockpitStart)
         parent.Controls.Add(cockpitNote)
         AddHandler cockpitStart.CheckedChanged, Sub() If Not updating Then RaiseEvent Changed()
+        parent.Controls.Add(steadyBox)
+        parent.Controls.Add(steadyNote)
+        parent.Controls.Add(hideDriverBox)
+        parent.Controls.Add(hideCoDriverBox)
+        parent.Controls.Add(hideNote)
+        For Each box In {steadyBox, hideDriverBox, hideCoDriverBox}
+            AddHandler box.CheckedChanged, Sub() If Not updating Then RaiseEvent Changed()
+        Next
         AddHandler car.SelectedIndexChanged, Sub() ShowCurrent()
         AddHandler everyCar.CheckedChanged, Sub()
                                                  If updating Then Return
@@ -115,6 +131,34 @@ Public NotInheritable Class SeatPicker
         End Get
     End Property
 
+    Public ReadOnly Property SteadyCamera As Boolean
+        Get
+            Return steadyBox.Checked
+        End Get
+    End Property
+
+    Public ReadOnly Property HidesDriver As Boolean
+        Get
+            Return hideDriverBox.Checked
+        End Get
+    End Property
+
+    Public ReadOnly Property HidesCoDriver As Boolean
+        Get
+            Return hideCoDriverBox.Checked
+        End Get
+    End Property
+
+    ' Shows the saved cockpit comfort choices.
+    Public Sub ApplyComfort(steady As Boolean, driver As Boolean, coDriver As Boolean)
+        updating = True
+        Try
+            steadyBox.Checked = steady : hideDriverBox.Checked = driver : hideCoDriverBox.Checked = coDriver
+        Finally
+            updating = False
+        End Try
+    End Sub
+
     Public ReadOnly Property SummaryText As String
         Get
             Return summary.Text
@@ -148,7 +192,7 @@ Public NotInheritable Class SeatPicker
     ' A position saved from the in-game seat menu (#bd820b32); it is already saved, so no Changed event.
     Public Sub ApplyCommit(commit As SeatCommit)
         Dim offset = commit.Offset.Copy()
-        offset.Cockpit = False
+        offset.ClearSessionFlags()
         If commit.AllCars Then
             everyCarOffset = offset
         ElseIf offset.IsZero Then

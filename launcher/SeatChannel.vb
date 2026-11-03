@@ -152,7 +152,7 @@ Public NotInheritable Class SeatChannel
     Public Shared Sub Apply(settings As LauncherSettings, commit As SeatCommit)
         commit.Offset.Validate()
         Dim offset = commit.Offset.Copy()
-        offset.Cockpit = False
+        offset.ClearSessionFlags()
         If commit.AllCars Then
             settings.SeatAllCars = offset
         Else

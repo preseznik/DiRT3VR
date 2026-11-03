@@ -60,7 +60,7 @@ Module SeatTests
               "a file that isn't a camera file, is cut short or has no cockpit view is refused")
 
         ' Settings: per car or one for every car; zero offsets aren't kept.
-        Dim settings As New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = "", .SeatOffsets = New Dictionary(Of String, SeatOffset) From {{"stx", New SeatOffset With {.Up = 3}}, {"frx", New SeatOffset With {.Forward = -4}}, {"mex", New SeatOffset}}}
+        Dim settings As New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = "", .CockpitSteady = False, .SeatOffsets = New Dictionary(Of String, SeatOffset) From {{"stx", New SeatOffset With {.Up = 3}}, {"frx", New SeatOffset With {.Forward = -4}}, {"mex", New SeatOffset}}}
         settings.Validate()
         check(settings.SeatOffsets.Keys.SequenceEqual({"frx", "stx"}), "settings keep only adjusted cars, in code order")
         check(Refused(Sub() Call New LauncherSettings With {.SeatOffsets = New Dictionary(Of String, SeatOffset) From {{"zzz", New SeatOffset With {.Up = 1}}}}.Validate()) AndAlso
@@ -68,7 +68,7 @@ Module SeatTests
               Refused(Sub() Call New LauncherSettings With {.SeatAllCars = New SeatOffset With {.Forward = -51}}.Validate()), "unknown cars and offsets beyond 50 cm are refused")
         check(SeatPositions.Effective(settings).Keys.SequenceEqual({"frx", "stx"}) AndAlso
               SeatPositions.Effective(New LauncherSettings With {.SeatSameForAll = True, .SeatAllCars = New SeatOffset With {.Up = 2}}).Count = EventCatalog.Current.Cars.Count AndAlso
-              SeatPositions.Effective(New LauncherSettings With {.SeatSameForAll = True}).Count = 0, "a session moves the adjusted cars, or every car with the shared position")
+              SeatPositions.Effective(New LauncherSettings With {.SeatSameForAll = True, .CockpitSteady = False}).Count = 0, "a session moves the adjusted cars, or every car with the shared position")
         check(New SeatOffset With {.Sideways = -3, .Up = 2, .Forward = -5}.Describe() = "3 cm right · 2 cm up · 5 cm back", "offsets read as directions")
         check(ProfileValues.Capture(New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = ""}).ApplyTo(settings).SeatOffsets.Keys.SequenceEqual({"frx", "stx"}) AndAlso
               LauncherDefaults.All(settings).SeatOffsets.Count = 2, "settings profiles and Restore launcher defaults keep this PC's seat positions")
