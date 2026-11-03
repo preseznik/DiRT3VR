@@ -2,7 +2,8 @@
 
 Temporary files use exclusive creation. The only replaceable original is the
 fingerprinted CPU restrictions file, with an exact backup and journal before
-its six parallel-render overrides are disabled. Conflicts retain all evidence.
+its six parallel-render overrides are disabled. A conflict keeps the changed file, its backup
+and the journal as evidence; everything else that is still exactly as written is undone.
 """
 from __future__ import annotations
 
@@ -536,26 +537,33 @@ class DiagnosticFiles:
             no_links(target)
             if target.exists() and sha256(target) != entry["sha256"]:
                 conflicts.append(str(target))
-        if conflicts:
-            return conflicts
+        # A changed file is kept as it is and reported, with its backup and the journal, but it
+        # never keeps the proxy or another unchanged file in the game: everything that is still
+        # exactly ours is undone, as the launcher's recovery does. A later --recover skips what is
+        # already undone.
         for target, original, entry in originals:
+            if str(target) in conflicts:
+                continue
             no_links(target)
-            if not target.is_file():
-                return [str(target)]
-            current = sha256(target)
+            current = sha256(target) if target.is_file() else None
             if current == entry["originalSha256"]:
                 continue  # Interrupted before application, or already restored.
             if current != entry["appliedSha256"]:
-                return [str(target)]
+                conflicts.append(str(target))
+                continue
             replace_verified(target, original, entry["appliedSha256"])
         for entry in entries:
             target = DiagnosticFiles.target(game, hardware, entry["name"])
-            if target.exists():
-                # Recheck immediately before removal; never recursively delete.
-                no_links(target)
-                if sha256(target) != entry["sha256"]:
-                    return [str(target)]
-                target.unlink()
+            if str(target) in conflicts or not target.exists():
+                continue
+            # Recheck immediately before removal; never recursively delete.
+            no_links(target)
+            if sha256(target) != entry["sha256"]:
+                conflicts.append(str(target))
+                continue
+            target.unlink()
+        if conflicts:
+            return conflicts
         record["restored"] = True
         save_json(journal, record)
         return []
