@@ -25,7 +25,7 @@ std::array<ComPtr<ID3D11Texture2D>,5> textures;
 std::array<bool,5> acquired{},waited{};
 XrSwapchain seatChain{},perfChain{};
 XrCompositionLayerQuad lastSeat{XR_TYPE_COMPOSITION_LAYER_QUAD},lastPerf{XR_TYPE_COMPOSITION_LAYER_QUAD};
-bool shouldRender=true,validTracking=true,fullTracking=true,badLuid=false,badPose=false,timeoutForever=false;
+bool shouldRender=true,validTracking=true,fullTracking=true,badLuid=false,zeroLuid=false,badPose=false,timeoutForever=false;
 unsigned chainCount{},imageCount=2,timeoutCount{},layers{},endFrames{},sessions{},destroyedSessions{},destroyedInstances{},destroyedChains{};
 int failAcquire=-1,failChain=-1;
 uint32_t imageIndex{};
@@ -42,7 +42,7 @@ unsigned Eye(XrSwapchain handle) { return unsigned(uint64_t(handle)-10); }
 void Reset() {
     calls.clear(); diagnosticMessages.clear(); events={XR_SESSION_STATE_READY,XR_SESSION_STATE_FOCUSED};
     textures={}; acquired={}; waited={};
-    shouldRender=validTracking=fullTracking=true; badLuid=badPose=timeoutForever=false;
+    shouldRender=validTracking=fullTracking=true; badLuid=zeroLuid=badPose=timeoutForever=false;
     chainCount=timeoutCount=layers=endFrames=sessions=destroyedSessions=destroyedInstances=destroyedChains=imageIndex=0;
     imageCount=2; failAcquire=failChain=-1; headHeight=1.4f; headX=headZ=0;
     recommendedWidth=64; recommendedHeight=48;
@@ -74,6 +74,7 @@ XRAPI_ATTR XrResult XRAPI_CALL xrDestroyInstance(XrInstance) { ++destroyedInstan
 XRAPI_ATTR XrResult XRAPI_CALL xrGetSystem(XrInstance,const XrSystemGetInfo*,XrSystemId* system) { *system=1; return XR_SUCCESS; }
 XRAPI_ATTR XrResult XRAPI_CALL GetRequirements(XrInstance,XrSystemId,XrGraphicsRequirementsD3D11KHR* requirements) {
     requirements->adapterLuid=adapterLuid; if(badLuid) ++requirements->adapterLuid.HighPart;
+    if(zeroLuid) requirements->adapterLuid={}; // SteamVR's null (virtual) headset names no adapter.
     requirements->minFeatureLevel=D3D_FEATURE_LEVEL_11_0; return XR_SUCCESS;
 }
 XRAPI_ATTR XrResult XRAPI_CALL xrGetInstanceProcAddr(XrInstance,const char* name,PFN_xrVoidFunction* function) {
@@ -535,6 +536,9 @@ int main() {
             frame.Abort(); Require(layers==0 && std::count(calls.begin(),calls.end(),"release0")==1,"Session loss failed to release/abort without a layer");
         }
         Reset(); badLuid=true; { XrRuntime runtime; Require(!runtime.Initialize(device.Get()) && sessions==0,"Mismatched adapter created session"); }
+        Reset(); zeroLuid=true; { XrRuntime runtime(CaptureDiagnostic); Require(runtime.Initialize(device.Get()) && sessions==1 &&
+            std::count(diagnosticMessages.begin(),diagnosticMessages.end(),"XR runtime names no graphics adapter; using the game's")==1,
+            "A runtime naming no adapter (SteamVR's null headset) was refused or not logged"); }
         Reset(); failChain=1; { XrRuntime runtime; Require(!runtime.Initialize(device.Get()),"Partial allocation accepted"); Require(destroyedChains==1 && destroyedSessions==1 && destroyedInstances==1,"Partial allocation leaked XR objects"); }
         Reset(); imageCount=9; { XrRuntime runtime; Require(!runtime.Initialize(device.Get()) && destroyedChains==1,"Unbounded image count accepted/leaked"); }
         Reset(); {
