@@ -18,6 +18,7 @@
 #include "hud_placement.h"
 #include "frame_timing.h"
 #include "performance_display.h"
+#include "flat_views.h"
 #include <windows.h>
 #include <MinHook.h>
 #include <array>
@@ -67,6 +68,7 @@ struct PrototypeState {
     RecenterPoll recenter;
     RecenterPoll toggle;
     bool flat{}; // Toggle VR: the player switched to the flat virtual screen.
+    unsigned flatViews{}; // flatviews::Group bits the player sends to the flat screen (#48208327).
     bool basisPending=true;
     unsigned basisSamples{};
     bool rendering{}, windowReported{};
@@ -405,6 +407,11 @@ bool Prepare(PrototypeState& state,ID3D11Texture2D* back) {
         state.perfDisplay=EnvironmentFlag("DIRT3VR_PERF_DISPLAY") && state.perfPresenter.Initialize(device.Get());
         state.perfFollow=EnvironmentFlag("DIRT3VR_PERF_FOLLOW");
         if(state.log) state.log("XR FPS display=%u follow=%u",unsigned(state.perfDisplay),unsigned(state.perfFollow));
+        char views[64]{};
+        const auto length=GetEnvironmentVariableA("DIRT3VR_FLAT_VIEWS",views,sizeof(views));
+        const bool valid=length<sizeof(views) && flatviews::Parse(std::string_view(views,length),state.flatViews);
+        if(state.log) state.log("XR flat views=%s car=%u cinematic=%u menus=%u",valid ? "ok" : "refused",
+            unsigned((state.flatViews&flatviews::Car)!=0),unsigned((state.flatViews&flatviews::Cinematic)!=0),unsigned((state.flatViews&flatviews::Menus)!=0));
     }
     if(!state.presenter.Initialize(device.Get()) ||
        (state.resolution.width && !state.hudPresenter.Initialize(device.Get())) ||
@@ -632,6 +639,7 @@ bool RenderVrScene(void* renderer,void* lists,void* a,void* b,void* context,void
             if(!camera.stereoEligible) return false;
             cockpit=camera.kind==CameraKind::Cockpit;
             if(state->flat) return false; // Toggle VR: the engine's own pass goes to the virtual screen.
+            if(state->flatViews & flatviews::Classify(camera.name.data())) return false; // The player's flat views, the same way.
         }
         if(!NativeStereoDisabled(renderer)) { Stop(*state,"native-driver-stereo-contract"); return false; }
         const auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
