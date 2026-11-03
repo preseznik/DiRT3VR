@@ -34,14 +34,34 @@ class DiagnosticFilesTests(unittest.TestCase):
         self.assertEqual(DiagnosticFiles.recover(self.journal, self.game), [])
         self.assertEqual((self.game / "d3d11.dll").read_bytes(), b"foreign")
 
-    def test_external_edit_retains_all_files_and_journal(self):
+    def test_external_edit_keeps_that_file_and_journal_and_undoes_the_rest(self):
         transaction = DiagnosticFiles(self.game, self.journal, self.run)
         transaction.add("d3d11.dll", b"our-proxy")
         transaction.add(f"dirt3vr-benchmark-{self.run}.xml", b"config")
         (self.game / "d3d11.dll").write_bytes(b"external-edit")
         self.assertEqual(DiagnosticFiles.recover(self.journal, self.game), [str(self.game / "d3d11.dll")])
-        self.assertTrue((self.game / f"dirt3vr-benchmark-{self.run}.xml").exists())
+        self.assertEqual((self.game / "d3d11.dll").read_bytes(), b"external-edit")
+        self.assertFalse((self.game / f"dirt3vr-benchmark-{self.run}.xml").exists())
         self.assertNotIn("restored", json.loads(self.journal.read_text()))
+        # Once the edit is undone by hand, a second recovery finishes.
+        (self.game / "d3d11.dll").write_bytes(b"our-proxy")
+        self.assertEqual(DiagnosticFiles.recover(self.journal, self.game), [])
+        self.assertFalse((self.game / "d3d11.dll").exists())
+
+    def test_game_written_hardware_copy_never_keeps_the_proxy(self):
+        # Lens's run 2026-11-03 19:3x: DiRT 3 rewrote the run's own settings copy with another
+        # size; the proxy and benchmark file must still leave the game folder.
+        hardware = self.root / "hardwaresettings"
+        hardware.mkdir()
+        transaction = DiagnosticFiles(self.game, self.journal, self.run, hardware)
+        settings = transaction.add(f"dirt3vr-hardware-{self.run}.xml", b"<settings width=\"3072\"/>")
+        transaction.add(f"dirt3vr-benchmark-{self.run}.xml", b"config")
+        transaction.add("d3d11.dll", b"proxy")
+        settings.write_bytes(b"<settings width=\"1280\"/>")
+        self.assertEqual(DiagnosticFiles.recover(self.journal, self.game, hardware), [str(settings)])
+        self.assertFalse((self.game / "d3d11.dll").exists())
+        self.assertFalse((self.game / f"dirt3vr-benchmark-{self.run}.xml").exists())
+        self.assertEqual(settings.read_bytes(), b"<settings width=\"1280\"/>")
 
     def test_tampered_path_refused_before_removal(self):
         transaction = DiagnosticFiles(self.game, self.journal, self.run)

@@ -157,27 +157,28 @@ class SerialRenderTransactionTests(unittest.TestCase):
         self.assertFalse((self.hardware / f"dirt3vr-hardware-{self.run_id}.xml").exists())
         self.assertEqual(self.recover(), [])
 
-    def test_external_restriction_edit_preserves_every_file_and_backup(self):
+    def test_external_restriction_edit_keeps_that_file_and_backup_and_removes_the_proxy(self):
         self.transaction().apply_serial_render(self.original)
         self.target.write_bytes(b"external edit")
         self.assertEqual(self.recover(), [str(self.target)])
         self.assertEqual(self.target.read_bytes(), b"external edit")
-        self.assertTrue((self.game / "d3d11.dll").exists())
+        self.assertFalse((self.game / "d3d11.dll").exists())
         self.assertFalse(json.loads(self.journal.read_text()).get("restored", False))
         self.assertEqual((self.root / f"restrictions-original-{self.run_id}.bin").read_bytes(), self.original)
 
-    def test_proxy_conflict_stops_original_restoration_during_full_preflight(self):
+    def test_proxy_conflict_keeps_the_proxy_and_still_restores_the_original(self):
         self.transaction().apply_serial_render(self.original)
         (self.game / "d3d11.dll").write_bytes(b"external proxy")
         self.assertEqual(self.recover(), [str(self.game / "d3d11.dll")])
-        self.assertEqual(self.target.read_bytes(), df.serial_render_restrictions(self.original))
+        self.assertEqual((self.game / "d3d11.dll").read_bytes(), b"external proxy")
+        self.assertEqual(self.target.read_bytes(), self.original)
 
     def test_missing_original_is_a_conflict_not_permission_to_recreate_it(self):
         self.transaction().apply_serial_render(self.original)
         self.target.unlink()
         self.assertEqual(self.recover(), [str(self.target)])
         self.assertFalse(self.target.exists())
-        self.assertTrue((self.game / "d3d11.dll").exists())
+        self.assertFalse((self.game / "d3d11.dll").exists())
 
     def test_bad_backup_blocks_all_recovery(self):
         self.transaction().apply_serial_render(self.original)
@@ -278,14 +279,14 @@ class SpectatorSwitchTransactionTests(unittest.TestCase):
         self.assertEqual((self.game / df.RESTRICTIONS_NAME).read_bytes(), self.restrictions)
         self.assertFalse((self.game / "d3d11.dll").exists())
 
-    def test_changed_start_sequence_is_a_conflict_and_keeps_everything(self):
+    def test_changed_start_sequence_is_kept_and_the_proxy_removed(self):
         transaction = df.DiagnosticFiles(self.game, self.journal, self.run_id)
         transaction.add("d3d11.dll", b"owned proxy")
         transaction.apply_replacement(df.SPECTATOR_NAME, SPECTATOR_FIXTURE)
         self.target.write_bytes(b"game update")
         self.assertEqual(self.recover(), [str(self.target)])
         self.assertEqual(self.target.read_bytes(), b"game update")
-        self.assertTrue((self.game / "d3d11.dll").exists())
+        self.assertFalse((self.game / "d3d11.dll").exists())
         self.assertEqual((self.root / f"spectator-original-{self.run_id}.bin").read_bytes(), SPECTATOR_FIXTURE)
 
     def test_unknown_or_duplicate_replacement_entries_are_refused(self):
