@@ -61,6 +61,10 @@ Public NotInheritable Class DrivingControls
     ' The steering wheel's own rotation lock to lock, as set in its software (#a72b44ea, as DiRT2VR 0.18);
     ' 0 until set with Wheel rotation…. Only used to show and apply the steering saturation.
     Public Property WheelRotation As Integer
+    ' The device direct practice drives with (#1b46c373), by DiRT 3's device name (SessionActionMaps.DeviceNameOf);
+    ' "" = automatic, the device bound to steering. DiRT 3 drives with one device per player, so with a wheel and
+    ' a controller both bound only this one drives (Wrench, 2026-11-03).
+    Public Property ActiveDevice As String = ""
     Public Property Bindings As New List(Of DrivingBinding)
 
     Public Const MinimumWheelRotation As Integer = 180, MaximumWheelRotation As Integer = 2520, MinimumGameRotation As Integer = 90
@@ -150,7 +154,7 @@ Public NotInheritable Class DrivingControls
         Validate()
         Dim found = Problems()
         If Enabled AndAlso found.Count > 0 Then Throw New IOException(String.Join(Environment.NewLine, found))
-        Dim bytes = JsonSerializer.SerializeToUtf8Bytes(New DrivingControls With {.Enabled = Enabled, .ListenAllDevices = ListenAllDevices, .WheelRotation = WheelRotation, .Bindings = Bindings.Select(Function(b) b.Copy()).ToList()}, SafeFiles.JsonOptions)
+        Dim bytes = JsonSerializer.SerializeToUtf8Bytes(New DrivingControls With {.Enabled = Enabled, .ListenAllDevices = ListenAllDevices, .WheelRotation = WheelRotation, .ActiveDevice = ActiveDevice, .Bindings = Bindings.Select(Function(b) b.Copy()).ToList()}, SafeFiles.JsonOptions)
         If bytes.Length > MaxFileBytes Then Throw New IOException("The driving controls file is too large.")
         SafeFiles.WriteAtomic(Path.GetFullPath(file), bytes)
     End Sub
@@ -158,6 +162,7 @@ Public NotInheritable Class DrivingControls
     Public Sub Validate()
         If Version <> 1 OrElse Bindings Is Nothing OrElse Bindings.Count > Actions.Length * MaxDevices Then Throw New IOException("The driving controls are invalid.")
         If WheelRotation <> 0 AndAlso (WheelRotation < MinimumWheelRotation OrElse WheelRotation > MaximumWheelRotation) Then Throw New IOException("The wheel rotation is invalid.")
+        If ActiveDevice Is Nothing OrElse ActiveDevice.Length > 260 OrElse ActiveDevice.Contains("|"c) OrElse ActiveDevice.Any(Function(c) Char.IsControl(c)) Then Throw New IOException("The direct practice device is invalid.")
         Dim slots As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
         Dim families As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
         For Each binding In Bindings
@@ -209,6 +214,12 @@ Public NotInheritable Class DrivingControls
             End If
         Next
         Return result
+    End Function
+
+    ' The bound devices that can drive (not the keyboard): DiRT 3's device name and the name shown, in binding order.
+    Public Function DrivingDevices() As IReadOnlyList(Of (Name As String, Label As String))
+        Return Bindings.Where(Function(b) Not b.Keyboard).GroupBy(Function(b) SessionActionMaps.DeviceNameOf(b), StringComparer.Ordinal).
+            Where(Function(g) g.Key <> "" AndAlso Not g.Key.Contains("|"c)).Select(Function(g) (g.Key, g.First().Device)).ToArray()
     End Function
 
     ' Steer Left and Steer Right on axes of one DirectInput wheel (Steer Left first), or Nothing when no

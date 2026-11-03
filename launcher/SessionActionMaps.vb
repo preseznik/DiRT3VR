@@ -168,13 +168,17 @@ Public NotInheritable Class SessionActionMaps
     ' its list, so the keyboard won over the G920). Best first: the device bound to steering, then the others
     ' by how many actions they carry. DiRT 3's names as in the session maps; never the keyboard. Passed to the
     ' renderer as DIRT3VR_DIRECT_DEVICES (Wrench's side moves the first match to the front).
+    ' The player's pick in Driving controls (DrivingControls.ActiveDevice, #1b46c373) goes first when it's bound.
     Public Shared Function PreferredDevices(controls As DrivingControls) As String()
         If controls Is Nothing OrElse Not controls.Enabled OrElse controls.Bindings Is Nothing Then Return Array.Empty(Of String)()
-        Return controls.Bindings.Where(Function(b) Not b.Keyboard).GroupBy(Function(b) DeviceNameOf(b), StringComparer.Ordinal).
+        Dim ordered = controls.Bindings.Where(Function(b) Not b.Keyboard).GroupBy(Function(b) DeviceNameOf(b), StringComparer.Ordinal).
             Where(Function(g) g.Key <> "" AndAlso g.Key <> "keyboard" AndAlso WritableName(g.Key) AndAlso Not g.Key.Contains("|"c)).
             OrderByDescending(Function(g) g.Any(Function(b) b.Action = "Steer Left" OrElse b.Action = "Steer Right")).
             ThenByDescending(Function(g) g.Count()).ThenBy(Function(g) g.Key, StringComparer.Ordinal).
-            Select(Function(g) g.Key).ToArray()
+            Select(Function(g) g.Key).ToList()
+        Dim picked = If(controls.ActiveDevice, "")
+        If picked <> "" AndAlso ordered.Remove(picked) Then ordered.Insert(0, picked)
+        Return ordered.ToArray()
     End Function
 
     ' The device's complete map: the base map's actions in their order, each action the player bound
