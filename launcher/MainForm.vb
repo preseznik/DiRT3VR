@@ -566,10 +566,10 @@ Public Class MainForm
         Dim seat = Section(content, "Seat")
         seat.Controls.Add(Info("Moves your eye point in the cockpit, per car, for example to match the headset to your seat and rig: sideways (+ left), height and forward. Launch VR applies it, and Launch too when Also when playing on the monitor is on: DiRT3VR writes the car's camera file for the session and restores it after exit."))
         seatPicker = New SeatPicker(seat)
-        Dim menuKeyRow As New FlowLayoutPanel With {.AutoSize = True, .WrapContents = True, .Margin = New Padding(0)}
+        Dim menuKeyRow As New FlowLayoutPanel With {.Name = "SeatMenuKeyRow", .AutoSize = True, .WrapContents = True, .Margin = New Padding(0)}
         menuKeyRow.Controls.AddRange({seatMenuKeyButton, noSeatMenuKey})
         Field(seat, "Seat menu key", menuKeyRow)
-        Dim menuDeviceRow As New FlowLayoutPanel With {.AutoSize = True, .WrapContents = True, .Margin = New Padding(0)}
+        Dim menuDeviceRow As New FlowLayoutPanel With {.Name = "SeatMenuButtonRow", .AutoSize = True, .WrapContents = True, .Margin = New Padding(0)}
         menuDeviceRow.Controls.AddRange({seatMenuDeviceButton, clearSeatMenuDevice})
         Field(seat, "Seat menu button", menuDeviceRow)
         seat.Controls.Add(Info("During Launch VR this key, or the optional controller or wheel button, opens a seat menu in the headset; press it again to save and close. In the menu, the arrows, D-pad or hat move the seat, hold Shift or X to move sideways, Enter or A saves and Esc or B cancels. What you save is kept here. DiRT 3 also receives the key or button that opens the menu, so pick one the game doesn't use."))

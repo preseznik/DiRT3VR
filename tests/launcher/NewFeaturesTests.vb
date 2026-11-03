@@ -4,13 +4,20 @@ Imports System.IO
 Imports System.Windows.Forms
 
 Module NewFeaturesTests
+    ' Features of every kind, first shipped in the next version: the drawing checks use these, so they don't
+    ' depend on what the next release happens to add.
+    Private ReadOnly Kinds As New Dictionary(Of String, String) From {
+        {"SectionLaunchmode", NewFeatures.NextVersion}, {"RecenterKey", NewFeatures.NextVersion}, {"RecenterKeepLevel", NewFeatures.NextVersion},
+        {"LiveInput", NewFeatures.NextVersion}, {"LauncherView", NewFeatures.NextVersion}}
+
     Public Sub Run(root As String, check As Action(Of Boolean, String))
         check(NewFeatures.Shown("0.1.20", False, "0.1.21"), "a development build before the release shows the marks")
         check(NewFeatures.Shown("0.1.21-beta.1", True, "0.1.21") AndAlso NewFeatures.Shown("0.1.21-experimental.2+abc", True, "0.1.21"), "the release's experimental builds show them")
         check(Not NewFeatures.Shown("0.1.21", False, "0.1.21"), "a stable release never shows them")
         check(Not NewFeatures.Shown("0.1.22-beta.1", True, "0.1.21") AndAlso Not NewFeatures.Shown("0.1.22", False, "0.1.21") AndAlso Not NewFeatures.Shown("0.2.0", True, "0.1.21"), "the next version drops them")
         check(Not NewFeatures.Shown("garbage", True, "0.1.21") AndAlso Not NewFeatures.Shown(Nothing, True, "0.1.21"), "an unreadable version shows nothing")
-        check(NewFeatures.NamesFor("0.1.21", False).Count = 0 AndAlso NewFeatures.NamesFor("0.1.21-beta.1", True).Count = NewFeatures.Listed.Count, "a stable build marks nothing; the experimental build marks every listed feature")
+        check(NewFeatures.NamesFor(NewFeatures.NextVersion, False).Count = 0 AndAlso NewFeatures.NamesFor(NewFeatures.NextVersion & "-beta.1", True).Count = NewFeatures.Listed.Count,
+              "a stable build marks nothing; the experimental build marks every listed feature")
         ' After a release, NextVersion must move on (and the released entries go): this build, or the release's
         ' Experimental-ring package of it (plain version, package.ps1 -Channel Experimental), must still show every mark.
         check(NewFeatures.NamesFor(BuildInfo.Version, True).Count = NewFeatures.Listed.Count,
@@ -52,8 +59,8 @@ Module NewFeaturesTests
         Using panel As New Panel()
             Dim header As New SectionHeader("Launch mode")
             panel.Controls.Add(header)
-            check(NewFeatures.Apply(panel, "0.1.21", False).Count = 0 AndAlso Not header.IsNew, "a stable release leaves every control unmarked")
-            check(NewFeatures.Apply(panel, "0.1.21-beta.1", True).Count = 1 AndAlso header.IsNew, "its experimental build marks them")
+            check(NewFeatures.Apply(panel, NewFeatures.NextVersion, False, Kinds).Count = 0 AndAlso Not header.IsNew, "a stable release leaves every control unmarked")
+            check(NewFeatures.Apply(panel, NewFeatures.NextVersion & "-beta.1", True, Kinds).Count = 1 AndAlso header.IsNew, "its experimental build marks them")
         End Using
     End Sub
 
@@ -64,8 +71,6 @@ Module NewFeaturesTests
             Dim headerOf = Function(title As String) form.SectionHeaders.Single(Function(header) header.Title = title)
             Dim missing = NewFeatures.Listed.Where(Function(name) form.Controls.Find(name, True).Length = 0 AndAlso Not form.SectionHeaders.Any(Function(header) header.Name = name)).ToArray()
             check(missing.Length = 0, "every listed feature exists in the launcher (" & String.Join(", ", missing) & ")")
-            check(headerOf("Launch mode").IsNew AndAlso headerOf("Quality").IsNew AndAlso headerOf("Defaults").IsNew, "new sections carry the mark")
-            check(Not headerOf("Startup").IsNew AndAlso Not headerOf("VR rendering").IsNew AndAlso Not headerOf("Desktop").IsNew AndAlso Not headerOf("Appearance").IsNew, "older sections don't")
             Dim rowOf = Function(name As String) As SettingRow
                             Dim item As Control = form.Controls.Find(name, True).Single()
                             While item IsNot Nothing AndAlso Not TypeOf item Is SettingRow
@@ -73,10 +78,15 @@ Module NewFeaturesTests
                             End While
                             Return DirectCast(item, SettingRow)
                         End Function
-            check(rowOf("RecenterKey").IsNew AndAlso rowOf("RecenterDevice").IsNew AndAlso Not rowOf("VrRenderScale").IsNew AndAlso Not rowOf("RuntimeChoice").IsNew, "new settings rows carry the mark on their label; older rows don't")
+            check(rowOf("SeatMenuKey").IsNew AndAlso rowOf("SeatMenuButton").IsNew AndAlso Not rowOf("RecenterKey").IsNew AndAlso Not rowOf("VrRenderScale").IsNew AndAlso Not headerOf("Launch mode").IsNew,
+                  "the listed features carry the mark; those of earlier releases don't")
+
+            ' Each kind of mark, with features of every kind.
+            check(NewFeatures.Apply(form, NewFeatures.NextVersion & "-beta.1", True, Kinds).Count = Kinds.Count, "every kind of feature is marked")
+            check(headerOf("Launch mode").IsNew AndAlso Not headerOf("Startup").IsNew AndAlso Not headerOf("VR rendering").IsNew, "a new section carries the mark; older sections don't")
+            check(rowOf("RecenterKey").IsNew AndAlso Not rowOf("RuntimeChoice").IsNew, "a new settings row carries the mark on its label; older rows don't")
             Dim keepLevel = form.Controls.Find("RecenterKeepLevel", True).Single()
-            check(NewFeatures.IsMarked(keepLevel) AndAlso NewFeatures.IsMarked(form.Controls.Find("LiveInput", True).Single()) AndAlso NewFeatures.IsMarked(form.Controls.Find("GraphicsDefaults", True).Single()) AndAlso
-                  NewFeatures.IsMarked(form.Controls.Find("VrCompatibility", True).Single()) AndAlso Not NewFeatures.IsMarked(form.Controls.Find("SkipStartupMovies", True).Single()),
+            check(NewFeatures.IsMarked(keepLevel) AndAlso NewFeatures.IsMarked(form.Controls.Find("LiveInput", True).Single()) AndAlso Not NewFeatures.IsMarked(form.Controls.Find("SkipStartupMovies", True).Single()),
                   "new buttons and options are marked beside them; older ones aren't")
             check(DirectCast(form.Controls.Find("LauncherView", True).Single(), LauncherViewPicker).IsNew, "the Simple | Advanced switch is marked")
 
