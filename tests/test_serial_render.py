@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import diagnostic_files as df
-from run_benchmark import diagnostic_hardware
+from run_benchmark import diagnostic_hardware, listed_sizes
 
 
 def restrictions_fixture():
@@ -85,6 +85,13 @@ class SerialRenderTransformTests(unittest.TestCase):
         for unsupported in ((639, 720), (1280, 4097), (1280,), (1280.0, 720)):
             with self.subTest(unsupported=unsupported), self.assertRaises(ValueError):
                 diagnostic_hardware(original, size=unsupported)
+
+    def test_only_sizes_the_game_lists_are_runnable(self):
+        info = (b'<hardware_settings_info><graphics_card><resolutions><resolution width="1280" height="720" aspect="auto">'
+                b'<refreshRate rate="60"/></resolution><resolution width="3840" height="2160" aspect="auto"/>'
+                b'<resolution width="bad" height="1"/></resolutions></graphics_card></hardware_settings_info>')
+        self.assertEqual(listed_sizes(info), {(1280, 720), (3840, 2160)})
+        self.assertNotIn((3072, 3264), listed_sizes(info))
 
 
 class SerialRenderTransactionTests(unittest.TestCase):

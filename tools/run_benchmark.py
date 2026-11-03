@@ -440,6 +440,18 @@ def parse_seat_offset(text: str) -> tuple[float, float, float]:
     return values
 
 
+def listed_sizes(info: bytes) -> set[tuple[int, int]]:
+    """The display sizes in the game's hardware_settings_info.xml. DiRT 3 runs any other size at 1280x720 and
+    writes that back, which leaves the run's settings copy changed and its recovery refused."""
+    sizes = set()
+    for element in ET.fromstring(info).iter("resolution"):
+        try:
+            sizes.add((int(element.get("width", "")), int(element.get("height", ""))))
+        except ValueError:
+            continue
+    return sizes
+
+
 def parse_size(text: str) -> tuple[int, int]:
     try:
         width, height = (int(part) for part in text.lower().split("x"))
@@ -665,6 +677,11 @@ def main() -> int:
     proxy_bytes = args.proxy.read_bytes()
     hardware_source = hardware_dir / "hardware_settings_config.xml"
     no_links(hardware_source)
+    if args.size != (1280, 720):
+        info = hardware_dir / "hardware_settings_info.xml"
+        no_links(info)
+        if args.size not in listed_sizes(info.read_bytes()):
+            raise ValueError(f"DiRT 3 doesn't list {args.size[0]}x{args.size[1]} in hardware_settings_info.xml; no files changed")
     hardware_bytes = diagnostic_hardware(hardware_source.read_bytes(), serial_render=args.serial_render, multisampling=args.msaa,
                                          size=args.size)
     restrictions = preflight_serial_render(game) if args.serial_render else None
