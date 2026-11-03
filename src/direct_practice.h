@@ -197,7 +197,8 @@ inline int AssistAnswer(uint8_t benchmarkActive,int requested,int original) {
 // 0xb31c70 as ScreenPressStart does. The keyboard is listed first, so a wheel bound in the
 // launcher never drives (#16fa2aa3). For that one call (returning to 0x56e150) the hook moves
 // the launcher's device to the front, and DiRT 3 binds it to player 1 itself (run
-// 20261103-104313: the Xbox pad became player 1, the keyboard player 2).
+// 20261103-104313: the Xbox pad became player 1, the keyboard player 2). Its other devices
+// are then bound to player 1 as well (see ArrangeDevices).
 // DIRT3VR_DIRECT_DEVICES="name|name|..." lists the session action maps' device names
 // (xinput_pad or a DirectInput product name), the steering device first.
 inline constexpr uintptr_t deviceListRva=0x704cf0;       // input service: list devices (jumps to 0xccf010)
@@ -245,9 +246,46 @@ inline int PreferredDevice(const InputDevice* devices,size_t count,const uint32_
         if(usable(i) && devices[i].family!=keyboard) return static_cast<int>(i);
     return -1;
 }
-// Moves devices[index] to the front, keeping the others in their order.
-inline void MoveToFront(InputDevice* devices,size_t index) {
-    std::rotate(devices,devices+index,devices+index+1);
+
+// Every launcher device drives (#1b46c373). The direct start binds player 1's device through
+// 0xb31c70(map, &descriptor) (the call at 0x56e214, returning to 0x56e219). That bind adds the
+// device to the player's map: 0xcc6280 looks for the descriptor and adds an entry only when it
+// is missing (0xcc5dd0, 0xcbfa30), so a second bind adds a device rather than replacing one.
+// Right after the game's own call, the hook binds the launcher's other listed devices to
+// player 1 too.
+inline constexpr uintptr_t bindRva=0x731c70;                 // 0xb31c70
+inline constexpr uintptr_t bindPlayerOneReturnRva=0x16e219;  // after the call at 0x56e214
+// push ebp; mov ebp,esp; push -1; push <handler>: the handler address is relocated, so only
+// its opcode is compared.
+inline constexpr uint8_t bindEntry[]{0x55,0x8b,0xec,0x6a,0xff,0x68};
+inline bool BindMatches(const uint8_t* image) {
+    if(std::memcmp(image+bindRva,bindEntry,sizeof(bindEntry))!=0 || image[bindPlayerOneReturnRva-5]!=0xe8) return false;
+    int32_t relative;
+    std::memcpy(&relative,image+bindPlayerOneReturnRva-4,sizeof(relative));
+    return static_cast<uintptr_t>(static_cast<intptr_t>(bindPlayerOneReturnRva)+relative)==bindRva;
+}
+
+// Orders the list for the direct start, which gives the first usable entry to player 1 and the
+// next to player 2: devices[index] first, then the devices the launcher didn't ask for (the
+// keyboard, so it stays player 2), then the launcher's other devices. Returns those other
+// devices, to be bound to player 1 as well; one that would still become player 2 (nothing else
+// listed) is left to player 2.
+inline std::vector<InputDevice> ArrangeDevices(InputDevice* devices,size_t count,size_t index,const uint32_t* wanted,size_t wantedCount) {
+    const auto usable=[](const InputDevice& d) { return d.backend && d.family; };
+    const auto isWanted=[&](const InputDevice& d) { return usable(d) && std::find(wanted,wanted+wantedCount,d.family)!=wanted+wantedCount; };
+    std::vector<InputDevice> ordered{devices[index]},others;
+    for(size_t i=0;i<count;++i)
+        if(i!=index) (isWanted(devices[i]) ? others : ordered).push_back(devices[i]);
+    const size_t firstOther=ordered.size();
+    ordered.insert(ordered.end(),others.begin(),others.end());
+    std::copy(ordered.begin(),ordered.end(),devices);
+    size_t secondUsable=count;
+    for(size_t i=1,seen=usable(ordered[0]) ? 1 : 0;i<count;++i)
+        if(usable(ordered[i]) && ++seen==2) { secondUsable=i; break; }
+    std::vector<InputDevice> extra;
+    for(size_t i=firstOther;i<count;++i)
+        if(i!=secondUsable) extra.push_back(ordered[i]);
+    return extra;
 }
 
 bool Requested();
