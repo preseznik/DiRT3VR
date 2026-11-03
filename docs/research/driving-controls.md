@@ -273,6 +273,25 @@ DiRT 3's counterparts (static only, fingerprint `c502b495…`):
   the main vtable is not the per-frame update, so GRID2VR's private-vtable hook does not
   carry over as is; the update, the map tree and the device registry still need mapping.
 
+More of the input library (static, for porting GRID2VR's claim):
+
+- A device is a 12-byte descriptor `{backend, family, index}`, as in GRID 2; valid when
+  backend and family are non-zero and the index isn't the "none" value at `0xfdb130`
+  (`0xcbb7c0`; built by `0xcbb720`).
+- The map library (service `+0x78`) locks through the object at its `+0x118`: vtable slot 1
+  with -1 (wait) to lock, slot 5 to unlock (`0xcc3400`, `0xccef20`). The per-player maps are
+  a map keyed by map id at library `+0x78` (lookup `0xbabe40`, end node `+0x7c`); the key
+  `[0xfdb134]` (no player) means the combined any-device map at library `+0x2c`.
+- `0xccef20(map key, action, &out)` lists the descriptors bound to an action (12-byte
+  vector); `0xb36fd0` uses it to find the device behind a pressed action.
+- Action ids are built once at startup by `0xccfe30(id object, name)`, e.g. "Accelerate" into
+  `0x10d3038`; the keyboard's family id is kept at `0x10d8ffc`, which the bind (`0xb31c70`)
+  compares with. The input service's active map id is at `+0x1b0`.
+- So the wheel's descriptor can come from the combined map's Accelerate / Steer bindings
+  (family not keyboard), without GRID2VR's device enumerator. Still to find: the player's map
+  id in a direct start and a game-thread hook point (the controller update `0xb29f80`, already
+  used by direct practice, is a candidate).
+
 Next: a research renderer probe that, in a direct start, logs the devices bound to the
 player's map and calls `0xb31c70` for a launcher-bound device (on this PC, the Bluetooth
 Xbox pad, checked by reading the map back rather than by pressing anything). The G920 itself
