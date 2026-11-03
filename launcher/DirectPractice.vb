@@ -25,6 +25,8 @@ Public NotInheritable Class DirectPractice
     Public Shared ReadOnly AfterFinishChoices As String() = {"quit", "menus"}
     ' Gearbox choices, in DiRT 3's transmission_type order (Wrench's ac09f6f).
     Public Shared ReadOnly GearboxChoices As String() = {"automatic", "sequential", "hpattern", "clutch"}
+    ' Their names in Driving controls, where the gearbox is chosen (iztok, 2026-11-03).
+    Public Shared ReadOnly GearboxNames As String() = {"Automatic (DiRT 3's default)", "Manual: sequential", "Manual: H-pattern", "Manual: H-pattern with clutch"}
 
     Private Sub New()
     End Sub

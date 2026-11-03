@@ -7,6 +7,8 @@ Public Class MainForm
     Private context As InstallContext
     Private settings As LauncherSettings
     Private savedSettings As String
+    ' Direct practice's gearbox, chosen and saved in Driving controls (iztok, 2026-11-03).
+    Private directGearbox As String = "automatic"
     Private profilePanel As SettingsProfilePanel
     Private busy As Boolean
     Private resourcesDisposed As Boolean
@@ -581,12 +583,21 @@ Public Class MainForm
     Private Sub OpenDrivingControls()
         Try
             Using dialog As New DrivingControlsForm(context)
-                dialog.ShowDialog(Me)
+                If dialog.ShowDialog(Me) = DialogResult.OK Then GearboxSaved(dialog.Gearbox)
             End Using
         Catch ex As IOException
             notice.Text = ex.Message
         End Try
         UpdateDrivingSummary()
+    End Sub
+
+    ' Driving controls saved the gearbox in the preferences: this window uses it and counts it as saved.
+    Public Sub GearboxSaved(choice As String)
+        directGearbox = choice
+        If savedSettings Is Nothing Then Return
+        Dim baseline = System.Text.Json.JsonSerializer.Deserialize(Of LauncherSettings)(savedSettings)
+        baseline.DirectGearbox = choice
+        savedSettings = System.Text.Json.JsonSerializer.Serialize(baseline)
     End Sub
 
     ' One line on the launcher's driving bindings, under Controls → Driving controls.
@@ -614,7 +625,7 @@ Public Class MainForm
                                         End Using
                                     End Sub
         Dim driving = Section(content, "Driving controls")
-        driving.Controls.Add(Info("Bind your wheel, pedals, shifter, controller and keys here for direct practice (Launch and Launch VR). A direct start doesn't load your DiRT 3 profile, so without these DiRT 3 uses its default preset for each device. Actions you don't bind keep DiRT 3's binding for that device. Normal launches keep your profile's controls. A direct start drives with one device: the one bound to steering, or the one you pick under Drives with; without bindings here DiRT 3 picks the keyboard."))
+        driving.Controls.Add(Info("Bind your wheel, pedals, shifter, controller and keys here for direct practice (Launch and Launch VR). A direct start doesn't load your DiRT 3 profile, so without these DiRT 3 uses its default preset for each device. Actions you don't bind keep DiRT 3's binding for that device. Normal launches keep your profile's controls. A direct start drives with one device: the one bound to steering, or the one you pick under Drives with; without bindings here DiRT 3 picks the keyboard. Gearbox there sets automatic or manual gears for direct practice."))
         Dim drivingButton As New Button With {.Name = "DrivingControls", .Text = "Driving controls…", .AutoSize = True}
         driving.Controls.Add(drivingButton)
         driving.Controls.Add(drivingSummary)
@@ -1022,7 +1033,8 @@ Public Class MainForm
         seatPicker.Apply(settings.SeatOffsets, settings.SeatSameForAll, settings.SeatAllCars, settings.DirectCar, settings.StartInCockpit, settings.SeatOnDesktop)
         seatPicker.ApplyComfort(settings.CockpitSteady, settings.CockpitHideDriver, settings.CockpitHideCoDriver)
         seatPicker.ApplyFieldOfView(settings.DesktopFov)
-        directPicker.ApplyAssists(settings.DirectGearbox, settings.DirectAbs, settings.DirectStability, settings.DirectCornerBraking, settings.DirectThrottle, settings.DirectSteering)
+        directGearbox = settings.DirectGearbox
+        directPicker.ApplyAssists(settings.DirectAbs, settings.DirectStability, settings.DirectCornerBraking, settings.DirectThrottle, settings.DirectSteering)
         directPicker.Apply(settings.LaunchMode, settings.DirectRoute, settings.DirectCar, settings.DirectLaps, settings.DirectOpponents, settings.DirectOpponentCars, settings.DirectDifficulty, settings.DirectAfterFinish)
         applyingPreset = False
         ClearPresetUndo()
@@ -1055,7 +1067,7 @@ Public Class MainForm
             .GraphicsQuality = desktopQuality.Values, .VrGraphicsQuality = vrQuality.Values,
             .LaunchMode = directPicker.Mode, .DirectRoute = directPicker.RouteId, .DirectCar = directPicker.CarCode, .DirectLaps = directPicker.LapCount,
             .DirectOpponents = directPicker.OpponentCount, .DirectOpponentCars = directPicker.OpponentCars, .DirectDifficulty = directPicker.DifficultyLevel, .DirectAfterFinish = directPicker.AfterFinish,
-            .DirectGearbox = directPicker.Gearbox, .DirectAbs = directPicker.AssistStates.Abs, .DirectStability = directPicker.AssistStates.Stability,
+            .DirectGearbox = directGearbox, .DirectAbs = directPicker.AssistStates.Abs, .DirectStability = directPicker.AssistStates.Stability,
             .DirectCornerBraking = directPicker.AssistStates.CornerBraking, .DirectThrottle = directPicker.AssistStates.Throttle, .DirectSteering = directPicker.AssistStates.Steering,
             .SeatOffsets = seatPicker.Offsets, .SeatSameForAll = seatPicker.SameForAll, .SeatAllCars = seatPicker.AllCars, .StartInCockpit = seatPicker.StartInCockpit, .SeatOnDesktop = seatPicker.OnDesktop,
             .CockpitSteady = seatPicker.SteadyCamera, .CockpitHideDriver = seatPicker.HidesDriver, .CockpitHideCoDriver = seatPicker.HidesCoDriver, .DesktopFov = seatPicker.DesktopFieldOfView}
@@ -1419,7 +1431,7 @@ Public Class MainForm
                 "Choose the discipline (rally, rallycross, trailblazer or Land Rush), the location and route, and the car. Cars are those of the route's discipline; Show cars from other disciplines lists the rest, which are untested. Search finds cars by name, code or class, and Class narrows the list." & vbCrLf & vbCrLf &
                 "Laps (1 to 5) apply to circuits (rallycross and Land Rush); point-to-point stages are one run. Direct practice works with Launch (on the monitor) and Launch VR." & vbCrLf & vbCrLf &
                 "On circuits you can add up to 7 AI opponents; you start from the back of the grid. Opponent cars: Same class as my car (the default), Mixed (any car of the route's discipline) or My car's model; opponents avoid your own model unless nothing else fits (Land Rush has one truck and one buggy, so there Same class races your own model and Mixed the other vehicle). Difficulty: DiRT 3's default, or Level 0 (easiest) to Level 5 (hardest) for this session; DiRT 3 shows these levels as stars. Stages are driven alone." & vbCrLf & vbCrLf &
-                "A direct start doesn't load your DiRT 3 profile, so the game uses its own defaults there, not what you set in its menus: the controls preset for your wheel or pad, default difficulty and default assists. Gearbox and Assists in the picker set those for direct practice (DiRT 3's defaults: automatic gears, ABS on, the other assists off); the racing line can't be shown in a direct start. Launcher controls for your wheel are being worked on." & vbCrLf & vbCrLf &
+                "A direct start doesn't load your DiRT 3 profile, so the game uses its own defaults there, not what you set in its menus: the controls preset for your wheel or pad, default difficulty and default assists. Assists in the picker and Gearbox in Driving controls set those for direct practice (DiRT 3's defaults: ABS on, the other assists off, automatic gears); the racing line can't be shown in a direct start. Launcher controls for your wheel are being worked on." & vbCrLf & vbCrLf &
                 "After the finish line DiRT 3 shows the finish camera and your time for a few seconds. Then, with After the finish on Quit to desktop (the default), it closes by itself, so launch again for another run; on Return to DiRT 3's menus it goes to its main menu and you play on as in a normal launch (careers, events, another race), until you quit DiRT 3. There is no results screen. During the run, Esc opens DiRT 3's pause menu as in any race: Restart (then confirm) puts you back on the start line, and Retire (then confirm) ends the run and DiRT 3 closes. End session (Launch VR) also stops it. The short config file it writes into the game folder, dirt3vr-direct.xml, is removed with DiRT3VR's other temporary changes, and DiRT 3's benchmark result file is deleted afterwards." & vbCrLf & vbCrLf &
                 "Normal launch keeps DiRT 3's menus for careers, events and multiplayer."),
             New HelpTopic(HelpStartup,
@@ -1454,7 +1466,7 @@ Public Class MainForm
                 "Restore graphics defaults sets the desktop, anisotropic filtering and quality choices to Use game setting, VR anti-aliasing off, the VR field of view and the render scale to 100%. It asks first and changes only the controls until Save settings or Launch."),
             New HelpTopic(HelpControls,
                 "Use your existing keyboard, controller or wheel bindings in DiRT 3." & vbCrLf & vbCrLf &
-                "Driving controls… binds your wheel, pedals, shifter, controller and keys for direct practice, with Launch and Launch VR. A direct start doesn't load your DiRT 3 profile, so DiRT 3 would otherwise use its default preset for each device. It also skips the Press Start screen, where DiRT 3 normally picks your controller, so DiRT3VR gives the player one device: the one you pick under Drives with, else the device you bound steering to (or the one with most bindings), since DiRT 3 drives with one device per player; without bindings here DiRT 3 picks the keyboard. The Binding wizard asks for the essentials (steering, pedals, clutch, handbrake, gear up and down, change view, look back and pause), then offers the H-pattern shifter, flashback and replays, menus, and look and horn; Skip keeps an action's current binding, and only finished groups are kept. Key… and Device… rebind one action, Calibrate… sets an axis's direction, dead zone and saturation, Wheel rotation… sets how far you turn your wheel for full steering lock (your wheel's rotation and the rotation you want in DiRT 3 set the steering saturation), and Xbox preset loads DiRT 3's own Xbox controller layout. Presets save and load whole binding sets. For each bound device the session writes a complete action map (DiRT 3's own map for that device with your bindings in place) and lists it in actionmap\actionMapPaths.xml; both are removed after exit, like DiRT3VR's other temporary changes. Two identical devices share one map, as DiRT 3 tells devices apart by name." & vbCrLf & vbCrLf &
+                "Driving controls… binds your wheel, pedals, shifter, controller and keys for direct practice, with Launch and Launch VR. A direct start doesn't load your DiRT 3 profile, so DiRT 3 would otherwise use its default preset for each device. It also skips the Press Start screen, where DiRT 3 normally picks your controller, so DiRT3VR gives the player one device: the one you pick under Drives with, else the device you bound steering to (or the one with most bindings), since DiRT 3 drives with one device per player; without bindings here DiRT 3 picks the keyboard. Gearbox chooses automatic gears (DiRT 3's default), sequential, H-pattern or H-pattern with clutch for direct practice; Save keeps it with the bindings. The Binding wizard asks for the essentials (steering, pedals, clutch, handbrake, gear up and down, change view, look back and pause), then offers the H-pattern shifter, flashback and replays, menus, and look and horn; Skip keeps an action's current binding, and only finished groups are kept. Key… and Device… rebind one action, Calibrate… sets an axis's direction, dead zone and saturation, Wheel rotation… sets how far you turn your wheel for full steering lock (your wheel's rotation and the rotation you want in DiRT 3 set the steering saturation), and Xbox preset loads DiRT 3's own Xbox controller layout. Presets save and load whole binding sets. For each bound device the session writes a complete action map (DiRT 3's own map for that device with your bindings in place) and lists it in actionmap\actionMapPaths.xml; both are removed after exit, like DiRT3VR's other temporary changes. Two identical devices share one map, as DiRT 3 tells devices apart by name." & vbCrLf & vbCrLf &
                 "Live input and force feedback shows your wheel, pedals, shifter and controllers as Windows reports them and tests rumble or force feedback on each one. It reads devices without taking them over and changes no game or Windows setting. Close DiRT 3 before testing force feedback." & vbCrLf & vbCrLf &
                 recenter & " recenters the headset view while DiRT 3 is in front. To change it, click the key under VR and seat controls and press another key, optionally with Ctrl, Alt or Shift; Esc cancels. DiRT 3 still receives the key, so pick one the game doesn't use. Alt+Tab, Alt+F4 and Ctrl+Alt+Delete are reserved." & vbCrLf & vbCrLf &
                 "Bind a button… adds a controller, wheel or button-box button, or a D-pad / hat direction, as another way to recenter. During VR the launcher watches it only while DiRT 3 is in front, without taking the device over. Clear removes it." & vbCrLf & vbCrLf &

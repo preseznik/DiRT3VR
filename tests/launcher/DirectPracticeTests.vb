@@ -273,11 +273,13 @@ Module DirectPracticeTests
             check(afterFinish.Enabled AndAlso afterFinish.SelectedIndex = 0 AndAlso find("DirectSummary").Text.EndsWith("DiRT 3 closes by itself after the finish.", StringComparison.Ordinal), "after the finish starts on Quit to desktop")
             afterFinish.SelectedIndex = 1 : Application.DoEvents()
             check(form.CurrentSettings().DirectAfterFinish = "menus" AndAlso find("DirectSummary").Text.EndsWith("After the finish DiRT 3 returns to its menus.", StringComparison.Ordinal), "Return to DiRT 3's menus shows in the settings and the summary")
-            Dim gearboxBox = DirectCast(find("DirectGearbox"), ComboBox), absBox = DirectCast(find("DirectAbs"), CheckBox)
-            check(gearboxBox.Enabled AndAlso gearboxBox.SelectedIndex = 0 AndAlso absBox.Enabled AndAlso absBox.Checked AndAlso Not DirectCast(find("DirectStability"), CheckBox).Checked, "gearbox and assists start on DiRT 3's defaults")
-            gearboxBox.SelectedIndex = 3 : absBox.Checked = False : Application.DoEvents()
-            check(form.CurrentSettings().DirectGearbox = "clutch" AndAlso Not form.CurrentSettings().DirectAbs AndAlso find("DirectSummary").Text.Contains("· H-pattern gears with clutch."),
-                  "the gearbox and assists show in the settings and the gearbox in the summary (" & find("DirectSummary").Text & ")")
+            Dim absBox = DirectCast(find("DirectAbs"), CheckBox)
+            check(form.Controls.Find("DirectGearbox", True).Length = 0 AndAlso absBox.Enabled AndAlso absBox.Checked AndAlso Not DirectCast(find("DirectStability"), CheckBox).Checked,
+                  "the assists start on DiRT 3's defaults; the gearbox is chosen in Driving controls, not here")
+            absBox.Checked = False : Application.DoEvents()
+            check(Not form.CurrentSettings().DirectAbs AndAlso form.CurrentSettings().DirectGearbox = "automatic", "the assists show in the settings")
+            form.GearboxSaved("clutch")
+            check(form.CurrentSettings().DirectGearbox = "clutch" AndAlso Not find("DirectSummary").Text.Contains("gears"), "a gearbox saved in Driving controls is used by the launcher (" & find("DirectSummary").Text & ")")
             check(rivalCars.Enabled AndAlso find("DirectSummary").Text.Contains("· 3 opponents (mixed cars, AI level 3) ·") AndAlso form.CurrentSettings().DirectOpponents = 3 AndAlso form.CurrentSettings().DirectOpponentCars = "mixed",
                   "opponents show in the summary and the settings (" & find("DirectSummary").Text & ")")
             Dim summary = find("DirectSummary").Text

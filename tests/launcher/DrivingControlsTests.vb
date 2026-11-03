@@ -522,6 +522,25 @@ Module DrivingControlsTests
                 New DrivingBinding With {.Action = "Steer Left", .Device = "Wheel", .DeviceId = WheelId, .DeviceType = WheelProduct, .Input = "di_x_axis", .Calibration = "biDirectionalLower"}}})
             check(pick.SelectedIndex = 0 AndAlso Not pick.Enabled AndAlso form.Current.ActiveDevice = "", "with one device, or a pick that's no longer bound, it's Automatic")
         End Using
+        ' Gearbox (iztok, 2026-11-03): direct practice's gearbox is chosen here and saved with the bindings.
+        Dim gearCtx = Context(root, "driving-controls-gearbox")
+        Call New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = "", .DirectGearbox = "hpattern", .VrRenderScale = 90}.Save(gearCtx)
+        Using form As New DrivingControlsForm(gearCtx, noInput)
+            form.ShowInTaskbar = False : form.StartPosition = FormStartPosition.Manual : form.Location = New Drawing.Point(-30000, -30000)
+            form.Show() : Application.DoEvents()
+            Dim gears = DirectCast(form.Controls.Find("DrivingGearbox", True).Single(), ComboBox)
+            check(gears.SelectedIndex = 2 AndAlso form.Gearbox = "hpattern" AndAlso gears.Items.Count = 4 AndAlso gears.Items(3).ToString() = "Manual: H-pattern with clutch" AndAlso gears.Visible,
+                  "Driving controls shows the saved gearbox")
+            gears.SelectedIndex = 3 : Application.DoEvents()
+            check(form.Gearbox = "clutch" AndAlso LauncherSettings.Load(gearCtx).DirectGearbox = "hpattern", "picking a gearbox saves nothing before Save")
+            DirectCast(form.Controls.Find("DrivingSave", True).Single(), Button).PerformClick() : Application.DoEvents()
+        End Using
+        Dim afterSave = LauncherSettings.Load(gearCtx)
+        check(afterSave.DirectGearbox = "clutch" AndAlso afterSave.VrRenderScale = 90, "Save keeps the gearbox for direct practice and leaves the other launcher settings")
+        Using form As New DrivingControlsForm(gearCtx, noInput)
+            form.Gearbox = "sequential"
+        End Using
+        check(LauncherSettings.Load(gearCtx).DirectGearbox = "clutch", "closing without Save keeps the saved gearbox")
         Using form As New DrivingControlsForm(ctx, noInput)
             check(form.Current.Enabled AndAlso form.Current.Bindings.Count = DrivingControls.XboxPreset().Count, "the window reopens with the saved bindings")
             form.UsePreset(New DrivingControls With {.Bindings = New List(Of DrivingBinding) From {Pad("Pause", "xinput_button_back")}})
@@ -536,6 +555,9 @@ Module DrivingControlsTests
             Dim find = Function(name As String) form.Controls.Find(name, True).Single()
             check(find("DrivingControls").Text = "Driving controls…" AndAlso find("DrivingSummary").Text.StartsWith("Off:", StringComparison.Ordinal) AndAlso find("SectionDrivingcontrols") IsNot Nothing,
                   "Controls has a Driving controls section, off by default (" & find("DrivingSummary").Text & ")")
+            check(Not form.HasUnsavedSettings(), "the main window opens without unsaved changes")
+            form.GearboxSaved("hpattern")
+            check(form.CurrentSettings().DirectGearbox = "hpattern" AndAlso Not form.HasUnsavedSettings(), "a gearbox saved in Driving controls counts as saved in the main window")
         End Using
         Call New DrivingControls With {.Enabled = True, .Bindings = DrivingControls.XboxPreset()}.Save(mainCtx)
         Using form As New MainForm(mainCtx)

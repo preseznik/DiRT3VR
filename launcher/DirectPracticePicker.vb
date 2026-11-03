@@ -18,8 +18,8 @@ Public NotInheritable Class DirectPracticePicker
     Private ReadOnly rivalCars As New ComboBox With {.Name = "DirectOpponentCars", .DropDownStyle = ComboBoxStyle.DropDownList}
     Private ReadOnly aiLevel As New ComboBox With {.Name = "DirectDifficulty", .DropDownStyle = ComboBoxStyle.DropDownList}
     Private ReadOnly finish As New ComboBox With {.Name = "DirectAfterFinish", .DropDownStyle = ComboBoxStyle.DropDownList}
-    ' Assists and gearbox: a direct start uses DiRT 3's defaults, not the player's profile.
-    Private ReadOnly gears As New ComboBox With {.Name = "DirectGearbox", .DropDownStyle = ComboBoxStyle.DropDownList}
+    ' Assists: a direct start uses DiRT 3's defaults, not the player's profile. The gearbox is chosen in
+    ' Driving controls (iztok, 2026-11-03).
     Private ReadOnly abs As New CheckBox With {.Name = "DirectAbs", .Text = "ABS", .AutoSize = True, .Checked = True}
     Private ReadOnly stability As New CheckBox With {.Name = "DirectStability", .Text = "Stability control", .AutoSize = True}
     Private ReadOnly cornerBraking As New CheckBox With {.Name = "DirectCornerBraking", .Text = "Corner braking", .AutoSize = True}
@@ -39,8 +39,7 @@ Public NotInheritable Class DirectPracticePicker
         rivalCars.Items.AddRange({"Same class as my car", "Mixed: any car of this discipline", "My car's model"})
         aiLevel.Items.AddRange({"DiRT 3's default", "Level 0 (easiest)", "Level 1", "Level 2", "Level 3", "Level 4", "Level 5 (hardest)"})
         finish.Items.AddRange({"Quit to desktop", "Return to DiRT 3's menus"})
-        gears.Items.AddRange({"Automatic (DiRT 3's default)", "Manual: sequential", "Manual: H-pattern", "Manual: H-pattern with clutch"})
-        For Each box In {discipline, route, carClass, car, rivalCars, aiLevel, finish, gears}
+        For Each box In {discipline, route, carClass, car, rivalCars, aiLevel, finish}
             StyleChoice(box, parent)
         Next
         Field(parent, "Discipline", discipline)
@@ -54,12 +53,11 @@ Public NotInheritable Class DirectPracticePicker
         Field(parent, "Opponent cars", rivalCars)
         Field(parent, "Difficulty", aiLevel)
         Field(parent, "After the finish", finish)
-        Field(parent, "Gearbox", gears)
         Dim assistBoxes As New FlowLayoutPanel With {.Name = "DirectAssists", .AutoSize = True, .WrapContents = True, .Margin = New Padding(0)}
         assistBoxes.Controls.AddRange({abs, stability, cornerBraking, throttle, steering})
         Field(parent, "Assists", assistBoxes)
         parent.Controls.Add(summary)
-        pickerControls = {discipline, route, search, carClass, allCars, car, finish, gears, abs, stability, cornerBraking, throttle, steering}
+        pickerControls = {discipline, route, search, carClass, allCars, car, finish, abs, stability, cornerBraking, throttle, steering}
         AddHandler normal.CheckedChanged, Sub() ModeChanged()
         AddHandler direct.CheckedChanged, Sub() ModeChanged()
         AddHandler discipline.SelectedIndexChanged, Sub()
@@ -78,7 +76,6 @@ Public NotInheritable Class DirectPracticePicker
         AddHandler rivalCars.SelectedIndexChanged, Sub() If Not updating Then Edited()
         AddHandler aiLevel.SelectedIndexChanged, Sub() If Not updating Then Edited()
         AddHandler finish.SelectedIndexChanged, Sub() If Not updating Then Edited()
-        AddHandler gears.SelectedIndexChanged, Sub() If Not updating Then Edited()
         For Each box In {abs, stability, cornerBraking, throttle, steering}
             AddHandler box.CheckedChanged, Sub() If Not updating Then Edited()
         Next
@@ -87,26 +84,19 @@ Public NotInheritable Class DirectPracticePicker
         AddHandler allCars.CheckedChanged, Sub() If Not updating Then FillCars(SelectedCarCode()) : Edited()
         AddHandler car.SelectedIndexChanged, Sub() If Not updating Then Edited()
         Apply("normal", 0, "", 1, 0, "class", -1, "quit")
-        ApplyAssists("automatic", True, False, False, False, False)
+        ApplyAssists(True, False, False, False, False)
     End Sub
 
-    ' Shows saved assists; DiRT 3's defaults are ABS on, the rest off, automatic gears.
-    Public Sub ApplyAssists(gearboxChoice As String, absOn As Boolean, stabilityOn As Boolean, cornerBrakingOn As Boolean, throttleOn As Boolean, steeringOn As Boolean)
+    ' Shows saved assists; DiRT 3's defaults are ABS on, the rest off.
+    Public Sub ApplyAssists(absOn As Boolean, stabilityOn As Boolean, cornerBrakingOn As Boolean, throttleOn As Boolean, steeringOn As Boolean)
         updating = True
         Try
-            gears.SelectedIndex = Math.Max(0, Array.IndexOf(DirectPractice.GearboxChoices, gearboxChoice))
             abs.Checked = absOn : stability.Checked = stabilityOn : cornerBraking.Checked = cornerBrakingOn : throttle.Checked = throttleOn : steering.Checked = steeringOn
         Finally
             updating = False
         End Try
         UpdateSummary()
     End Sub
-
-    Public ReadOnly Property Gearbox As String
-        Get
-            Return DirectPractice.GearboxChoices(Math.Max(0, gears.SelectedIndex))
-        End Get
-    End Property
 
     Public ReadOnly Property AssistStates As (Abs As Boolean, Stability As Boolean, CornerBraking As Boolean, Throttle As Boolean, Steering As Boolean)
         Get
@@ -279,7 +269,7 @@ Public NotInheritable Class DirectPracticePicker
                           If(chosenRoute Is Nothing OrElse chosenCar Is Nothing, "Choose a route and a car (adjust the search if no car is listed).",
                              "Direct practice: " & CurrentDisciplineName() & " · " & chosenRoute.ToString() & If(circuit, " · " & laps.Value & If(laps.Value = 1, " lap", " laps"), "") &
                              If(rivals > 0, " · " & rivals & If(rivals = 1, " opponent", " opponents") & " (" & {"same class", "mixed cars", "your car's model"}(Math.Max(0, rivalCars.SelectedIndex)) & If(DifficultyLevel >= 0, ", AI level " & DifficultyLevel, "") & ")", "") &
-                             " · " & chosenCar.Name & {"", " · sequential gears", " · H-pattern gears", " · H-pattern gears with clutch"}(Math.Max(0, gears.SelectedIndex)) & ". " & If(rivals > 0, "", "No opponents. ") & If(AfterFinish = "menus", "After the finish DiRT 3 returns to its menus.", "DiRT 3 closes by itself after the finish.")))
+                             " · " & chosenCar.Name & ". " & If(rivals > 0, "", "No opponents. ") & If(AfterFinish = "menus", "After the finish DiRT 3 returns to its menus.", "DiRT 3 closes by itself after the finish.")))
     End Sub
 
     Private Function CurrentDisciplineName() As String
