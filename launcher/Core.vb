@@ -200,6 +200,9 @@ Public Class LauncherSettings
     Public Property CockpitSteady As Boolean = True
     Public Property CockpitHideDriver As Boolean
     Public Property CockpitHideCoDriver As Boolean
+    ' The cockpit field of view on the monitor (#b330cc4f): degrees added to each car's own, 0 = DiRT 3's.
+    ' Launch writes it into the cars' camera files for the session; VR uses the headset's own field of view.
+    Public Property DesktopFov As Integer
     ' Seat positions on the monitor too (Launch, #b330cc4f): the same camera files, journaled for a desktop session.
     Public Property SeatOnDesktop As Boolean
     ' The in-game seat menu's key (#bd820b32, docs/seat-channel.md): opens it, and saves and closes it; 0 = none.
@@ -251,13 +254,14 @@ Public Class LauncherSettings
         If DirectDifficulty < -1 OrElse DirectDifficulty > DirectPractice.MaxDifficulty Then Throw New IOException("Choose the AI difficulty for direct practice.")
         If Not DirectPractice.AfterFinishChoices.Contains(DirectAfterFinish) Then Throw New IOException("Choose what happens after the finish.")
         If Not DirectPractice.GearboxChoices.Contains(DirectGearbox) Then Throw New IOException("Choose the gearbox for direct practice.")
-        SeatAllCars = If(SeatAllCars, New SeatOffset) : SeatAllCars.Validate() : SeatAllCars.ClearSessionFlags()
+        SeatAllCars = If(SeatAllCars, New SeatOffset) : SeatAllCars.ClearSessionFlags() : SeatAllCars.Validate()
+        If DesktopFov < -SeatOffset.FovNarrower OrElse DesktopFov > SeatOffset.FovWider Then Throw New IOException("Choose a cockpit field of view between " & SeatOffset.FovNarrower & "° narrower and " & SeatOffset.FovWider & "° wider.")
         Dim seats As New Dictionary(Of String, SeatOffset)(StringComparer.Ordinal)
         For Each pair In If(SeatOffsets, New Dictionary(Of String, SeatOffset)).OrderBy(Function(item) item.Key, StringComparer.Ordinal)
             If EventCatalog.Current.FindCar(pair.Key) Is Nothing Then Throw New IOException("Seat positions name an unknown car.")
             If pair.Value Is Nothing OrElse pair.Value.IsZero Then Continue For
-            pair.Value.Validate()
             pair.Value.ClearSessionFlags()
+            pair.Value.Validate()
             seats.Add(pair.Key, pair.Value)
         Next
         SeatOffsets = seats
