@@ -150,7 +150,7 @@ Module SeatMenuInputTests
             noKey.PerformClick()
             check(key.Text = "None" AndAlso Not noKey.Enabled AndAlso form.CurrentSettings().SeatMenuKey = 0 AndAlso notice.Text.Contains("seat menu is off"), "No key turns the key off")
             form.SetSeatMenuDevice(PadButton("button:12"))
-            check(button.Text = "Bind a button…" AndAlso form.CurrentSettings().SeatMenuButton Is Nothing AndAlso notice.Text.Contains("D-pad, A, B and X"), "a pad's A is refused with the reason")
+            check(button.Text = "Bind a button…" AndAlso form.CurrentSettings().SeatMenuButton Is Nothing AndAlso notice.Text.Contains("D-pad, A, B, X"), "a pad's A is refused with the reason")
             form.SetSeatMenuDevice(PadButton("button:15"))
             check(button.Text = "Y on Xbox controller 3" AndAlso form.CurrentSettings().SeatMenuButton?.Input = "button:15", "Y is bound")
             form.SetRecenterDevice(PadButton("button:15"))

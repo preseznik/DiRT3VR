@@ -53,6 +53,10 @@ opens it with `OpenFileMappingW(FILE_MAP_ALL_ACCESS)`.
 | 188 | u32 | launcher | 1 when one position is used for every car |
 | 192 | f32[3] | both | position for every car |
 | 204 | f32[3] | launcher | the every-car position written into the camera files this session |
+| 216 | u32 | launcher | 1 = monitor session (Launch), 0 = VR session |
+| 220 | i32 | launcher | monitor: the cockpit FOV offset the session's camera files hold (whole degrees, −20…+30 from each car's own) |
+| 224 | i32 | renderer | monitor: the current FOV offset (inside the state seqlock) |
+| 228 | i32 | renderer | monitor: the committed FOV offset (written with each commit) |
 | 256 | car × 96 | launcher (position also renderer on commit) | car table |
 | 10500 | UTF-16, 400 chars | launcher | hint text under the panel (the controller buttons in use) |
 
@@ -76,12 +80,26 @@ behaves as before.
 
 Held mask bits (DiRT2VR's): 0 left, 1 right, 2 up, 3 down, 4 back, 5 forward, 6 sideways modifier
 (while held, left/right move sideways instead of back/forward), 7–10 navigation up / down / left /
-right (D-pad or hat), 11 save, 12 cancel, 13 open.
+right (D-pad or hat), 11 save, 12 cancel, 13 open. Monitor sessions only: 14 FOV wider (Xbox RB),
+15 FOV narrower (Xbox LB); the launcher publishes them and lists those buttons at 60 only there.
+
+## Monitor sessions (#c137c681 launcher, #35826889 renderer)
+
+With **Seat menu on the monitor too (Launch)** and a menu key or button, Launch installs DiRT3VR's renderer
+for the session (recovery journal schema 10 without direct practice) and passes `DIRT3VR_SEAT_CHANNEL`
+and `DIRT3VR_LOG_DIR`. The launcher writes 216 = 1 and 220 = the FOV offset the session's camera files
+hold (0 when the cockpit field of view on the monitor is DiRT 3's own); 224 and 228 start at that value.
+The renderer draws the panel over the game image and writes the selected head camera's eye point
+(+0x19d0) and FOV (+0x19e4) as the file's values plus (current − applied), following Wrench's research
+(docs/research/seat-adjustment.md). Keys: PgUp wider, PgDn narrower, 1° per press, repeating while
+held. A zero at 216 is a VR session, so the channel stays version 1.
 
 ## Commits
 
 On save the renderer writes 108–127 inside its seqlock and also the position into the car's table
-entry (or 192 for every car). The launcher reads a commit when the sequence at 92 is even and
+entry (or 192 for every car). In a monitor session it also writes the committed FOV offset at 228 with
+every commit, and when no car is identified the commit index is −3: the field of view alone. The launcher reads a commit when the sequence at 92 is even and
 unchanged across the read and the generation at 124 is new; it validates the position, rounds it to
-centimetres, converts it to a seat offset and saves the launcher settings. The applied values do not
+centimetres, converts it to a seat offset and saves the launcher settings. A monitor commit's FOV offset
+(−20…+30) becomes Controls → Seat → Cockpit field of view (monitor); one out of range is ignored. The applied values do not
 change during the session.
