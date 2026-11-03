@@ -35,8 +35,8 @@ Module ToggleVrTests
         ' Settings: F6 by default, never the recenter or seat menu key; its own controller button.
         Dim defaults = Settings()
         check(defaults.ToggleVrKey = 117 AndAlso defaults.ToggleVrDevice Is Nothing AndAlso Not Refused(Sub() defaults.Validate()), "F6 toggles VR by default, with no controller button")
-        check(Refused(Sub() Settings(121).Validate()) AndAlso Refused(Sub() Settings(122).Validate()) AndAlso Not Refused(Sub() Settings(121, 1).Validate()) AndAlso
-              Refused(Sub() Settings(9, 2).Validate()), "the recenter (F10) and seat menu (F11) keys and Alt+Tab are refused; Ctrl+F10 is fine")
+        check(Refused(Sub() Settings(121).Validate()) AndAlso Refused(Sub() Settings(9).Validate()) AndAlso Not Refused(Sub() Settings(121, 1).Validate()) AndAlso
+              Refused(Sub() Settings(9, 2).Validate()), "the recenter (F10) and seat menu (Tab) keys and Alt+Tab are refused; Ctrl+F10 is fine")
         Dim cleared = Settings(0, 4)
         cleared.Validate()
         check(cleared.ToggleVrModifiers = 0, "no key keeps no modifiers")
@@ -107,7 +107,7 @@ Module ToggleVrTests
             check(Not form.CaptureToggleKey(Keys.F5), "keys pass through until the Toggle VR key is clicked")
             key.PerformClick()
             check(key.Text = "Press a key…" AndAlso form.CaptureToggleKey(Keys.F10) AndAlso notice.Text.Contains("recentering need different keys") AndAlso
-                  form.CaptureToggleKey(Keys.F11) AndAlso notice.Text.Contains("seat menu need different keys") AndAlso key.Text = "Press a key…", "the recenter and seat menu keys are refused and capture continues")
+                  form.CaptureToggleKey(Keys.Tab) AndAlso notice.Text.Contains("seat menu need different keys") AndAlso key.Text = "Press a key…", "the recenter and seat menu keys are refused and capture continues")
             check(form.CaptureToggleKey(Keys.F5 Or Keys.Alt) AndAlso key.Text = "Alt+F5" AndAlso form.CurrentSettings().ToggleVrKey = 116 AndAlso form.CurrentSettings().ToggleVrModifiers = 2, "a key combination is captured")
             DirectCast(form.Controls.Find("RecenterKey", True).Single(), Button).PerformClick()
             check(form.CaptureRecenterKey(Keys.F5 Or Keys.Alt) AndAlso notice.Text.Contains("toggles VR") AndAlso form.CaptureRecenterKey(Keys.Escape), "the recenter key can't take Toggle VR's key")

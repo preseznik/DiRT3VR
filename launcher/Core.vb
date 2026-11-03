@@ -223,8 +223,9 @@ Public Class LauncherSettings
     ' Seat positions on the monitor too (Launch, #b330cc4f): the same camera files, journaled for a desktop session.
     Public Property SeatOnDesktop As Boolean
     ' The in-game seat menu's key (#bd820b32, docs/seat-channel.md): opens it, and saves and closes it; 0 = none.
-    ' F11 by default, a key DiRT 3's own keyboard map leaves free. Kept with the other seat settings.
-    Public Const DefaultSeatMenuKey As Integer = 122
+    ' Tab by default, as in DiRT2VR (iztok: the same experience across the launchers), a key DiRT 3's own keyboard
+    ' map leaves free. A saved key is kept. Kept with the other seat settings.
+    Public Const DefaultSeatMenuKey As Integer = 9
     Public Property SeatMenuKey As Integer = DefaultSeatMenuKey
     Public Property SeatMenuModifiers As Integer
     ' A controller or wheel button that also opens the seat menu (#c137c681); machine-specific like RecenterDevice.
