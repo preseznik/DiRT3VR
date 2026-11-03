@@ -9,10 +9,13 @@ void Require(bool value,const char* message) { if(!value) throw std::runtime_err
 namespace cs=dirt3vr::cockpitstart;
 
 std::vector<uint8_t> Image(uintptr_t loadedBase) {
-    std::vector<uint8_t> image(cs::switchRva+0x100,0xcc);
-    uint8_t original[7]; cs::Original(loadedBase,original);
-    std::copy(std::begin(original),std::end(original),image.begin()+cs::switchRva);
-    std::copy(std::begin(cs::switchEnd),std::end(cs::switchEnd),image.begin()+cs::switchEndRva);
+    std::vector<uint8_t> image(cs::sites[0].endRva+0x100,0xcc);
+    uint8_t push[5]; cs::Push(loadedBase,push);
+    for(const auto& site:cs::sites) {
+        std::copy(std::begin(push),std::end(push),image.begin()+site.rva);
+        std::copy(site.after,site.after+site.afterSize,image.begin()+site.rva+5);
+        std::copy(site.end,site.end+site.endSize,image.begin()+site.endRva);
+    }
     return image;
 }
 
@@ -21,39 +24,49 @@ std::vector<uint8_t> Image(uintptr_t loadedBase) {
 bool InstalledGameMatches(const char* path) {
     std::ifstream file(path,std::ios::binary);
     if(!file) return false;
-    std::vector<uint8_t> image(cs::switchRva+0x100,0);
-    for(const auto [rva,size]:{std::pair{cs::switchRva,size_t{7}},std::pair{cs::switchEndRva,sizeof(cs::switchEnd)}}) {
-        file.seekg(static_cast<std::streamoff>(rva-0x1000+0x400));
-        file.read(reinterpret_cast<char*>(image.data()+rva),static_cast<std::streamsize>(size));
-        if(!file) return false;
-    }
-    return cs::SiteMatches(image.data(),0x400000);
+    std::vector<uint8_t> image(cs::sites[0].endRva+0x100,0);
+    for(const auto& site:cs::sites)
+        for(const auto [rva,size]:{std::pair{site.rva,5+site.afterSize},std::pair{site.endRva,site.endSize}}) {
+            file.seekg(static_cast<std::streamoff>(rva-0x1000+0x400));
+            file.read(reinterpret_cast<char*>(image.data()+rva),static_cast<std::streamsize>(size));
+            if(!file) return false;
+        }
+    return cs::SitesMatch(image.data(),0x400000);
 }
 }
 
 int main(int argc,char** argv) {
     try {
-        uint8_t preferred[7]; cs::Original(0x400000,preferred);
+        uint8_t preferred[5]; cs::Push(0x400000,preferred);
         Require(preferred[0]==0x68 && preferred[1]==0x38 && preferred[2]==0x55 && preferred[3]==0xe8 && preferred[4]==0x00,
                 "The push is not of 0xe85538 at the preferred base");
-        uint8_t patched[5]; cs::Patched(patched);
-        Require(patched[0]==0xe9 && patched[1]==0x99 && patched[2]==0 && patched[3]==0 && patched[4]==0,"The jump does not reach 0x53bd67");
+        uint8_t setup[5],sequence[5]; cs::Patched(cs::sites[0],setup); cs::Patched(cs::sites[1],sequence);
+        Require(setup[0]==0xe9 && setup[1]==0x11 && setup[2]==0 && setup[3]==0 && setup[4]==0,"The race-setup jump does not reach 0x553c19");
+        Require(sequence[0]==0xe9 && sequence[1]==0x99 && sequence[2]==0 && sequence[3]==0 && sequence[4]==0,"The start-sequence jump does not reach 0x53bd67");
 
-        for(const uintptr_t base:{uintptr_t{0x400000},uintptr_t{0x2a0000}}) {
+        for(const uintptr_t base:{uintptr_t{0x400000},uintptr_t{0x550000}}) {
             auto image=Image(base);
-            Require(cs::SiteMatches(image.data(),base),"The site was not recognised at its own base");
-            Require(!cs::SiteMatches(image.data(),base+0x10000),"A site relocated for another base was accepted");
-            Require(!cs::Applied(image.data()),"An unpatched site looked applied");
-            std::copy(std::begin(patched),std::end(patched),image.begin()+cs::switchRva);
-            Require(cs::Applied(image.data()) && !cs::SiteMatches(image.data(),base),"The patched site was not recognised");
+            Require(cs::SitesMatch(image.data(),base),"The sites were not recognised at their own base");
+            Require(!cs::SitesMatch(image.data(),base+0x10000),"Sites relocated for another base were accepted");
+            for(const auto& site:cs::sites) {
+                Require(!cs::Applied(image.data(),site),"An unpatched site looked applied");
+                uint8_t patched[5]; cs::Patched(site,patched);
+                std::copy(std::begin(patched),std::end(patched),image.begin()+site.rva);
+                Require(cs::Applied(image.data(),site) && !cs::SiteMatches(image.data(),base,site),"A patched site was not recognised");
+            }
         }
-        auto image=Image(0x400000);
-        image[cs::switchEndRva]=0x90;
-        Require(!cs::SiteMatches(image.data(),0x400000),"A different jump target was accepted");
+        for(const auto& site:cs::sites) {
+            auto image=Image(0x400000);
+            image[site.endRva]=0x90;
+            Require(!cs::SitesMatch(image.data(),0x400000),"A different jump target was accepted");
+            image=Image(0x400000);
+            image[site.rva+5]^=0xff;
+            Require(!cs::SitesMatch(image.data(),0x400000),"A different instruction after the push was accepted");
+        }
 
-        if(argc>1) {
-            if(!InstalledGameMatches(argv[1])) { std::puts("cockpit start: installed game skipped (not found or different)"); }
-            else std::puts("cockpit start: installed game matches");
+        if(argc>1 && argv[1][0]) {
+            Require(InstalledGameMatches(argv[1]),"The installed game's chase-view sites differ");
+            std::puts("cockpit start: installed game matches");
         }
         std::puts("cockpit start: ok");
         return 0;
