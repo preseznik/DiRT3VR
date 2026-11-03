@@ -24,6 +24,8 @@ Public NotInheritable Class LastVrSession
     Public Property RefreshHz As Double?
     ' The renderer's performance summary for the session (#4896ffd3), or Nothing.
     Public Property Performance As MeasuredPerformance
+    ' The VR quality the session ran with (session.json, GraphicsRecommendation.VrQuality), or Nothing for older sessions.
+    Public Property VrQuality As Dictionary(Of String, String)
 
     Public Shared Function Parse(log As String, startedUtc As DateTime) As LastVrSession
         Dim scene = Requested.Match(log)
@@ -67,7 +69,7 @@ Public NotInheritable Class LastVrSession
                     text = New String(buffer, 0, reader.ReadBlock(buffer, 0, buffer.Length))
                 End Using
                 Dim result = Parse(text, Directory.GetCreationTimeUtc(folder))
-                If result IsNot Nothing Then result.Performance = MeasuredPerformance.Load(folder)
+                If result IsNot Nothing Then result.Performance = MeasuredPerformance.Load(folder) : result.VrQuality = ReadVrQuality(folder)
                 Return result
             Next
         Catch ex As Exception When TypeOf ex Is IOException OrElse TypeOf ex Is UnauthorizedAccessException
@@ -79,6 +81,22 @@ Public NotInheritable Class LastVrSession
     Private Class SessionMode
         Public Property Mode As String
     End Class
+
+    Private Class SessionQuality
+        Public Property VrQuality As Dictionary(Of String, String)
+    End Class
+
+    ' The VR quality a session recorded; Nothing when it didn't (older builds) or it isn't valid.
+    Private Shared Function ReadVrQuality(folder As String) As Dictionary(Of String, String)
+        Dim info = Path.Combine(folder, "session.json")
+        If Not File.Exists(info) Then Return Nothing
+        Try
+            Dim recorded = SafeFiles.ReadJson(Of SessionQuality)(info)?.VrQuality
+            Return If(recorded Is Nothing, Nothing, GraphicsCatalog.Current.Normalize(recorded))
+        Catch ex As Exception When TypeOf ex Is System.Text.Json.JsonException OrElse TypeOf ex Is IOException OrElse TypeOf ex Is UnauthorizedAccessException
+            Return Nothing
+        End Try
+    End Function
 
     ' Desktop direct practice also logs into a session folder; its session.json names its mode. Folders
     ' without a session.json are VR sessions of older builds.

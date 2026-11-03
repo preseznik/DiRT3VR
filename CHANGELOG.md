@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Recommend for this PC** (#68e16dc9) under **Graphics → Quality**: after a VR session, it suggests a VR render scale, or the VR Balanced or Potato preset, from that session's measured frame rate. It only changes the controls; Undo preset brings them back.
 - FPS in VR (#4896ffd3): **Graphics → VR HUD → Show FPS and GPU usage in the headset** adds a small performance display, and the last VR session's measured frame rate (median, low, GPU usage and what held it back) shows under **Graphics → VR rendering**.
 - Toggle VR (#288ceec1): press **F6** during Launch VR to switch the headset between VR and a flat screen in front of you, for a view that looks wrong or uncomfortable; press it again to go back. Change the key, or add a controller or wheel button, under **Controls → VR and seat controls**.
 - Place the VR HUD (#3652b9aa): **Graphics → VR HUD** sets how far away the HUD and menu panel is (1 to 5 m; it keeps the same size in your view) and whether it follows your view or stays where you recentered.

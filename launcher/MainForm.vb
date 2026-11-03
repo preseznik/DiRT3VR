@@ -80,6 +80,7 @@ Public Class MainForm
     Private ReadOnly potatoPreset As New Button With {.Name = "PotatoPreset", .Text = "Potato / Low-End", .AutoSize = True}
     Private ReadOnly vrBalancedPreset As New Button With {.Name = "VrBalancedPreset", .Text = "VR Balanced", .AutoSize = True}
     Private ReadOnly undoPreset As New Button With {.Name = "UndoGraphicsPreset", .Text = "Undo preset", .AutoSize = True, .Enabled = False}
+    Private ReadOnly recommendButton As New Button With {.Name = "RecommendGraphics", .Text = "Recommend for this PC", .AutoSize = True}
     ' The controls before the last preset (desktop quality, VR quality, VR render scale), for Undo preset.
     Private presetUndo As (Desktop As Dictionary(Of String, String), Vr As Dictionary(Of String, String), Scale As Integer)?
     Private applyingPreset As Boolean
@@ -414,13 +415,14 @@ Public Class MainForm
         quality.Controls.Add(Info("VR: applied only while a VR session runs, together with DiRT3VR's other temporary changes, and undone when it ends. Options on Same as desktop use the desktop choice (or the game's setting)."))
         quality.Controls.Add(Info("These are DiRT 3's own presets and options (DirectX 11 values); Medium is the game's default."))
         Dim quick As New FlowLayoutPanel With {.Name = "GraphicsPresetActions", .AutoSize = True, .WrapContents = True, .Margin = New Padding(0, 0, 0, 8)}
-        quick.Controls.AddRange({potatoPreset, vrBalancedPreset, undoPreset})
+        quick.Controls.AddRange({potatoPreset, vrBalancedPreset, recommendButton, undoPreset})
         quality.Controls.Add(quick)
-        quality.Controls.Add(Info("Quick VR presets: Potato / Low-End sets VR quality to Ultra Low and VR render scale to 70%. VR Balanced keeps High's look with the crowd one step lower and leaves the render scale alone. Undo preset brings back the controls from before the last preset until you change an option yourself."))
+        quality.Controls.Add(Info("Quick VR presets: Potato / Low-End sets VR quality to Ultra Low and VR render scale to 70%. VR Balanced keeps High's look with the crowd one step lower and leaves the render scale alone. Recommend for this PC tunes the VR render scale, or picks one of these presets, from your last VR session's measured frame rate when it ran the same VR quality. Undo preset brings back the controls from before the last preset until you change an option yourself."))
         Dim columns As New ResponsiveColumns() : content.Controls.Add(columns)
         desktopQuality = New QualityChoices(Section(columns.First, "Desktop quality"), "Quality", "Use game setting", "Use game settings")
         vrQuality = New QualityChoices(Section(columns.Second, "VR quality"), "VrQuality", "Same as desktop", "Same as desktop", {GraphicsCatalog.Current.VrBalanced()})
         AddHandler potatoPreset.Click, Sub() ApplyQuickPreset("potato")
+        AddHandler recommendButton.Click, Sub() RecommendGraphics()
         AddHandler vrBalancedPreset.Click, Sub() ApplyQuickPreset("vrbalanced")
         AddHandler undoPreset.Click, Sub() UndoGraphicsPreset()
         AddHandler renderScale.ValueChanged, Sub() If Not applyingPreset Then ClearPresetUndo()
@@ -462,6 +464,35 @@ Public Class MainForm
             applyingPreset = False
         End Try
         UpdateResolutionLabels()
+    End Sub
+
+    ' Recommend for this PC (#68e16dc9): applied to the controls with Undo; nothing is saved.
+    Public Sub RecommendGraphics()
+        Dim result As GraphicsRecommendation.Result
+        Try
+            result = GraphicsRecommendation.Recommend(LastVrSession.Load(context), CurrentSettings(), If(headsetResolution?.Width, 0), If(headsetResolution?.Height, 0))
+        Catch ex As IOException
+            notice.Text = "No recommendation: " & ex.Message
+            Return
+        End Try
+        If result.Preset = GraphicsRecommendation.Unchanged Then
+            notice.Text = result.Reason
+            Return
+        End If
+        RememberForUndo()
+        applyingPreset = True
+        Try
+            If result.Preset = GraphicsRecommendation.Potato Then
+                vrQuality.ChoosePreset("ultralow")
+            ElseIf result.Preset = GraphicsRecommendation.Balanced Then
+                vrQuality.ChoosePreset("vrbalanced")
+            End If
+            renderScale.Value = Math.Clamp(result.Scale, 50, 300)
+        Finally
+            applyingPreset = False
+        End Try
+        UpdateResolutionLabels()
+        notice.Text = result.Reason & " Save settings or Launch to keep it, or choose Undo preset."
     End Sub
 
     Public Sub UndoGraphicsPreset()
@@ -1347,6 +1378,7 @@ Public Class MainForm
                 "Advanced → Enable experimental VR turns on the VR session when this package supports it. Choose VDXR (through Virtual Desktop) or SteamVR under Settings → VR runtime. " & RuntimeCapabilities.SteamVrNote & " Close other VR games first." & vbCrLf & vbCrLf &
                 "All rendered 3D camera views use stereo and headset tracking, including cockpit, bonnet, bumper, chase and replay. Loading screens, movies and frames without a 3D scene use a virtual screen, and recognized HUD and menu draws use a transparent panel 2 metres away. Camera transitions are still experimental." & vbCrLf & vbCrLf &
                 "Show FPS and GPU usage in the headset (Graphics → VR HUD, off by default) adds a small display below straight ahead, or in front of you when it follows the view. Each VR session also measures its frame rate; Graphics → VR rendering shows the last one (median and low FPS, GPU usage, and whether the GPU or CPU held it back)." & vbCrLf & vbCrLf &
+                "Recommend for this PC (Graphics → Quality) reads the last VR session's measured frame rate. If that session ran the same VR quality on the same headset, it lowers the VR render scale when the GPU held the frame rate back, raises it by 10% when the GPU had plenty to spare, keeps it when the CPU was the limit (lowering it wouldn't help), or picks VR Balanced or Potato / Low-End when Ultra or the lowest scale was still too heavy. It changes only the controls; Undo preset brings them back, and nothing is kept until Save settings or Launch. Without a measured session it asks you to drive one first." & vbCrLf & vbCrLf &
                 "Graphics → VR HUD moves that panel from 1 to 5 metres away; it keeps the same size in your view, so only how far away it seems changes. Follow view keeps it in front of you as you turn your head; off (the default), it stays where you last recentered." & vbCrLf & vbCrLf &
                 "DiRT 3's motion blur is switched off for VR sessions: in the headset every head movement counts as camera movement, so it smeared the nearest ground and objects. DiRT3VR writes the game's postprocess\effects.xml with the blur lengths at zero for the session and restores it after exit; desktop play keeps the game's motion blur." & vbCrLf & vbCrLf &
                 ExperimentalFiles.ProfileDescription & vbCrLf & vbCrLf &
