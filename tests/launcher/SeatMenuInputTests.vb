@@ -138,7 +138,7 @@ Module SeatMenuInputTests
             Dim recenter = DirectCast(form.Controls.Find("RecenterKey", True).Single(), Button)
             Dim notice = form.Controls.Find("Notice", True).Single()
             tabs.SelectedTab = tabs.TabPages.Cast(Of TabPage)().Single(Function(page) page.Contains(key)) : Application.DoEvents()
-            check(key.Text = "F11" AndAlso noKey.Enabled AndAlso button.Text = "Bind a button…" AndAlso Not form.HasUnsavedSettings(), "Controls → Seat shows the F11 default and no button")
+            check(key.Text = "Tab" AndAlso noKey.Enabled AndAlso button.Text = "Bind a button…" AndAlso Not form.HasUnsavedSettings(), "Controls → Seat shows the Tab default and no button")
             check(Not form.CaptureSeatMenuKey(Keys.F9), "keys pass through until the seat menu key is clicked")
             key.PerformClick()
             check(key.Text = "Press a key…" AndAlso form.CaptureSeatMenuKey(Keys.Up) AndAlso key.Text = "Press a key…" AndAlso notice.Text.Contains("Up can't be used"), "an arrow is refused and capture continues")

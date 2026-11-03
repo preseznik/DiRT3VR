@@ -45,7 +45,7 @@ Module SeatChannelTests
         Using channel As New SeatChannel(settings, applied, name), opened = MemoryMappedFile.OpenExisting(name), renderer = opened.CreateViewAccessor()
             check(channel.Name = name AndAlso renderer.ReadUInt32(0) = &H54414553UI AndAlso renderer.ReadUInt32(4) = 1UI AndAlso renderer.ReadUInt32(8) = 16384UI AndAlso renderer.ReadUInt32(12) <> 0UI,
                   "the channel opens with DiRT3VR's header and a heartbeat")
-            check(renderer.ReadInt32(88) = -1 AndAlso renderer.ReadInt32(120) = -1 AndAlso renderer.ReadUInt32(128) = 122UI AndAlso renderer.ReadUInt32(132) = 0UI, "no car yet, no commit, and F11 opens the menu")
+            check(renderer.ReadInt32(88) = -1 AndAlso renderer.ReadInt32(120) = -1 AndAlso renderer.ReadUInt32(128) = 9UI AndAlso renderer.ReadUInt32(132) = 0UI, "no car yet, no commit, and Tab opens the menu")
             check(renderer.ReadUInt32(184) = CUInt(EventCatalog.Current.Cars.Count) AndAlso renderer.ReadUInt32(188) = 0UI, "every catalog car is listed, each with its own position")
             Dim entry = SeatChannel.Table + frxIndex * SeatChannel.Stride
             check(Text(renderer, entry, 16) = "frx" AndAlso Text(renderer, entry + 16, 48) = frx.Name.Substring(0, Math.Min(frx.Name.Length, 47)), "the car table has DiRT 3's code and the car's name")
@@ -115,10 +115,10 @@ Module SeatChannelTests
             check(SeatChannel.SaveCommit(ctx, channel) Is Nothing AndAlso LauncherSettings.Load(ctx).SeatOffsets("frx").Up = 9, "and only once")
         End Using
 
-        ' The menu key: F11 by default, never the recenter key, the arrows or Enter.
+        ' The menu key: Tab by default (as in DiRT2VR), never the recenter key, the arrows or Enter.
         Dim keys As New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = ""}
         keys.Validate()
-        check(keys.SeatMenuKey = 122 AndAlso keys.SeatMenuModifiers = 0, "F11 opens the seat menu by default")
+        check(keys.SeatMenuKey = 9 AndAlso keys.SeatMenuModifiers = 0, "Tab opens the seat menu by default")
         For Each bad In {New LauncherSettings With {.SeatMenuKey = keys.RecenterKey}, New LauncherSettings With {.SeatMenuKey = 38}, New LauncherSettings With {.SeatMenuKey = 13},
                          New LauncherSettings With {.SeatMenuKey = 115, .SeatMenuModifiers = 2}, New LauncherSettings With {.SeatMenuKey = 122, .SeatMenuModifiers = 9}}
             Dim value = bad

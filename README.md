@@ -40,7 +40,7 @@ SteamVR can be used for Launch VR again; it is new and still being checked
    or co-driver. Launch VR applies these for the session, and Launch applies
    the seat too with **Also when playing on the monitor**, and a wider or
    narrower cockpit field of view on the monitor. During Launch VR,
-   **F11** (or a controller or wheel button you choose there) opens a seat
+   **Tab** (or a controller or wheel button you choose there) opens a seat
    menu in the headset.
    The **Simple | Advanced** switch beside **?** picks the view: Advanced
    (the default) shows every tab; Simple shows one **Quick start** page with
