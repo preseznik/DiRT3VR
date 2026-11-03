@@ -118,6 +118,14 @@ Module DirectPracticeTests
               desktopStart.Environment("DIRT3VR_DIRECT_PRACTICE") = "1" AndAlso desktopStart.Environment("DIRT3VR_DIRECT_LAPS") = "3" AndAlso desktopStart.Environment("DIRT3VR_DIAGNOSTICS") = "1" AndAlso desktopStart.Environment("DIRT3VR_LOG_DIR") = desktopLogs AndAlso Not desktopStart.Environment.ContainsKey("XR_RUNTIME_JSON"),
               "desktop direct practice starts the benchmark with the player-control switch, laps and the observer log, and nothing for VR (" & String.Join(", ", dirt3vrVariables) & ")")
         check(Not DesktopStartupSession.StartInfo(desktopCtx, stage, desktopLogs).Environment.ContainsKey("DIRT3VR_DIRECT_LAPS"), "a desktop stage gets no lap count")
+        check(DesktopStartupSession.StartInfo(desktopCtx, settings, desktopLogs, {"Logitech G HUB G920 Driving Force Racing Wheel USB", "xinput_pad"}).Environment("DIRT3VR_DIRECT_DEVICES") = "Logitech G HUB G920 Driving Force Racing Wheel USB|xinput_pad",
+              "the player's devices are passed best first, for DiRT 3 to bind the right one (#16fa2aa3)")
+        Environment.SetEnvironmentVariable("DIRT3VR_DIRECT_DEVICES", "stale")
+        Try
+            check(Not DesktopStartupSession.StartInfo(desktopCtx, settings, desktopLogs).Environment.ContainsKey("DIRT3VR_DIRECT_DEVICES"), "without bound devices nothing is passed, even if inherited")
+        Finally
+            Environment.SetEnvironmentVariable("DIRT3VR_DIRECT_DEVICES", Nothing)
+        End Try
         Dim plainStart = DesktopStartupSession.StartInfo(desktopCtx, New LauncherSettings With {.SteamRuntimeManifest = "", .VdxrRuntimeManifest = "", .SkipStartupMovies = True}, desktopLogs)
         check(plainStart.ArgumentList.Count = 0 AndAlso Not plainStart.Environment.Keys.Any(Function(key) key.StartsWith("DIRT3VR_", StringComparison.OrdinalIgnoreCase)), "a startup-skip desktop session starts DiRT 3 as before")
         check(Refused(Sub() DesktopStartupSession.StartInfo(desktopCtx, settings, "logs")), "the desktop session log path must be absolute")

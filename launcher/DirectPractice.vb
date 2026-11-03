@@ -66,8 +66,14 @@ Public NotInheritable Class DirectPractice
     End Function
 
     ' The benchmark start and the renderer's direct practice switches, for Launch and Launch VR.
-    Public Shared Sub AddStart(start As ProcessStartInfo, settings As LauncherSettings)
+    ' devices: the player's devices, best first (SessionActionMaps.PreferredDevices), for DIRT3VR_DIRECT_DEVICES.
+    Public Shared Sub AddStart(start As ProcessStartInfo, settings As LauncherSettings, Optional devices As IReadOnlyList(Of String) = Nothing)
         start.Environment("DIRT3VR_DIRECT_PRACTICE") = "1"
+        If devices IsNot Nothing AndAlso devices.Count > 0 Then
+            start.Environment("DIRT3VR_DIRECT_DEVICES") = String.Join("|", devices)
+        Else
+            start.Environment.Remove("DIRT3VR_DIRECT_DEVICES")
+        End If
         Dim lapCount = Laps(settings), level = Difficulty(settings)
         If lapCount > 0 Then start.Environment("DIRT3VR_DIRECT_LAPS") = Number(lapCount)
         If level >= 0 Then start.Environment("DIRT3VR_DIRECT_DIFFICULTY") = Number(level)

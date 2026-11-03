@@ -63,6 +63,8 @@ Public NotInheritable Class SessionActionMaps
         ' deviceName → the stock map file each session map was built from.
         Public ReadOnly Property Devices As New List(Of (DeviceName As String, BaseFile As String))
         Public ReadOnly Property Skipped As New List(Of String)
+        ' The devices DiRT 3 should give the player in a direct start, best first (PreferredDevices).
+        Public Property PreferredDevices As String() = Array.Empty(Of String)()
 
         ' For the launch notice: the devices whose bindings couldn't be applied, or "".
         Public ReadOnly Property Note As String
@@ -160,6 +162,19 @@ Public NotInheritable Class SessionActionMaps
         If binding.Keyboard Then Return "keyboard"
         If binding.DeviceType = "xinput_pad" Then Return "xinput_pad"
         Return binding.Device
+    End Function
+
+    ' The devices DiRT 3 should bind to the player in a direct start (#16fa2aa3: it binds the first device in
+    ' its list, so the keyboard won over the G920). Best first: the device bound to steering, then the others
+    ' by how many actions they carry. DiRT 3's names as in the session maps; never the keyboard. Passed to the
+    ' renderer as DIRT3VR_DIRECT_DEVICES (Wrench's side moves the first match to the front).
+    Public Shared Function PreferredDevices(controls As DrivingControls) As String()
+        If controls Is Nothing OrElse Not controls.Enabled OrElse controls.Bindings Is Nothing Then Return Array.Empty(Of String)()
+        Return controls.Bindings.Where(Function(b) Not b.Keyboard).GroupBy(Function(b) DeviceNameOf(b), StringComparer.Ordinal).
+            Where(Function(g) g.Key <> "" AndAlso g.Key <> "keyboard" AndAlso WritableName(g.Key) AndAlso Not g.Key.Contains("|"c)).
+            OrderByDescending(Function(g) g.Any(Function(b) b.Action = "Steer Left" OrElse b.Action = "Steer Right")).
+            ThenByDescending(Function(g) g.Count()).ThenBy(Function(g) g.Key, StringComparer.Ordinal).
+            Select(Function(g) g.Key).ToArray()
     End Function
 
     ' The device's complete map: the base map's actions in their order, each action the player bound
@@ -286,6 +301,7 @@ Public NotInheritable Class SessionActionMaps
         controls.Validate()
         Dim found = controls.Problems()
         If found.Count > 0 Then Throw New IOException(String.Join(Environment.NewLine, found) & Environment.NewLine & "Open Controls → Driving controls to fix these bindings.")
+        result.PreferredDevices = PreferredDevices(controls)
         Dim pathsFile = PathsPath(context)
         SafeFiles.NoLinks(pathsFile)
         If Not File.Exists(pathsFile) Then Throw New IOException("DiRT 3's action map list is missing: " & pathsFile)
