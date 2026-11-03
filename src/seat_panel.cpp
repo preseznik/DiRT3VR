@@ -46,9 +46,12 @@ ID3D11Texture2D* SeatPanelImage::Render(ID3D11Device* device,const seat::Menu& m
         const auto& channel=menu.View();
         const std::wstring name=channel.Universal() ? L"All cars" : !menu.CanAdjust() ? L"Car not identified" : Wide(channel.CarName(menu.Active()));
         const auto p=menu.Current();
-        wchar_t values[160]{};
-        swprintf_s(values,L"Height     %+.1f cm\nDepth      %+.1f cm\nSideways  %+.1f cm",p.y*100,-p.z*100,p.x*100);
-        const std::wstring close=KeyName(channel.Binding(0))+L": save & close",hint=channel.HintText();
+        wchar_t values[192]{};
+        // On the monitor the panel also shows the view angle, degrees from the car's own (DiRT2VR's desktop panel).
+        if(menu.Desktop()) swprintf_s(values,L"Height     %+.1f cm\nDepth      %+.1f cm\nSideways  %+.1f cm\nView angle %+d°",p.y*100,-p.z*100,p.x*100,menu.Fov());
+        else swprintf_s(values,L"Height     %+.1f cm\nDepth      %+.1f cm\nSideways  %+.1f cm",p.y*100,-p.z*100,p.x*100);
+        const std::wstring close=KeyName(channel.Binding(0))+L": save & close",
+            hint=channel.HintText()+(menu.Desktop() ? L"\nPgUp/PgDn or LB/RB: view angle" : L"");
         const bool sideways=menu.SidewaysHeld();
         const wchar_t* status=!menu.InputReady() ? L"Input filtering unavailable" : !menu.CanAdjust() ? L"Adjustment unavailable for this car" : L"Arrows / D-pad: move";
         const auto signature=name+L'\n'+values+L'\n'+close+L'\n'+hint+L'\n'+status+(sideways ? L"\nside" : L"\ndepth");
@@ -80,7 +83,7 @@ ID3D11Texture2D* SeatPanelImage::Render(ID3D11Device* device,const seat::Menu& m
         arrow(384,254,0,-1); arrow(384,555,0,1); arrow(126,406,-1,0); arrow(642,406,1,0);
         label(L"UP",356,286,90,45,bold,white); label(L"DOWN",335,597,130,45,bold,white);
         label(sideways ? L"LEFT" : L"BACK",55,451,180,45,bold,white); label(sideways ? L"RIGHT" : L"FORWARD",550,451,205,45,bold,white);
-        label(values,175,670,550,145,bold,white);
+        label(values,175,menu.Desktop() ? 640.f : 670.f,550,menu.Desktop() ? 200.f : 145.f,bold,white);
         label(status,40,838,690,45,normal,white);
         label(hint.c_str(),40,886,690,120,normal,white);
 

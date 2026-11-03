@@ -156,6 +156,13 @@ int main() {
         auto emptyHud=Texture(1,1,DXGI_FORMAT_R8G8B8A8_UNORM,D3D11_BIND_RENDER_TARGET,transparent.data());
         Require(presenter.Draw(emptyHud.Get(),linearTarget.Get(),4,4,dirt3vr::TexturePresenter::Mode::StraightAlpha),"Transparent HUD conversion failed");
         Color(ReadPixel(linearOutput.Get(),1,1),{0,0,0,0}); game.Verify();
+        // A panel over part of the monitor image: only its rectangle changes, and it must fit.
+        context->ClearRenderTargetView(linearTarget.Get(),blue);
+        Require(presenter.DrawRegion(hud.Get(),linearTarget.Get(),2,1,2,2,dirt3vr::TexturePresenter::Mode::Composite),"Panel region composite failed");
+        Color(ReadPixel(linearOutput.Get(),3,2),{128,0,127,255}); Color(ReadPixel(linearOutput.Get(),1,1),{0,0,255,255}); Color(ReadPixel(linearOutput.Get(),3,0),{0,0,255,255});
+        game.Verify();
+        Require(!presenter.DrawRegion(hud.Get(),linearTarget.Get(),3,0,2,2,dirt3vr::TexturePresenter::Mode::Composite) &&
+                !presenter.DrawRegion(hud.Get(),linearTarget.Get(),4,0,1,1,dirt3vr::TexturePresenter::Mode::Composite),"Panel region outside the target accepted");
         presenter.Reset(); game.Verify();
         puts("Texture presenter WARP: resampling, UNORM/sRGB, RGBA/BGRA/10-bit RGB, MSAA and game state preservation passed"); return 0;
     } catch(const std::exception& error) { puts(error.what()); return 1; }

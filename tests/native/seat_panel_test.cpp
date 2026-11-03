@@ -60,6 +60,12 @@ int main() {
         bool changed{};
         for(unsigned y=670;y<815 && !changed;++y) for(unsigned x=0;x<SeatPanelImage::Width && !changed;++x) changed=std::memcmp(first.At(x,y),second.At(x,y),4)!=0;
         Require(changed,"Panel not redrawn for a new seat position");
+
+        // On the monitor the panel adds the view angle line (DiRT2VR's desktop layout).
+        channel.Write(216,1u); channel.Write(220,int32_t(10));
+        seat::Menu desktop(channel,true,NoKeys); desktop.Select(0); desktop.Update(1000,0,true);
+        const auto third=Download(device.Get(),image.Render(device.Get(),desktop));
+        Require(Bright(third,780,830)>Bright(second,780,830)+100,"Monitor panel lacks the view angle line");
         std::puts("seat panel: drawn, translucent, redrawn on change");
         return 0;
     } catch(const std::exception& error) { std::fprintf(stderr,"%s\n",error.what()); return 1; }

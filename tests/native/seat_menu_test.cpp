@@ -44,7 +44,7 @@ int main() {
             Channel c(bytes.data());
             Require(c.CarCode(1)=="mini_cooper" && c.CarName(1)=="Car" && c.FindCar("mini_cooper")==1 && c.FindCar("")==-1 && c.HintText()==L"D-pad: move",
                     "Car table or hint misread");
-            for(auto [offset,value]:std::initializer_list<std::pair<unsigned,uint32_t>>{{0,1},{4,2},{8,4096},{184,65},{188,2}}) {
+            for(auto [offset,value]:std::initializer_list<std::pair<unsigned,uint32_t>>{{0,1},{4,2},{8,4096},{184,65},{188,2},{216,2},{220,31},{220,uint32_t(-21)}}) {
                 auto bad=Launcher(); Channel(bad.data()).Write(offset,value);
                 Require(!Channel::Acceptable(bad.data()),"Bad header accepted");
             }
@@ -160,6 +160,43 @@ int main() {
             Require(menu.BlocksButton(wheel,3,true) && menu.BlocksHat(wheel,0,false),"Held wheel input reached the game after the menu closed");
             Require(menu.BlocksButton(wheel,3,false) && menu.BlocksHat(wheel,0,true),"Release of a held wheel input not kept");
             Require(!menu.BlocksButton(wheel,3,true) && !menu.BlocksHat(wheel,0,false),"Wheel input stayed blocked after its release");
+        }
+        { // A monitor session: the view angle with PgUp / PgDn or RB / LB while the menu is open.
+            down.clear(); auto bytes=Launcher(); Channel c(bytes.data()); c.Write(216,1u); c.Write(220,int32_t(5)); Clock clock;
+            Require(Channel::Acceptable(bytes.data()),"Monitor session refused");
+            Menu menu(c,true,KeyDown); menu.Select(1); clock.Frame(menu);
+            Require(menu.Desktop() && menu.Fov()==5 && menu.FovChange()==0 && c.Read<int32_t>(224)==5,"Launch FOV not taken");
+            down={VK_PRIOR}; clock.Frame(menu);
+            Require(menu.Fov()==5 && !menu.BlocksKey(VK_PRIOR),"PgUp changed the FOV with the menu closed, or was kept from the game");
+            down.clear(); clock.Frame(menu); down={F11}; clock.Frame(menu); down.clear(); clock.Frame(menu);
+            down={VK_PRIOR}; clock.Frame(menu);
+            Require(menu.Fov()==6 && menu.FovChange()==1 && c.Read<int32_t>(224)==6 && menu.BlocksKey(VK_PRIOR),"PgUp press is not one degree wider");
+            for(unsigned frame=0;frame<40;++frame) clock.Frame(menu);
+            Require(menu.Fov()>8,"Held PgUp did not repeat");
+            down.clear(); clock.Frame(menu);
+            const int wider=menu.Fov();
+            c.Write(20,unsigned(FovNarrower)); clock.Frame(menu); c.Write(20,0u); clock.Frame(menu);
+            Require(menu.Fov()==wider-1,"LB from the launcher did not narrow the view");
+            down={VK_ESCAPE}; clock.Frame(menu);
+            Require(menu.Fov()==5 && Generation(c)==0,"Esc did not restore the FOV");
+            down.clear(); clock.Frame(menu); down={F11}; clock.Frame(menu); down.clear(); clock.Frame(menu);
+            down={VK_NEXT}; for(unsigned frame=0;frame<400;++frame) clock.Frame(menu);
+            Require(menu.Fov()==MinFov,"FOV narrower than its limit");
+            down={VK_RETURN}; clock.Frame(menu);
+            Require(Generation(c)==1 && c.Read<int32_t>(228)==MinFov && c.Read<int>(120)==1 && Near(c.Saved(1),{-.03f,.05f,.04f}),"FOV not committed with the car");
+        }
+        { // No car identified on the monitor: an FOV-only commit leaves every seat position alone.
+            down.clear(); auto bytes=Launcher(); Channel c(bytes.data()); c.Write(216,1u); Clock clock;
+            Menu menu(c,true,KeyDown); clock.Frame(menu);
+            down={F11}; clock.Frame(menu); down.clear(); clock.Frame(menu); down={VK_PRIOR}; clock.Frame(menu); down={VK_RETURN}; clock.Frame(menu);
+            Require(Generation(c)==1 && c.Read<int>(120)==FovOnly && c.Read<int32_t>(228)==1 && Near(c.Saved(1),{-.03f,.05f,.04f}) &&
+                    Near(c.Read<Position>(192),{0,.02f,0}),"FOV-only commit wrong");
+        }
+        { // VR sessions have no view angle: PgUp stays the game's.
+            down.clear(); auto bytes=Launcher(); Channel c(bytes.data()); Clock clock;
+            Menu menu(c,true,KeyDown); menu.Select(1); clock.Frame(menu);
+            down={F11}; clock.Frame(menu); down.clear(); clock.Frame(menu); down={VK_PRIOR}; clock.Frame(menu);
+            Require(!menu.Desktop() && menu.Fov()==0 && !menu.BlocksKey(VK_PRIOR),"VR menu changed the FOV or took PgUp");
         }
         { // One position for every car.
             down.clear(); auto bytes=Launcher(true); Channel c(bytes.data()); Clock clock;

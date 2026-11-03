@@ -59,11 +59,13 @@ inline std::string CarCodeFromVehicleName(std::string_view name) {
 // Held mask bits, written by the launcher (controllers) and added from the keyboard here.
 enum Held : unsigned {
     Left=1u<<0,Right=1u<<1,Up=1u<<2,Down=1u<<3,Back=1u<<4,Forward=1u<<5,Sideways=1u<<6,
-    NavUp=1u<<7,NavDown=1u<<8,NavLeft=1u<<9,NavRight=1u<<10,Save=1u<<11,Cancel=1u<<12,Open=1u<<13
+    NavUp=1u<<7,NavDown=1u<<8,NavLeft=1u<<9,NavRight=1u<<10,Save=1u<<11,Cancel=1u<<12,Open=1u<<13,
+    FovWider=1u<<14,FovNarrower=1u<<15 // Monitor sessions only (RB / LB).
 };
 // Renderer status at offset 84.
 enum Status : unsigned { Ready=0,CarUnknown=1,InputUnavailable=2 };
-constexpr int AllCars=-2;
+constexpr int AllCars=-2,FovOnly=-3; // Commit indexes besides a car: every car, or the field of view alone.
+constexpr int MinFov=-20,MaxFov=30; // The cockpit FOV offset, degrees from each car's own.
 
 class Channel {
 public:
@@ -76,7 +78,8 @@ public:
         if(!view) return false;
         const Channel channel(const_cast<unsigned char*>(view));
         if(channel.Read<uint32_t>(0)!=Magic || channel.Read<uint32_t>(4)!=Version || channel.Read<uint32_t>(8)!=Bytes ||
-           channel.Cars()>MaxCars || channel.Read<uint32_t>(188)>1 || !Valid(channel.Read<Position>(192)) || !Valid(channel.Read<Position>(204))) return false;
+           channel.Cars()>MaxCars || channel.Read<uint32_t>(188)>1 || !Valid(channel.Read<Position>(192)) || !Valid(channel.Read<Position>(204)) ||
+           channel.Read<uint32_t>(216)>1 || channel.LaunchFov()<MinFov || channel.LaunchFov()>MaxFov) return false;
         for(unsigned i=0;i<channel.Cars();++i)
             if(!Valid(channel.Read<Position>(Table+i*Stride+64)) || !Valid(channel.Read<Position>(Table+i*Stride+76))) return false;
         return true;
@@ -86,6 +89,9 @@ public:
     unsigned Cars() const { return Read<uint32_t>(184); }
     bool Universal() const { return Read<uint32_t>(188)==1; }
     uint32_t Heartbeat() const { return Read<uint32_t>(12); }
+    // Monitor sessions (Launch) set 216; 220 is the cockpit FOV offset the session's camera files hold.
+    bool Desktop() const { return Read<uint32_t>(216)==1; }
+    int LaunchFov() const { return Read<int32_t>(220); }
     std::string CarCode(int index) const { return Text(index,0,16); }
     std::string CarName(int index) const { return Text(index,16,48); }
     // AllCars reads the every-car values at 192 and 204.
@@ -115,15 +121,16 @@ public:
         if(Read<uint32_t>(16)!=sequence) return false;
         output=next; return true;
     }
-    // Renderer state 80–127 inside the seqlock at 92; a commit also stores the position in its car entry (or 192).
-    void Publish(bool open,unsigned status,int active,Position current,const int* commitIndex=nullptr) {
+    // Renderer state 80–127 and the FOV at 224 / 228 inside the seqlock at 92; a commit also stores the
+    // position in its car entry (or 192), except an FOV-only commit.
+    void Publish(bool open,unsigned status,int active,Position current,int fov,const int* commitIndex=nullptr) {
         InterlockedIncrement(reinterpret_cast<volatile LONG*>(view_+92));
         MemoryBarrier();
-        Write(80,uint32_t(open)); Write(84,uint32_t(status)); Write(88,active); Write(96,current);
+        Write(80,uint32_t(open)); Write(84,uint32_t(status)); Write(88,active); Write(96,current); Write(224,int32_t(fov));
         if(commitIndex) {
-            Write(108,current); Write(120,*commitIndex);
+            Write(108,current); Write(120,*commitIndex); Write(228,int32_t(fov));
             Write(124,Read<uint32_t>(124)+1);
-            Write(*commitIndex==AllCars ? 192u : Table+unsigned(*commitIndex)*Stride+64,current);
+            if(*commitIndex!=FovOnly) Write(*commitIndex==AllCars ? 192u : Table+unsigned(*commitIndex)*Stride+64,current);
         }
         MemoryBarrier();
         InterlockedIncrement(reinterpret_cast<volatile LONG*>(view_+92));
@@ -147,6 +154,8 @@ public:
     using KeyDown=std::function<bool(unsigned)>;
     Menu(Channel channel,bool inputReady,KeyDown keyDown) : channel_(channel),inputReady_(inputReady),keyDown_(std::move(keyDown)) {
         for(unsigned key=0;key<256;++key) armed_[key]=!Key(key);
+        desktop_=channel_.Desktop();
+        fov_=savedFov_=openingFov_=std::clamp(channel_.LaunchFov(),MinFov,MaxFov);
     }
     Menu(const Menu&)=delete;
     Menu& operator=(const Menu&)=delete;
@@ -171,7 +180,7 @@ public:
         if(pressed&Open) {
             if(panel_) { Commit(); panel_=false; }
             else if(inputReady_) {
-                Commit(); opening_=current_; panel_=true; ++openings_; movement_.Reset();
+                Commit(); opening_=current_; openingFov_=fov_; panel_=true; ++openings_; movement_.Reset();
                 for(unsigned key:Navigation) armed_[key]=!Key(key); // Keys still held from before wait for a release.
             }
         }
@@ -186,6 +195,18 @@ public:
             if(held&NavRight) directions|=sideways_ ? Right : Forward;
         }
         if(inputReady_ && CanAdjustLocked() && movement_.Update(current_,directions,seconds)) { dirty_=!panel_; lastChange_=now; }
+        if(desktop_ && panel_ && inputReady_) {
+            // Page Up / Page Down or RB / LB: one degree per press, repeating while held (DiRT2VR).
+            const int direction=((Key(VK_PRIOR) || (held&FovWider)) ? 1 : 0)-((Key(VK_NEXT) || (held&FovNarrower)) ? 1 : 0);
+            int steps=0;
+            if(direction!=fovDirection_) { fovHeld_=0; steps=direction!=0; }
+            else if(direction) {
+                const double before=fovHeld_; fovHeld_+=std::min(seconds,.1);
+                steps=int(std::max(0.0,fovHeld_-.35)*12)-int(std::max(0.0,before-.35)*12);
+            }
+            fovDirection_=direction;
+            if(steps) fov_=std::clamp(fov_+direction*steps,MinFov,MaxFov);
+        } else fovDirection_=0;
         if(dirty_ && !directions && now-lastChange_>=300) Commit();
         Publish();
     }
@@ -212,7 +233,8 @@ public:
             const auto binding=channel_.Binding(k);
             if(key && key==binding.key && Modifiers()==binding.modifiers) block=blocked_[key]=true;
         }
-        if(panel_ && (key==VK_SHIFT || key==VK_LSHIFT || key==VK_RSHIFT || key==VK_RETURN || key==VK_ESCAPE || (key>=VK_LEFT && key<=VK_DOWN))) block=true;
+        if(panel_ && (key==VK_SHIFT || key==VK_LSHIFT || key==VK_RSHIFT || key==VK_RETURN || key==VK_ESCAPE || (key>=VK_LEFT && key<=VK_DOWN) ||
+                      (desktop_ && (key==VK_PRIOR || key==VK_NEXT)))) block=true;
         if(!Key(key)) blocked_[key]=false;
         return block;
     }
@@ -253,6 +275,10 @@ public:
     bool SidewaysHeld() const { Lock lock(mutex_); return sideways_; }
     bool CanAdjust() const { Lock lock(mutex_); return CanAdjustLocked(); }
     bool InputReady() const { Lock lock(mutex_); return inputReady_; }
+    bool Desktop() const { return desktop_; }
+    // The cockpit FOV offset now, and the change to add to the camera's own FOV (which holds LaunchFov).
+    int Fov() const { Lock lock(mutex_); return fov_; }
+    int FovChange() const { Lock lock(mutex_); return fov_-std::clamp(channel_.LaunchFov(),MinFov,MaxFov); }
     unsigned Openings() const { Lock lock(mutex_); return openings_; }
     int Active() const { Lock lock(mutex_); return active_; }
     Position Current() const { Lock lock(mutex_); return current_; }
@@ -294,14 +320,15 @@ private:
     }
     void Publish(bool commit=false) {
         const unsigned status=!inputReady_ ? InputUnavailable : !CanAdjustLocked() ? CarUnknown : Ready;
-        const int index=Universal() ? AllCars : active_;
-        channel_.Publish(panel_,status,active_,current_,commit ? &index : nullptr);
+        const int index=!CanAdjustLocked() ? FovOnly : Universal() ? AllCars : active_;
+        channel_.Publish(panel_,status,active_,current_,fov_,commit ? &index : nullptr);
     }
     void Commit() {
-        if(CanAdjustLocked() && current_!=saved_) { saved_=current_; Publish(true); }
+        const bool position=CanAdjustLocked() && current_!=saved_,fov=desktop_ && fov_!=savedFov_;
+        if(position || fov) { saved_=current_; savedFov_=fov_; Publish(true); }
         dirty_=false;
     }
-    void CancelPanel() { if(panel_) current_=opening_; panel_=false; movement_.Reset(); }
+    void CancelPanel() { if(panel_) { current_=opening_; fov_=openingFov_; } panel_=false; movement_.Reset(); fovDirection_=0; }
 
     Channel channel_;
     bool inputReady_;
@@ -310,7 +337,9 @@ private:
     Movement movement_;
     Position current_{},saved_{},opening_{};
     int selected_=-1,active_=-2;
-    bool panel_{},dirty_{},sideways_{},eligible_{};
+    bool panel_{},dirty_{},sideways_{},eligible_{},desktop_{};
+    int fov_{},savedFov_{},openingFov_{},fovDirection_{};
+    double fovHeld_{};
     bool armed_[256]{},blocked_[256]{};
     unsigned previousHeld_=~0u,openings_{};
     uint64_t lastUpdate_{},lastChange_{};
