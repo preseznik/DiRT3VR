@@ -197,7 +197,7 @@ def diagnostic_environment(directory: Path, *, scene_observer: bool = False, rep
                  "DIRT3VR_XR_PROTOTYPE", "DIRT3VR_XR_STOP_FILE", "XR_RUNTIME_JSON", "DIRT3VR_BACKGROUND_PLAY", "DIRT3VR_RESEARCH_PATCH", "DIRT3VR_RESEARCH_FILE_TRACE", "DIRT3VR_DIRECT_PRACTICE", "DIRT3VR_DIRECT_LAPS", "DIRT3VR_DIRECT_RETURN", "DIRT3VR_DIRECT_DIFFICULTY", "DIRT3VR_DIRECT_ASSISTS", "DIRT3VR_RESEARCH_LAPS", "DIRT3VR_SCREENSHOT_SECONDS", "DIRT3VR_RESEARCH_SETTINGS_TRACE",
                 "DIRT3VR_RESEARCH_STACKS", "DIRT3VR_RESEARCH_COUNT", "DIRT3VR_RESEARCH_PRESS_START_USER",
                 "DIRT3VR_RESEARCH_AUTO_SAVE_CHOICE", "DIRT3VR_RESEARCH_STORE_TRACE",
-                "DIRT3VR_RESEARCH_DATA_WATCH", "DIRT3VR_RESEARCH_GAME_LOG", "DIRT3VR_RESEARCH_VEHICLES"):
+                "DIRT3VR_RESEARCH_DATA_WATCH", "DIRT3VR_RESEARCH_GAME_LOG", "DIRT3VR_RESEARCH_VEHICLES", "DIRT3VR_RESEARCH_DEVICES", "DIRT3VR_RESEARCH_DEVICE_FIRST"):
         env.pop(flag, None)
     if background_play:
         env["DIRT3VR_BACKGROUND_PLAY"] = "1"
@@ -577,6 +577,10 @@ def main() -> int:
                         help="Research only: the research proxy logs the game's own log (e.g. the race load's vehicle list)")
     parser.add_argument("--vehicles", metavar="SECONDS",
                         help="Research only: the research proxy logs the race's vehicle name table at these seconds, e.g. 40,90")
+    parser.add_argument("--devices", action="store_true",
+                        help="Research only: the research proxy logs the input device lists and binds of a direct start")
+    parser.add_argument("--device-first", metavar="FAMILY",
+                        help="Research only (with --devices): move this device family to the front of the direct start's list")
     parser.add_argument("--recover", type=Path, metavar="JOURNAL")
     args = parser.parse_args()
     if args.replay_pair and not (args.serial_render and args.scene_observer):
@@ -720,6 +724,10 @@ def main() -> int:
             env["DIRT3VR_RESEARCH_GAME_LOG"] = "1"
         if args.vehicles:
             env["DIRT3VR_RESEARCH_VEHICLES"] = args.vehicles
+        if args.devices:
+            env["DIRT3VR_RESEARCH_DEVICES"] = "1"
+            if args.device_first:
+                env["DIRT3VR_RESEARCH_DEVICE_FIRST"] = args.device_first
         if args.settings_trace:
             env["DIRT3VR_RESEARCH_SETTINGS_TRACE"] = "1"
         if args.stacks:
