@@ -16,6 +16,7 @@
 #include "seat_panel.h"
 #include "seat_input.h"
 #include "hud_placement.h"
+#include "frame_timing.h"
 #include <windows.h>
 #include <MinHook.h>
 #include <array>
@@ -37,6 +38,7 @@ constexpr std::array<size_t,4> PoseOffsets{0x10,0x20,0x30,0x40};
 static_assert(SeatPanelImage::Width==XrRuntime::SeatPanelWidth && SeatPanelImage::Height==XrRuntime::SeatPanelHeight);
 
 void RuntimeLog(const char*) noexcept;
+std::wstring EnvironmentPath(const wchar_t* variable);
 struct PrototypeState {
     DWORD ownerThread=GetCurrentThreadId();
     DiagnosticLogger log{};
@@ -219,6 +221,7 @@ void Stop(PrototypeState& state,const char* reason) noexcept {
         }
     } catch(...) { }
     state.pendingFrame.reset(); EndPresentationFrame(); ResetFrontendShadowResources();
+    try { frametiming::Stop(); } catch(...) { } // Writes the final performance-summary.json.
     if(state.seat) state.seat->Inactive();
     state.seatActive=false; state.seatPresenter.Reset();
     state.hud.Reset(); state.hudPresenter.Reset(); state.presenter.Reset(); state.xr.Shutdown(); state.device.Reset();
@@ -393,6 +396,12 @@ bool Prepare(PrototypeState& state,ID3D11Texture2D* back) {
         Stop(state,"initialization"); return false;
     }
     state.device=device;
+    // The session's performance summary (#4896ffd3) for the launcher's Last VR session line.
+    if(InteractiveVrEnabled()) {
+        const auto folder=EnvironmentPath(L"DIRT3VR_LOG_DIR");
+        const bool timing=!folder.empty() && frametiming::Start(device.Get(),folder,state.resolution.width,state.resolution.height,state.resolution.scale);
+        RuntimeLog(timing ? "XR performance summary on" : "XR performance summary unavailable");
+    }
     if(state.log) state.log("XR prototype enabled headset=%ux%u render_scale=%u scene=%ux%u game_units_per_metre=1; first tracked focused frame required",
         state.resolution.width,state.resolution.height,state.resolution.scale,state.resolution.sceneWidth,state.resolution.sceneHeight);
     return true;
@@ -543,6 +552,7 @@ void VrBeforePresent(IDXGISwapChain* chain) noexcept {
                 ++state->presentationReports;
             }
             state->previousVideo=video; state->previousIntroScreen=introScreen; state->previousTransitions=transitions;
+            if(successful) frametiming::Submitted(!introScreen);
             if(successful) {
                 if(introScreen) state->history.Reset();
                 else state->history.Completed(state->pendingPlugin,state->boundary.Sequence(),state->xr.ReferenceRevision());
@@ -564,13 +574,16 @@ void VrBeforePresent(IDXGISwapChain* chain) noexcept {
         ComPtr<ID3D11Texture2D> back; std::filesystem::path directory;
         if(!AcquireDiagnosticBackbuffer(&back,directory) || !Prepare(*state,back.Get())) return;
         D3D11_TEXTURE2D_DESC desc{}; back->GetDesc(&desc);
+        const auto waitStarted=frametiming::Now();
         auto frame=state->xr.BeginScreenFrame(state->boundary.Sequence());
+        frametiming::Wait(waitStarted,state->xr.DisplayPeriod());
         if(!frame) { if(state->xr.Exiting()) Stop(*state,"runtime-unavailable"); return; }
         auto eye=frame.AcquireEye(0);
         const bool ready=eye && state->presenter.Draw(back.Get(),eye.Target(),eye.Width(),eye.Height()) && eye.Complete();
         if(!ready || !frame.SubmitScreen(float(desc.Width)/float(desc.Height))) {
             frame.Abort(); Stop(*state,"screen-frame-incomplete"); return;
         }
+        frametiming::Submitted(false);
         if(state->xr.ScreenSubmitted()<=3 || state->xr.ScreenSubmitted()%300==0)
             state->log("XR screen submitted=%llu aspect=%u/%u",state->xr.ScreenSubmitted(),desc.Width,desc.Height);
     } catch(...) { Stop(*state,"present-exception"); }
@@ -639,7 +652,9 @@ bool RenderVrScene(void* renderer,void* lists,void* a,void* b,void* context,void
         bool prime{};
         {
             if(state->pendingFrame) { Stop(*state,"unpresented-stereo-frame"); return false; }
+            const auto waitStarted=frametiming::Now();
             state->pendingFrame.emplace(state->xr.BeginFrame(state->boundary.Sequence()));
+            frametiming::Wait(waitStarted,state->xr.DisplayPeriod());
             auto& frame=*state->pendingFrame;
             waitMs=GetTickCount64()-started;
             if(!frame) {
@@ -676,7 +691,9 @@ bool RenderVrScene(void* renderer,void* lists,void* a,void* b,void* context,void
                 {
                     const auto eyeStarted=GetTickCount64();
                     HudDrawScope capture(state->hud,index);
+                    frametiming::Mark(index ? frametiming::RightBegin : frametiming::CenterBegin);
                     realInner(renderer,lists,a,b,context,scene,flags);
+                    frametiming::Mark(index ? frametiming::RightEnd : frametiming::CenterEnd);
                     eyeMs[index]=GetTickCount64()-eyeStarted;
                 }
                 restored&=nearPlane.Restore();

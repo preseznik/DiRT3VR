@@ -99,6 +99,8 @@ public:
     uint64_t Submitted() const noexcept { return submitted_; }
     uint64_t ScreenSubmitted() const noexcept { return screenSubmitted_; }
     DXGI_FORMAT Format() const noexcept { return format_; }
+    // The headset's frame period from the last xrWaitFrame, 0 before the first frame.
+    XrDuration DisplayPeriod() const noexcept { return displayPeriod_; }
     std::array<uint32_t,4> EyeDimensions() const noexcept;
 private:
     friend struct XrRuntimeTestAccess;
@@ -138,6 +140,7 @@ private:
     std::array<XrView,2> views_{{{XR_TYPE_VIEW},{XR_TYPE_VIEW}}};
     XrPosef reference_{{0,0,0,1},{0,0,0}};
     XrTime displayTime_{};
+    XrDuration displayPeriod_{};
     XrTime spaceChangeTime_{};
     DXGI_FORMAT format_=DXGI_FORMAT_UNKNOWN;
     uint64_t generation_{},lastGameSequence_{},submitted_{},screenSubmitted_{},referenceRevision_{};

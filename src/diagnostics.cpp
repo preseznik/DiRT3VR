@@ -6,6 +6,7 @@
 #include "background_play.h"
 #include "direct_practice.h"
 #include "screenshot.h"
+#include "frame_timing.h"
 #if defined(DIRT3VR_RESEARCH_PATCHES)
 #include "research_patch.h"
 #endif
@@ -198,7 +199,10 @@ bool Observed(IDXGISwapChain* chain) {
 HRESULT STDMETHODCALLTYPE Present(IDXGISwapChain* chain, UINT interval, UINT flags) {
     try { if(Observed(chain) && !(flags & DXGI_PRESENT_TEST)) VrBeforePresent(chain); } catch(...) { }
     try { if(Observed(chain) && !(flags & DXGI_PRESENT_TEST)) screenshot::BeforePresent(chain, Log); } catch(...) { }
+    const auto presentStarted = frametiming::Now();
     const HRESULT result = realPresent(chain, interval, flags);
+    // VR performance summary: ignored unless the render thread started one.
+    try { if(!(flags & DXGI_PRESENT_TEST)) frametiming::Present(presentStarted); } catch(...) { }
     try {
         if(!Observed(chain)) return result;
         auto& state = GetState();
