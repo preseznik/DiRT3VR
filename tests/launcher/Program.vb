@@ -251,7 +251,15 @@ Module Program
         Next
         Check(headset.MaximumScale = 157 AndAlso headset.SceneSize(157) = New Size(3768, 4082), "reported headset-specific maximum is usable")
         Reject(Sub() headset.SceneSize(158), "next percentage above the limit is refused")
-        Check(headset.Summary(300).Contains("unsupported"), "unsupported slider requests show a clear explanation")
+        ' #7f93667d: Launch VR runs a scale above the headset's maximum at the maximum and says so.
+        Check(headset.EffectiveScale(150) = 150 AndAlso headset.ScaleNote(150) = "" AndAlso headset.EffectiveScale(300) = 157, "a fitting scale is kept, a larger one lowered to the maximum")
+        Check(headset.Summary(300).Contains("Render: 3768 × 4082 per eye at 157%.") AndAlso headset.Summary(300).Contains("300% is above this headset's maximum, so Launch VR uses 157%"),
+              "the summary shows the scale Launch VR will use: " & headset.Summary(300))
+        Dim quest = New HeadsetResolution("vdxr", "Meta Quest 3", 3072, 3264)
+        Check(quest.EffectiveScale(150) = 125 AndAlso quest.SceneSize(quest.EffectiveScale(150)) = New Size(3840, 4080) AndAlso
+              quest.ScaleNote(150) = "VR render scale 150% is above the 125% this headset's 3072 × 3264 allows (4096 per dimension), so this session uses 125%.",
+              "iztok's 150% on a Quest 3 at 3072 × 3264 runs at 125% with a note: " & quest.ScaleNote(150))
+        Reject(Sub() quest.EffectiveScale(49), "scale limits still checked")
         For Each invalid In {49, 301, Integer.MaxValue}
             Reject(Sub() headset.SceneSize(invalid), "scale limits checked before arithmetic")
         Next
@@ -286,7 +294,8 @@ Module Program
         Check(start.Environment("DIRT3VR_HEADSET_WIDTH") = "2400" AndAlso start.Environment("DIRT3VR_HEADSET_HEIGHT") = "2600" AndAlso start.Environment("DIRT3VR_VR_RENDER_SCALE") = "150", "one plan supplies baseline and scene scale to native runtime")
         Check(Not start.Environment.ContainsKey("DIRT3VR_HEADSET_SCALE_PERCENT"), "obsolete output scale is never sent to the game")
         settings.VrRenderScale = 300
-        Reject(Sub() InteractiveSession.StartInfo(install, runtime, install.UserRoot, settings, headset), "unsafe scene request cannot reach the child")
+        Check(InteractiveSession.StartInfo(install, runtime, install.UserRoot, settings, headset).Environment("DIRT3VR_VR_RENDER_SCALE") = "157",
+              "an unsafe scene request reaches the child only as the headset's largest safe scale (#7f93667d)")
         settings.VrRenderScale = 100
         Reject(Sub() InteractiveSession.StartInfo(install, runtime, install.UserRoot, settings, Nothing), "missing headset cannot fall back to fixed dimensions")
         Reject(Sub() InteractiveSession.StartInfo(install, runtime, install.UserRoot, settings, New HeadsetResolution("steamvr", "Other", 2400, 2600)), "launch rejects a result from another runtime")

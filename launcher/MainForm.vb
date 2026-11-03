@@ -238,6 +238,7 @@ Public Class MainForm
                                                                   If(interactive.SeatsSkipped.Count > 0, " Cockpit changes (seat, comfort or field of view) not applied for " & String.Join(", ", interactive.SeatsSkipped) & ": its camera file is missing or not in the expected format.", "") &
                                                                   If(interactive.MotionBlurNote <> "", " " & interactive.MotionBlurNote, "") &
                                                                   If(interactive.TheaterNote <> "", " " & interactive.TheaterNote, "") &
+                                                                  If(interactive.ScaleNote <> "", " " & interactive.ScaleNote, "") &
                                                                   If(interactive.DrivingNote <> "", " " & interactive.DrivingNote, "")
                                                               launchProgress.Start()
                                                               ObserveInteractive()

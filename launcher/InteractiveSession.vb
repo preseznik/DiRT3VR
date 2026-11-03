@@ -19,6 +19,8 @@ Public Class InteractiveSession
     Public Property DrivingNote As String = ""
     ' Why SteamVR's desktop theater stayed on, or "" (#24867b69).
     Public Property TheaterNote As String = ""
+    ' The chosen VR render scale didn't fit this headset; the launch message says what ran.
+    Public Property ScaleNote As String = ""
     ' The SteamVR folder whose theater setting this session turned off, or Nothing.
     Private steamVrFolder As String
     ' The in-game seat menu's shared memory for this session (#bd820b32), or Nothing without a menu key or button.
@@ -44,14 +46,15 @@ Public Class InteractiveSession
         If Not Path.IsPathFullyQualified(directory) Then Throw New IOException("The session log path must be absolute.")
         settings.Validate()
         If headset Is Nothing OrElse headset.RuntimeMode <> runtime.Mode Then Throw New IOException("Query the selected headset before launching.")
-        headset.SceneSize(settings.VrRenderScale)
+        Dim scale = headset.EffectiveScale(settings.VrRenderScale)
+        headset.SceneSize(scale)
         Dim start = Session.DesktopStartInfo(context)
         start.Environment("DIRT3VR_DIAGNOSTICS") = "1"
         start.Environment("DIRT3VR_SCENE_DIAGNOSTICS") = "1"
         start.Environment("DIRT3VR_PRESENTATION_TRACE") = If(settings.DiagnosticLogging, "1", "0")
         start.Environment("DIRT3VR_XR_PROTOTYPE") = "1"
         start.Environment("DIRT3VR_XR_INTERACTIVE") = "1"
-        start.Environment("DIRT3VR_VR_RENDER_SCALE") = settings.VrRenderScale.ToString(Globalization.CultureInfo.InvariantCulture)
+        start.Environment("DIRT3VR_VR_RENDER_SCALE") = scale.ToString(Globalization.CultureInfo.InvariantCulture)
         start.Environment("DIRT3VR_RECENTER_KEY") = String.Format(Globalization.CultureInfo.InvariantCulture, "{0} {1}", settings.RecenterKey, settings.RecenterModifiers)
         start.Environment("DIRT3VR_RECENTER_TILT") = If(settings.RecenterKeepLevel, "0", "1")
         ' The HUD panel's distance and follow mode (#3652b9aa, Lens's contract).
@@ -125,7 +128,9 @@ Public Class InteractiveSession
             ' An OpenXR add-on that blocks the probe can be turned off for DiRT 3 with the player's approval.
             Dim preflight = Await VrLayerPreflight.ReadHeadsetAsync(context, Function(layers) VrRuntime.ReadHeadsetAsync(context, settings, selectedRuntime:=runtime, layers:=layers), confirmLayers)
             Dim headset = preflight.Headset
-            Dim scene = headset.SceneSize(settings.VrRenderScale)
+            ' A scale above what this headset allows runs at the largest that fits (#7f93667d).
+            Dim scale = headset.EffectiveScale(settings.VrRenderScale)
+            Dim scene = headset.SceneSize(scale)
             context.RequireClosed()
             ' Quality choices are shared with desktop play and kept in the game file (with a backup), so the
             ' VR transaction below records the quality-applied file as the original to restore.
@@ -162,8 +167,8 @@ Public Class InteractiveSession
             If settings.SeatMenuKey <> 0 OrElse settings.SeatMenuButton IsNot Nothing Then seatMenu = New SeatChannel(settings, seats.Offsets)
             game = Process.Start(StartInfo(context, runtime, directory, settings, headset, preflight.Bypasses, seatMenu?.Name))
             If game Is Nothing Then Throw New IOException("DiRT 3 could not start.")
-            Dim result As New InteractiveSession(context, game, directory, lease) With {.SeatsSkipped = seats.Skipped, .MotionBlurNote = blurNote, .DrivingNote = actionMaps.Note, .TheaterNote = theaterNote, .steamVrFolder = theaterFolder, .SeatMenu = seatMenu}
-            SafeFiles.SaveJson(Path.Combine(directory, "session.json"), New With {.schema = 1, .mode = "experimental-interactive", .processId = game.Id, .startedUtc = result.StartedUtc, .runtime = runtime.Mode, .vrRenderScale = settings.VrRenderScale, .vrQuality = GraphicsRecommendation.VrQuality(settings), .headsetWidth = headset.Width, .headsetHeight = headset.Height, .sceneWidth = scene.Width, .sceneHeight = scene.Height, .stereoVerified = False, .launchMode = settings.LaunchMode, .directRoute = If(settings.LaunchMode = "direct", settings.DirectRoute, 0), .directCar = If(settings.LaunchMode = "direct", settings.DirectCar, ""), .directLaps = If(settings.LaunchMode = "direct", DirectPractice.Laps(settings), 0), .directOpponents = If(settings.LaunchMode = "direct", DirectPractice.Opponents(settings), 0), .directOpponentCars = If(settings.LaunchMode = "direct", settings.DirectOpponentCars, ""), .directDifficulty = If(settings.LaunchMode = "direct", DirectPractice.Difficulty(settings), -1), .directAfterFinish = If(settings.LaunchMode = "direct", settings.DirectAfterFinish, ""), .directAssists = If(settings.LaunchMode = "direct", DirectPractice.Assists(settings), ""), .seatCars = seats.Offsets.Keys.ToArray(), .startInCockpit = settings.StartInCockpit, .cockpitSteady = settings.CockpitSteady, .hideDriver = settings.CockpitHideDriver, .hideCoDriver = settings.CockpitHideCoDriver, .seatSkipped = seats.Skipped.ToArray(), .motionBlurOff = effects IsNot Nothing, .motionBlurNote = blurNote, .drivingMaps = actionMaps.Devices.Select(Function(d) d.DeviceName & " (" & d.BaseFile & ")").ToArray(), .drivingSkipped = actionMaps.Skipped.ToArray(), .disabledApiLayers = preflight.Bypasses.Select(Function(layer) layer.LayerName).ToArray(), .layerWarning = preflight.Warning})
+            Dim result As New InteractiveSession(context, game, directory, lease) With {.SeatsSkipped = seats.Skipped, .MotionBlurNote = blurNote, .DrivingNote = actionMaps.Note, .TheaterNote = theaterNote, .ScaleNote = headset.ScaleNote(settings.VrRenderScale), .steamVrFolder = theaterFolder, .SeatMenu = seatMenu}
+            SafeFiles.SaveJson(Path.Combine(directory, "session.json"), New With {.schema = 1, .mode = "experimental-interactive", .processId = game.Id, .startedUtc = result.StartedUtc, .runtime = runtime.Mode, .vrRenderScale = scale, .requestedVrRenderScale = settings.VrRenderScale, .vrQuality = GraphicsRecommendation.VrQuality(settings), .headsetWidth = headset.Width, .headsetHeight = headset.Height, .sceneWidth = scene.Width, .sceneHeight = scene.Height, .stereoVerified = False, .launchMode = settings.LaunchMode, .directRoute = If(settings.LaunchMode = "direct", settings.DirectRoute, 0), .directCar = If(settings.LaunchMode = "direct", settings.DirectCar, ""), .directLaps = If(settings.LaunchMode = "direct", DirectPractice.Laps(settings), 0), .directOpponents = If(settings.LaunchMode = "direct", DirectPractice.Opponents(settings), 0), .directOpponentCars = If(settings.LaunchMode = "direct", settings.DirectOpponentCars, ""), .directDifficulty = If(settings.LaunchMode = "direct", DirectPractice.Difficulty(settings), -1), .directAfterFinish = If(settings.LaunchMode = "direct", settings.DirectAfterFinish, ""), .directAssists = If(settings.LaunchMode = "direct", DirectPractice.Assists(settings), ""), .seatCars = seats.Offsets.Keys.ToArray(), .startInCockpit = settings.StartInCockpit, .cockpitSteady = settings.CockpitSteady, .hideDriver = settings.CockpitHideDriver, .hideCoDriver = settings.CockpitHideCoDriver, .seatSkipped = seats.Skipped.ToArray(), .motionBlurOff = effects IsNot Nothing, .motionBlurNote = blurNote, .drivingMaps = actionMaps.Devices.Select(Function(d) d.DeviceName & " (" & d.BaseFile & ")").ToArray(), .drivingSkipped = actionMaps.Skipped.ToArray(), .disabledApiLayers = preflight.Bypasses.Select(Function(layer) layer.LayerName).ToArray(), .layerWarning = preflight.Warning})
             Session.WriteLaunchStatus(context, "starting", "Waiting for the game window and native headset output.", game.Id, result.StartedUtc, mode:="experimental-interactive")
             Return result
         Catch ex As Exception
