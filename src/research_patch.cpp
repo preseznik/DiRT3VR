@@ -294,6 +294,47 @@ void InstallGameLog(void (*log)(const char*,...)) {
     }).detach();
     log("Research game log: waiting for the log sink");
 }
+// The race's vehicle names, read rather than logged: a direct start doesn't reach the race
+// load's "Vehicle %2d: %s" lines (0x53d33b), but they come from 16-byte names at 0xf9fc08,
+// counted by [[0xf9fbfc]+0xb234]. DIRT3VR_RESEARCH_VEHICLES="s,s,..." reads them at those
+// seconds after startup (at most 8 times), through ReadProcessMemory so a bad pointer only
+// fails the read.
+void InstallVehicleNames(void (*log)(const char*,...)) {
+    char text[64]{};
+    const auto length=GetEnvironmentVariableA("DIRT3VR_RESEARCH_VEHICLES",text,sizeof(text));
+    if(!length || length>=sizeof(text)) return;
+    std::vector<unsigned> seconds;
+    for(char* cursor=text;*cursor && seconds.size()<8;) {
+        char* end{};
+        const auto value=std::strtoul(cursor,&end,10);
+        if(end==cursor || value<1 || value>900) { log("Research vehicles refused: %s",text); return; }
+        seconds.push_back(static_cast<unsigned>(value));
+        cursor=*end==',' ? end+1 : end;
+    }
+    std::thread([log,seconds] {
+        auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+        const auto read=[](const void* at,void* out,size_t bytes) {
+            SIZE_T copied{};
+            return ReadProcessMemory(GetCurrentProcess(),at,out,bytes,&copied) && copied==bytes;
+        };
+        unsigned waited=0;
+        for(const auto second:seconds) {
+            if(second>waited) { Sleep((second-waited)*1000); waited=second; }
+            uint8_t* race{};
+            int count=-1;
+            if(!read(image+(0xf9fbfc-0x400000),&race,sizeof(race)) || !race || !read(race+0xb234,&count,sizeof(count))) {
+                log("Research vehicles at %us: race data unreadable (%p)",second,static_cast<void*>(race));
+                continue;
+            }
+            log("Research vehicles at %us: count=%d",second,count);
+            for(int i=0;i<count && i<16;++i) {
+                char name[17]{};
+                if(read(image+(0xf9fc08-0x400000)+i*16,name,16)) log("Research vehicles at %us: %2d %s",second,i,name);
+            }
+        }
+    }).detach();
+    log("Research vehicles: reading at %u time(s)",static_cast<unsigned>(seconds.size()));
+}
 int* __fastcall WaitUpdate(void* self,void*,int* out) {
     auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
     InstallSaveSink(image);
@@ -624,6 +665,7 @@ void Apply(void (*log)(const char*,...)) {
         InstallCallCounter(log);
         InstallStackSampler(log);
         InstallGameLog(log);
+        InstallVehicleNames(log);
         char text[513]{};
         const auto length=GetEnvironmentVariableA("DIRT3VR_RESEARCH_PATCH",text,sizeof(text));
         if(!length) return;
