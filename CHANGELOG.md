@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The **Enable experimental VR** checkbox and the launcher's help no longer say VR works only with VDXR: SteamVR and other OpenXR runtimes work too.
 - The README is now a short quickstart, like DiRT2VR's (iztok). The launcher's **?** instructions cover every option.
 - The GitHub repository now holds only what builds the installer (iztok): development notes, tests and research tools stay with the developers. A fresh clone still builds the installer; `tools/build.ps1` skips the tests that aren't there.
 
