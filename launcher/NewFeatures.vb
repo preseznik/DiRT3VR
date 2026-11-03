@@ -8,15 +8,13 @@ Imports System.Windows.Forms
 ' stable releases never show marks, and the next version drops them.
 Public NotInheritable Class NewFeatures
     Public Const Mark As String = "*new*"
-    ' The release after 0.1.20. After each release, set the next version and remove the released entries
+    ' The release after 0.1.21. After each release, set the next version and remove the released entries
     ' (NewFeaturesTests fails while this build is past NextVersion).
-    Public Const NextVersion As String = "0.1.21"
+    Public Const NextVersion As String = "0.1.22"
 
     ' Control or section names, and the version that first ships them.
     Private Shared ReadOnly Since As New Dictionary(Of String, String)(StringComparer.Ordinal) From {
-        {"LauncherView", NextVersion}, {"SectionLaunchmode", NextVersion}, {"SectionQuality", NextVersion}, {"SectionDefaults", NextVersion},
-        {"GraphicsDefaults", NextVersion}, {"LiveInput", NextVersion}, {"RecenterKey", NextVersion}, {"RecenterDevice", NextVersion},
-        {"RecenterKeepLevel", NextVersion}, {"VrCompatibility", NextVersion}, {"SectionSeat", NextVersion}, {"SectionDrivingcontrols", NextVersion}}
+        {"SeatMenuKey", NextVersion}, {"SeatMenuButton", NextVersion}}
     Private Shared ReadOnly marked As New ConditionalWeakTable(Of Control, Object)
     ' Whether the running build is an experimental one (BuildInfo.Experimental); tests may set it.
     Public Shared Property ExperimentalBuild As Boolean = BuildInfo.Experimental
@@ -38,13 +36,14 @@ Public NotInheritable Class NewFeatures
         Return order < 0 OrElse (order = 0 AndAlso experimental)
     End Function
 
-    Public Shared Function NamesFor(buildVersion As String, experimental As Boolean) As IReadOnlyList(Of String)
-        Return Since.Where(Function(entry) Shown(buildVersion, experimental, entry.Value)).Select(Function(entry) entry.Key).ToArray()
+    ' features: the names and first versions to consider instead of the listed ones (for the tests).
+    Public Shared Function NamesFor(buildVersion As String, experimental As Boolean, Optional features As IReadOnlyDictionary(Of String, String) = Nothing) As IReadOnlyList(Of String)
+        Return If(features, Since).Where(Function(entry) Shown(buildVersion, experimental, entry.Value)).Select(Function(entry) entry.Key).ToArray()
     End Function
 
     ' Marks the listed controls under root for this build; returns the names marked.
-    Public Shared Function Apply(root As Control, Optional buildVersion As String = Nothing, Optional experimental As Boolean? = Nothing) As IReadOnlyList(Of String)
-        Dim names = NamesFor(If(buildVersion, BuildInfo.Version), experimental.GetValueOrDefault(ExperimentalBuild)).ToHashSet(StringComparer.Ordinal)
+    Public Shared Function Apply(root As Control, Optional buildVersion As String = Nothing, Optional experimental As Boolean? = Nothing, Optional features As IReadOnlyDictionary(Of String, String) = Nothing) As IReadOnlyList(Of String)
+        Dim names = NamesFor(If(buildVersion, BuildInfo.Version), experimental.GetValueOrDefault(ExperimentalBuild), features).ToHashSet(StringComparer.Ordinal)
         Dim done As New List(Of String)
         For Each item In Descendants(root).ToArray()
             If names.Contains(item.Name) Then MarkControl(item) : done.Add(item.Name)
