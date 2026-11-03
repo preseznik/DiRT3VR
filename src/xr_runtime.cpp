@@ -356,15 +356,20 @@ bool XrRuntime::EndFrame(uint64_t generation,bool submit,FrameMode mode,float as
     seat.subImage.swapchain=eyes_[3].handle;
     seat.subImage.imageRect.extent={int32_t(eyes_[3].width),int32_t(eyes_[3].height)};
     // GRID2VR's FPS / GPU strip: 1.5 m ahead and 45 cm below the view, or 60 cm below the
-    // recentered HUD position at 2 m.
+    // recentered HUD position at 2 m. It stays in front of the HUD panel, never in its plane:
+    // SteamVR flickered between the two where they overlapped (default 2 m HUD). Nearer, it
+    // keeps its angular size.
+    const float perfDistance=perfFollow_ ? 1.5f : 2.f;
+    const float perfScale=overlay && std::isfinite(distance) && distance>0 ? std::min(1.f,.95f*distance/perfDistance) : 1.f;
     XrCompositionLayerQuad perf{XR_TYPE_COMPOSITION_LAYER_QUAD};
     perf.space=space_; perf.eyeVisibility=XR_EYE_VISIBILITY_BOTH;
     perf.subImage.swapchain=eyes_[4].handle;
     perf.subImage.imageRect.extent={int32_t(eyes_[4].width),int32_t(eyes_[4].height)};
-    perf.size=perfFollow_ ? XrExtent2Df{.6f,.075f} : XrExtent2Df{.8f,.1f};
+    perf.size=perfFollow_ ? XrExtent2Df{.6f*perfScale,.075f*perfScale} : XrExtent2Df{.8f*perfScale,.1f*perfScale};
     if(complete && eyes_[4].completed) {
         try {
-            perf.pose=perfFollow_ ? math::OffsetPose(math::CenterPose(views_),{0,-.45f,-1.5f}) : math::OffsetPose(reference_,{0,-.6f,-2.f});
+            perf.pose=perfFollow_ ? math::OffsetPose(math::CenterPose(views_),{0,-.45f*perfScale,-1.5f*perfScale}) :
+                                    math::OffsetPose(reference_,{0,-.6f*perfScale,-2.f*perfScale});
             complete&=math::Finite(perf.pose.position);
         } catch(...) { complete=false; }
     }
