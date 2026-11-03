@@ -53,3 +53,19 @@ cockpit" option.
 
 Not yet checked: in VR (the headset adds its own tracked offset on top), and whether the
 `head-cam_reverse` view (look back) should follow the seat.
+
+## The player's car at runtime (#88b7f778)
+
+For per-car seats in the in-game menu the renderer needs the car being driven. DiRT 3 keeps
+the race's cars as 16-byte names in a static table at `0xf9fc08` (entry *i* at
+`0xf9fc08 + 16*i`), counted by `[[0xf9fbfc] + 0xb234]`; the race load's `Vehicle %2d: %s`
+log lines (`0x53d33b`) print them. Each name is `<car>_<livery> <tag>`, NUL-terminated, so
+the car code is the text before `_`.
+
+Run `20261103-084448` (research proxy, `run_benchmark.py --direct-practice --car frx
+--opponents 2 --vehicles 30,60,100`, no input): at 30, 60 and 100 s the count was 3 and the
+entries `frx_00 sn`, `stx_00 sn`, `mex_00 sn`, i.e. entry 0 is the player's car in a direct
+start (whose first car is always the player's). The race load's log lines are not reached in
+a direct start (run `20261103-084140`, `--game-log`), so the table, not the log, is the
+source. Not yet checked: a race started from the menus (whether the player is still entry 0,
+e.g. in a career event with the player on a later grid slot) and the table between races.
