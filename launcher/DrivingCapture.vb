@@ -110,6 +110,8 @@ Public NotInheritable Class DrivingCapture
         If Not valid Then Return Nothing
         Dim found = result(If(value.Xbox, DrivingControls.XboxAxes, DrivingControls.DirectAxes)(best))
         found.Calibration = If(centered, If(negative, "biDirectionalLower", "biDirectionalUpper"), If(negative, "uniDirectionalNegative", "uniDirectionalPositive"))
+        Dim initial = DrivingControls.DefaultCalibration(action)
+        found.DeadZone = initial.DeadZone : found.Saturation = initial.Saturation
         Return found
     End Function
 

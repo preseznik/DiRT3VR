@@ -162,6 +162,19 @@ Module DrivingControlsTests
         check(Refused(Sub() DrivingControls.LoadFile(presetFile)), "a damaged preset is refused")
         File.WriteAllText(presetFile, "{""Version"":2,""Bindings"":[]}")
         check(Refused(Sub() DrivingControls.LoadFile(presetFile)), "a newer controls version is refused")
+        ' A clutch axis saved at the earlier 0% / 100% loads with the clutch's default; other calibrations stay.
+        Dim clutchAxis As New DrivingBinding With {.Action = "Clutch", .Device = "Test wheel", .DeviceId = WheelId, .DeviceType = WheelProduct, .Input = "di_slider_0", .Calibration = "uniDirectionalNegative"}
+        Call New DrivingControls With {.Bindings = New List(Of DrivingBinding) From {clutchAxis, Changed(wheelThrottle, Sub(b) b.DeadZone = 0D),
+            New DrivingBinding With {.Action = "Clutch", .Device = "Separate shifter", .DeviceId = ShifterId, .DeviceType = ShifterProduct, .Input = "di_button_3"}}}.SaveFile(presetFile)
+        Dim migrated = DrivingControls.LoadFile(presetFile)
+        Dim movedClutch = migrated.Bindings.Single(Function(b) b.Input = "di_slider_0")
+        check(movedClutch.DeadZone = 0.1D AndAlso movedClutch.Saturation = 0.8D, "a clutch axis at 0% / 100% loads at 10% / 80%")
+        check(migrated.Bindings.Single(Function(b) b.Action = "Accelerate").Saturation = 1D AndAlso migrated.Bindings.Single(Function(b) b.Input = "di_button_3").Saturation = 1D,
+              "other axes and a clutch button keep 0% / 100%")
+        Call New DrivingControls With {.Bindings = New List(Of DrivingBinding) From {Changed(clutchAxis, Sub(b)
+                                                                                                                b.DeadZone = 0.05D : b.Saturation = 0.9D
+                                                                                                            End Sub)}}.SaveFile(presetFile)
+        check(DrivingControls.LoadFile(presetFile).Bindings.Single().Saturation = 0.9D, "a calibrated clutch keeps its calibration")
         check(File.ReadAllText(DrivingControls.SettingsPath(ctx)) = saved, "loading presets doesn't touch the saved controls")
     End Sub
 
@@ -270,6 +283,10 @@ Module DrivingControlsTests
         For Each bound In {DrivingCapture.Detect("Steer Right", wheel, rest, steerRight), DrivingCapture.Detect("Brake", wheel, rest, down), finite.Detected}
             check(bound IsNot Nothing AndAlso bound.DeadZone = 0D AndAlso bound.Saturation = 1D, "a bound axis starts at 0% dead zone and 100% saturation (" & bound?.Input & ")")
         Next
+        ' #16fa2aa3: the clutch starts as in DiRT 3's own wheel presets (G25/G27: 10% / 80%).
+        Dim clutch = DrivingCapture.Detect("Clutch", wheel, rest, down)
+        check(clutch IsNot Nothing AndAlso clutch.Calibration = "uniDirectionalNegative" AndAlso clutch.DeadZone = 0.1D AndAlso clutch.Saturation = 0.8D, "a bound clutch axis starts at 10% dead zone and 80% saturation")
+        check(SessionActionMaps.AxisOf(clutch).DeadZone = "0.1" AndAlso SessionActionMaps.AxisOf(clutch).Saturation = "0.8", "and the session map writes it so")
         ' #9ff647cf: which bound inputs are pressed or moved now, for the live highlight.
         Dim bindingFor = Function(action As String, input As String, calibration As String) New DrivingBinding With {.Action = action, .Device = "Wheel", .DeviceId = WheelId, .DeviceType = WheelProduct, .Input = input, .Calibration = calibration}
         Dim live = Copy(rest) : live.Buttons(3) = 1 : live.Pov(0) = 0UI : live.Values(0) = -0.5F : live.Values(1) = -0.5F
@@ -463,6 +480,15 @@ Module DrivingControlsTests
             check(Field(Of ComboBox)(calibration, "direction").SelectedIndex = 1 AndAlso calibration.Binding.DeadZone = 0.05D AndAlso calibration.Binding.Saturation = 0.9D, "calibration starts from the binding")
             Field(Of NumericUpDown)(calibration, "dead").Value = 10 : Field(Of NumericUpDown)(calibration, "saturationBox").Value = 80
             check(calibration.Binding.DeadZone = 0.1D AndAlso calibration.Binding.Saturation = 0.8D AndAlso calibration.Binding.Calibration = "uniDirectionalNegative", "calibration edits dead zone and saturation")
+        End Using
+        Using calibration As New DrivingCalibrationForm(New DrivingBinding With {.Action = "Clutch", .Device = "Wheel", .DeviceId = WheelId, .DeviceType = WheelProduct, .Input = "di_slider_0", .Calibration = "uniDirectionalNegative", .DeadZone = 0.3D, .Saturation = 0.95D})
+            calibration.ShowInTaskbar = False : calibration.StartPosition = FormStartPosition.Manual : calibration.Location = New Drawing.Point(-30000, -30000)
+            calibration.Show() : Application.DoEvents()
+            Dim reset = DirectCast(calibration.Controls.Find("CalibrationReset", True).Single(), Button)
+            check(reset.Text = "Reset to 10% / 80%", "the clutch's reset names its own default (" & reset.Text & ")")
+            reset.PerformClick()
+            check(calibration.Binding.DeadZone = 0.1D AndAlso calibration.Binding.Saturation = 0.8D, "and resets to it (" & calibration.Binding.DeadZone & " / " & calibration.Binding.Saturation & ")")
+            calibration.Close()
         End Using
     End Sub
 End Module
