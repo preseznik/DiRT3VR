@@ -47,6 +47,7 @@ Public Class MainForm
     Private capturingSeatMenu As Boolean
     Private seatMenuDevice As RecenterDeviceBinding
     Private seatMenuReader As SeatMenuWatcher
+    Private ReadOnly seatMenuDesktop As New CheckBox With {.Name = "SeatMenuOnDesktop", .Text = "Seat menu on the monitor too (Launch)", .AutoSize = True}
     Private ReadOnly experimental As New CheckBox With {.Name = "ExperimentalVR", .Text = "Enable experimental VR (VDXR)", .AutoSize = True}
     Private ReadOnly tabs As New ModernTabs With {.Name = "LauncherTabs", .Dock = DockStyle.Fill}
     ' Both can be selected and copied, for pasting into reports.
@@ -200,6 +201,7 @@ Public Class MainForm
                                                                                         If(desktopStartup.DrivingNote <> "", " " & desktopStartup.DrivingNote, "") &
                                                                                         If(desktopStartup.SeatsSkipped.Count > 0, " Cockpit changes (seat, comfort or field of view) not applied for " & String.Join(", ", desktopStartup.SeatsSkipped) & ": its camera file is missing or not in the expected format.", ""))
                                                                        launchProgress.Start()
+                                                                       If desktopStartup?.SeatMenu IsNot Nothing Then StartSeatMenuReader(selected.SeatMenuButton)
                                                                    Finally
                                                                        If desktopStartup IsNot Nothing Then ObserveDesktopStartup()
                                                                    End Try
@@ -655,6 +657,8 @@ Public Class MainForm
         menuDeviceRow.Controls.AddRange({seatMenuDeviceButton, clearSeatMenuDevice})
         Field(seat, "Seat menu button", menuDeviceRow)
         seat.Controls.Add(Info("During Launch VR this key, or the optional controller or wheel button, opens a seat menu in the headset; press it again to save and close. In the menu, the arrows, D-pad or hat move the seat, hold Shift or X to move sideways, Enter or A saves and Esc or B cancels. What you save is kept here. DiRT 3 also receives the key or button that opens the menu, so pick one the game doesn't use."))
+        seat.Controls.Add(seatMenuDesktop)
+        seat.Controls.Add(Info("Off by default. With it on, Launch also installs DiRT3VR's renderer for the session (removed after exit) so the same menu opens over the game on the monitor; there PgUp / RB and PgDn / LB also make the cockpit field of view wider or narrower, saved as Cockpit field of view (monitor)."))
         AddHandler seatMenuKeyButton.Click, Sub()
                                                 capturingSeatMenu = True
                                                 UpdateSeatMenuLabels()
@@ -667,7 +671,7 @@ Public Class MainForm
         AddHandler noSeatMenuKey.Click, Sub() ClearSeatMenuKey()
         AddHandler seatMenuDeviceButton.Click, Sub()
                                                    Using dialog As New RecenterDeviceForm(DrivingInput.LibraryPath(context), "Seat menu button",
-                                                                                          "Press the button on your controller, wheel or button box that should open the in-game seat menu. On an Xbox controller the D-pad, A, B and X are the menu's own buttons.")
+                                                                                          "Press the button on your controller, wheel or button box that should open the in-game seat menu. On an Xbox controller the D-pad, A, B, X, LB and RB are the menu's own buttons.")
                                                        If dialog.ShowDialog(Me) = DialogResult.OK AndAlso dialog.Binding IsNot Nothing Then SetSeatMenuDevice(dialog.Binding)
                                                    End Using
                                                End Sub
@@ -749,13 +753,15 @@ Public Class MainForm
         clearSeatMenuDevice.Enabled = seatMenuDevice IsNot Nothing
     End Sub
 
-    ' Reads controllers for the in-game seat menu while this VR session runs.
+    ' Reads controllers for the in-game seat menu while this session runs (VR, or the monitor menu).
     Private Sub StartSeatMenuReader(button As RecenterDeviceBinding)
         seatMenuReader?.Dispose() : seatMenuReader = Nothing
-        If interactive?.SeatMenu Is Nothing Then Return
+        Dim channel = If(interactive?.SeatMenu, desktopStartup?.SeatMenu)
+        If channel Is Nothing Then Return
         Try
-            Dim gameId = interactive.Game.Id
-            seatMenuReader = New SeatMenuWatcher(DrivingInput.LibraryPath(context), Handle, interactive.SeatMenu, button, Function() RecenterDeviceWatcher.InFront(gameId), interactive.LogDirectory)
+            Dim gameId = If(interactive IsNot Nothing, interactive.Game.Id, desktopStartup.Game.Id)
+            Dim logs = If(interactive IsNot Nothing, interactive.LogDirectory, desktopStartup.LogDirectory)
+            seatMenuReader = New SeatMenuWatcher(DrivingInput.LibraryPath(context), Handle, channel, button, Function() RecenterDeviceWatcher.InFront(gameId), If(logs = "", Nothing, logs))
             seatMenuReader.Start()
         Catch ex As Exception When TypeOf ex Is IOException OrElse TypeOf ex Is DllNotFoundException OrElse TypeOf ex Is BadImageFormatException OrElse TypeOf ex Is EntryPointNotFoundException
             notice.Text &= " Controllers can't be used in the seat menu: " & ex.Message
@@ -972,6 +978,7 @@ Public Class MainForm
         recenterDevice = settings.RecenterDevice : UpdateRecenterDeviceLabel()
         seatMenuKey = settings.SeatMenuKey : seatMenuModifiers = settings.SeatMenuModifiers : seatMenuDevice = settings.SeatMenuButton : capturingSeatMenu = False : UpdateSeatMenuLabels()
         toggleKey = settings.ToggleVrKey : toggleModifiers = settings.ToggleVrModifiers : toggleDevice = settings.ToggleVrDevice : capturingToggle = False : UpdateToggleLabels()
+        seatMenuDesktop.Checked = settings.SeatMenuOnDesktop
         recenterKeepLevel.Checked = settings.RecenterKeepLevel
         renderScale.Value = settings.VrRenderScale
         hudDistance.Value = CInt(settings.HudDistance * 2D) : hudFollow.Checked = settings.HudFollowView
@@ -1005,7 +1012,7 @@ Public Class MainForm
             .DesktopDisplayMode = {"game", "windowed", "fullscreen", "borderless"}(Math.Max(0, desktopMode.SelectedIndex)), .DesktopVSync = {"game", "off", "on"}(Math.Max(0, desktopVSync.SelectedIndex)), .SkipStartupMovies = skipStartupMovies.Checked,
             .RecenterKey = recenterKey, .RecenterModifiers = recenterModifiers, .RecenterDevice = recenterDevice, .RecenterKeepLevel = recenterKeepLevel.Checked,
             .SeatMenuKey = seatMenuKey, .SeatMenuModifiers = seatMenuModifiers, .SeatMenuButton = seatMenuDevice,
-            .ToggleVrKey = toggleKey, .ToggleVrModifiers = toggleModifiers, .ToggleVrDevice = toggleDevice,
+            .ToggleVrKey = toggleKey, .ToggleVrModifiers = toggleModifiers, .ToggleVrDevice = toggleDevice, .SeatMenuOnDesktop = seatMenuDesktop.Checked,
             .GraphicsQuality = desktopQuality.Values, .VrGraphicsQuality = vrQuality.Values,
             .LaunchMode = directPicker.Mode, .DirectRoute = directPicker.RouteId, .DirectCar = directPicker.CarCode, .DirectLaps = directPicker.LapCount,
             .DirectOpponents = directPicker.OpponentCount, .DirectOpponentCars = directPicker.OpponentCars, .DirectDifficulty = directPicker.DifficultyLevel, .DirectAfterFinish = directPicker.AfterFinish,
@@ -1103,10 +1110,10 @@ Public Class MainForm
 
     ' Saves from the in-game seat menu go into Controls → Seat while the VR session runs (#bd820b32).
     Private Sub PollSeatMenu()
-        Dim session = interactive
-        If session?.SeatMenu Is Nothing Then Return
+        Dim channel = If(interactive?.SeatMenu, desktopStartup?.SeatMenu)
+        If channel Is Nothing Then Return
         Try
-            ShowSeatCommit(SeatChannel.SaveCommit(context, session.SeatMenu))
+            ShowSeatCommit(SeatChannel.SaveCommit(context, channel))
         Catch ex As IOException
             notice.Text = "The seat position from the in-game menu couldn't be saved: " & ex.Message
         End Try
@@ -1116,10 +1123,13 @@ Public Class MainForm
     Public Sub ShowSeatCommit(commit As SeatCommit)
         If commit Is Nothing Then Return
         Dim clean = Not HasUnsavedSettings()
-        seatPicker.ApplyCommit(commit)
+        If Not commit.FovOnly Then seatPicker.ApplyCommit(commit)
+        If commit.Fov.HasValue Then seatPicker.ApplyFieldOfView(commit.Fov.Value)
         SeatChannel.Apply(settings, commit)
         If clean Then RememberSavedSettings()
-        notice.Text = "Seat position " & If(commit.AllCars, "for every car", "for " & EventCatalog.Current.FindCar(commit.Car).Name) & " saved from the in-game menu: " & commit.Offset.Describe() & "."
+        Dim fovText = If(commit.Fov.HasValue, "Cockpit field of view (monitor): " & If(commit.Fov.Value = 0, "DiRT 3's own", Math.Abs(commit.Fov.Value) & "° " & If(commit.Fov.Value > 0, "wider", "narrower")) & ".", "")
+        notice.Text = If(commit.FovOnly, "Saved from the in-game menu. " & fovText,
+                         "Seat position " & If(commit.AllCars, "for every car", "for " & EventCatalog.Current.FindCar(commit.Car).Name) & " saved from the in-game menu: " & commit.Offset.Describe() & "." & If(fovText = "", "", " " & fovText))
     End Sub
 
     Private Async Sub ObserveInteractive()
@@ -1153,6 +1163,8 @@ Public Class MainForm
             failed = True
         Finally
             launchProgress?.Dispose() : launchProgress = Nothing
+            seatMenuReader?.Dispose() : seatMenuReader = Nothing
+            If Not IsDisposed AndAlso owned.FinalSeatCommit IsNot Nothing Then ShowSeatCommit(owned.FinalSeatCommit)
             desktopStartup = Nothing
         End Try
         If Not IsDisposed Then
@@ -1407,7 +1419,7 @@ Public Class MainForm
                 "Toggle VR key (F6 by default) switches the headset between VR and a flat screen in front of you while DiRT 3 is in front, for a view that looks wrong or uncomfortable; press it again to go back. Every VR session starts in VR. Toggle VR button adds a controller, wheel or button-box button for the same, watched like the recenter button. No key removes the key. DiRT 3 also receives the key or button, so pick one the game doesn't use (F9 is its Replay UI key)." & vbCrLf & vbCrLf &
                 "Keep the horizon level when recentering is on by default: recentering turns the view to face forward but leaves pitch and roll alone. Turn it off if your headset sits tilted; the key or button then also makes the way you hold your head level. The automatic centering at the start of VR always keeps the horizon level." & vbCrLf & vbCrLf &
                 "Seat moves your eye point in the cockpit, for each car, up to 50 cm in each direction: sideways (+ left), height and forward. Pick the car (cars with their own position say adjusted), move the sliders, and Reset this car to go back to DiRT 3's seat. Same position for all cars uses one position everywhere. Launch VR writes each adjusted car's camera file (cars\models\<car>\cameras.xml) for the session and restores it after exit, like DiRT3VR's other temporary changes; a car whose camera file isn't in the expected format keeps its own seat, and the launcher names it. Also when playing on the monitor (off by default) does the same for Launch, including direct practice on the monitor; without it desktop play keeps DiRT 3's seat. Seat positions stay with this PC: settings profiles and Restore launcher defaults keep them." & vbCrLf & vbCrLf &
-                "Seat menu key (F11 by default) opens a seat menu in the headset during Launch VR; press it again to save and close. In the menu the arrows move the seat (hold Shift to move sideways), Enter saves and Esc cancels; on an Xbox controller the D-pad, X, A and B do the same, and on a wheel or button box its first hat moves the seat. Seat menu button adds a controller, wheel or button-box button that opens the menu too; the launcher reads it only while DiRT 3 is in front, without taking the device over. What you save is kept under Seat. No key removes the key; without a key or button there is no menu. DiRT 3 also receives the key or button that opens the menu, so pick one the game doesn't use." & vbCrLf & vbCrLf &
+                "Seat menu key (F11 by default) opens a seat menu in the headset during Launch VR; press it again to save and close. In the menu the arrows move the seat (hold Shift to move sideways), Enter saves and Esc cancels; on an Xbox controller the D-pad, X, A and B do the same, and on a wheel or button box its first hat moves the seat. Seat menu button adds a controller, wheel or button-box button that opens the menu too; the launcher reads it only while DiRT 3 is in front, without taking the device over. What you save is kept under Seat. No key removes the key; without a key or button there is no menu. Seat menu on the monitor too (off by default) opens the same menu over the game when you play with Launch: DiRT3VR's renderer is installed for that session and removed after exit, and there PgUp / RB and PgDn / LB also change the cockpit field of view, saved as Cockpit field of view (monitor). DiRT 3 also receives the key or button that opens the menu, so pick one the game doesn't use." & vbCrLf & vbCrLf &
                 "Cockpit field of view (monitor) makes the cockpit view wider or narrower when you play on the monitor, by up to 30° wider or 20° narrower than each car's own (50–55° in DiRT 3). Launch writes it into every installed car's camera file for the session and restores it after exit, as for the seat. VR always uses your headset's own field of view." & vbCrLf & vbCrLf &
                 "Steady cockpit camera in VR (on by default): DiRT 3 moves the cockpit camera by itself with G-forces (head and body movement), shakes it under acceleration and over bumps, and briefly distorts it on hard hits. In the headset your own head already moves the view, so Launch VR turns these off in every installed car's cockpit view for the session. Hide the driver in VR and Hide the co-driver in VR (off by default) hide those models in the cockpit view. All three are restored after exit with the seat changes." & vbCrLf & vbCrLf &
                 "Cockpit view only (off by default): DiRT 3 starts a race with the first view in each car's camera list (chase close, chase far, bumper, bonnet, then cockpit), so for the VR session DiRT3VR hides those four views in every car's camera file. Races then start in the cockpit and Change View stays there. It is restored after exit with the seat changes."),

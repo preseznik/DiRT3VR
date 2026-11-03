@@ -104,7 +104,9 @@ Public NotInheritable Class LastVrSession
         Dim info = Path.Combine(folder, "session.json")
         If Not File.Exists(info) Then Return True
         Try
-            Return SafeFiles.ReadJson(Of SessionMode)(info)?.Mode <> DesktopStartupSession.DirectMode
+            ' Desktop sessions (direct practice, the monitor seat menu) name a mode starting with "desktop-".
+            Dim mode = SafeFiles.ReadJson(Of SessionMode)(info)?.Mode
+            Return mode Is Nothing OrElse Not mode.StartsWith("desktop-", StringComparison.Ordinal)
         Catch ex As Exception When TypeOf ex Is System.Text.Json.JsonException OrElse TypeOf ex Is IOException OrElse TypeOf ex Is UnauthorizedAccessException
             Return True
         End Try

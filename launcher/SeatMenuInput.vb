@@ -8,12 +8,18 @@ Public NotInheritable Class SeatMenuInput
     Public Const SidewaysBit As Integer = 6
     Public Const UpBit As Integer = 7, DownBit As Integer = 8, LeftBit As Integer = 9, RightBit As Integer = 10
     Public Const SaveBit As Integer = 11, CancelBit As Integer = 12, OpenBit As Integer = 13
-    ' XInput buttons by DrivingInput index (= wButtons bit): D-pad up, down, left, right, A, B, X.
+    ' Monitor sessions only: the cockpit field of view wider (RB) and narrower (LB).
+    Public Const FovWiderBit As Integer = 14, FovNarrowerBit As Integer = 15
+    ' XInput buttons by DrivingInput index (= wButtons bit): D-pad up, down, left, right, A, B, X; then RB and LB,
+    ' which change the field of view in a monitor session.
     Private Shared ReadOnly XboxMenuButtons As Integer() = {0, 1, 2, 3, 12, 13, 14}
     Private Shared ReadOnly XboxMenuBits As Integer() = {UpBit, DownBit, LeftBit, RightBit, SaveBit, CancelBit, SidewaysBit}
+    Private Shared ReadOnly XboxFovButtons As Integer() = {9, 8}
+    Private Shared ReadOnly XboxFovBits As Integer() = {FovWiderBit, FovNarrowerBit}
     ' RecenterDeviceBinding.PovDirection (0 up, 1 right, 2 down, 3 left) → menu bits.
     Private Shared ReadOnly HatBits As Integer() = {UpBit, RightBit, DownBit, LeftBit}
     Public Const XboxHint As String = "Arrows / D-pad: move. Hold Shift / X: sideways. Enter / A: save. Esc / B: cancel."
+    Public Const XboxDesktopHint As String = "Arrows / D-pad: move. Hold Shift / X: sideways. PgUp / RB: wider, PgDn / LB: narrower. Enter / A: save. Esc / B: cancel."
 
     Private Sub New()
     End Sub
@@ -38,7 +44,8 @@ Public NotInheritable Class SeatMenuInput
 
     ' One device's contribution. open: the bound menu button (Nothing for none); menuOpen: what the renderer shows.
     ' Closed, only the bound button counts; open, an Xbox pad's D-pad, A, B and X and a wheel's first hat do too.
-    Public Shared Function Read(device As DrivingInput.Device, sample As DrivingInput.Sample, open As RecenterDeviceBinding, menuOpen As Boolean) As Contribution
+    ' desktop: a monitor session, where RB and LB also change the field of view.
+    Public Shared Function Read(device As DrivingInput.Device, sample As DrivingInput.Sample, open As RecenterDeviceBinding, menuOpen As Boolean, Optional desktop As Boolean = False) As Contribution
         Dim result = Contribution.None()
         If sample.Connected = 0UI Then Return result
         If Owns(open, device) Then
@@ -51,6 +58,12 @@ Public NotInheritable Class SeatMenuInput
                 If sample.Buttons(XboxMenuButtons(i)) <> 0 Then result.Held = result.Held Or (1UI << XboxMenuBits(i))
                 result.Buttons(0) = result.Buttons(0) Or (1UI << XboxMenuButtons(i))
             Next
+            If desktop Then
+                For i = 0 To XboxFovButtons.Length - 1
+                    If sample.Buttons(XboxFovButtons(i)) <> 0 Then result.Held = result.Held Or (1UI << XboxFovBits(i))
+                    result.Buttons(0) = result.Buttons(0) Or (1UI << XboxFovButtons(i))
+                Next
+            End If
         Else
             Dim direction = RecenterDeviceBinding.PovDirection(sample.Pov(0))
             If direction >= 0 Then result.Held = result.Held Or (1UI << HatBits(direction))
@@ -72,8 +85,8 @@ Public NotInheritable Class SeatMenuInput
     ' Why a button can't open the menu, or "" when it can: the menu's own buttons move, save and cancel.
     Public Shared Function Reserved(binding As RecenterDeviceBinding) As String
         Dim parts = binding.Input.Split(":"c)
-        If binding.Xbox AndAlso parts(0) = "button" AndAlso XboxMenuButtons.Contains(Integer.Parse(parts(1), Globalization.CultureInfo.InvariantCulture)) Then
-            Return "On an Xbox controller the D-pad, A, B and X move, save and cancel in the seat menu. Choose another button."
+        If binding.Xbox AndAlso parts(0) = "button" AndAlso XboxMenuButtons.Concat(XboxFovButtons).Contains(Integer.Parse(parts(1), Globalization.CultureInfo.InvariantCulture)) Then
+            Return "On an Xbox controller the D-pad, A, B, X, LB and RB move, save, cancel and set the field of view in the seat menu. Choose another button."
         End If
         If Not binding.Xbox AndAlso parts(0) = "hat" AndAlso parts(1) = "0" Then Return "The first hat moves the seat in the menu. Choose a button or another hat."
         Return ""
@@ -92,9 +105,9 @@ Public NotInheritable Class SeatMenuInput
     End Function
 
     ' The hint under the menu for the device in use.
-    Public Shared Function Hint(device As DrivingInput.Device, open As RecenterDeviceBinding) As String
-        If device Is Nothing OrElse device.Xbox Then Return XboxHint
-        Return "Arrows / hat: move. Hold Shift: sideways. Enter" & If(Owns(open, device), " / " & open.Control(), "") & ": save. Esc: cancel."
+    Public Shared Function Hint(device As DrivingInput.Device, open As RecenterDeviceBinding, Optional desktop As Boolean = False) As String
+        If device Is Nothing OrElse device.Xbox Then Return If(desktop, XboxDesktopHint, XboxHint)
+        Return "Arrows / hat: move. Hold Shift: sideways. " & If(desktop, "PgUp: wider, PgDn: narrower. ", "") & "Enter" & If(Owns(open, device), " / " & open.Control(), "") & ": save. Esc: cancel."
     End Function
 
     ' Publishes a choice into the channel (source 1 XInput with its slot, 2 DirectInput with its GUID).
@@ -207,10 +220,10 @@ Public NotInheritable Class SeatMenuWatcher
         If due AndAlso ((menuOpen AndAlso Not wasOpen) OrElse (Not menuOpen AndAlso open IsNot Nothing AndAlso Not input.Devices.Any(Function(d) SeatMenuInput.Owns(open, d)))) Then Find()
         wasOpen = menuOpen
         Dim devices = If(menuOpen, input.Devices, input.Devices.Where(Function(d) SeatMenuInput.Owns(open, d)))
-        Dim reads = devices.Select(Function(d) (Device:=d, Input:=SeatMenuInput.Read(d, input.Read(d), open, menuOpen))).ToList()
+        Dim reads = devices.Select(Function(d) (Device:=d, Input:=SeatMenuInput.Read(d, input.Read(d), open, menuOpen, channel.Desktop))).ToList()
         Dim chosen = tracker.Update(reads, menuOpen, focused(), open)
         SeatMenuInput.Publish(channel, chosen)
-        channel.WriteHint(SeatMenuInput.Hint(chosen.Device, open))
+        channel.WriteHint(SeatMenuInput.Hint(chosen.Device, open, channel.Desktop))
         Dim held = chosen.Input.Held
         If (held And Not lastHeld And (1UI << SeatMenuInput.OpenBit)) <> 0UI Then _Presses += 1
         lastHeld = held

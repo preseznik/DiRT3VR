@@ -220,6 +220,9 @@ Public Class LauncherSettings
     Public Property SeatMenuModifiers As Integer
     ' A controller or wheel button that also opens the seat menu (#c137c681); machine-specific like RecenterDevice.
     Public Property SeatMenuButton As RecenterDeviceBinding
+    ' The in-game seat menu on the monitor too (Launch; Lens's renderer side on #35826889): Launch then installs
+    ' DiRT3VR's renderer for the session. Off by default; it needs a seat menu key or button.
+    Public Property SeatMenuOnDesktop As Boolean
     ' Toggle VR (#288ceec1; Lens's renderer side): switches between stereo and a flat virtual screen while
     ' playing. F6 by default (DiRT2VR's F9 is DiRT 3's Replay UI On Off); 0 = no key. Kept with the seat menu key.
     Public Const DefaultToggleVrKey As Integer = 117

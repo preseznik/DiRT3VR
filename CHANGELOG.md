@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The in-game seat menu on the monitor too (#c137c681, launcher side; needs Lens's renderer side): turn on **Controls → Seat → Seat menu on the monitor too (Launch)**, and the seat menu key or button opens the same menu over the game when you play with **Launch**. There **PgUp** / **RB** and **PgDn** / **LB** also make the cockpit view wider or narrower. Launch installs DiRT3VR's renderer for those sessions only and removes it after exit.
 - Direct practice now drives with your wheel or controller (#16fa2aa3). A direct start skips DiRT 3's Press Start screen, so it used to pick the keyboard and ignore a wheel such as the G920. It now uses the device you bound steering to under **Controls → Driving controls**.
 - The **Live input and force feedback** window now opens tall enough to show your controller or wheel down to **Test rumble** / **Test force feedback**, also with Windows display scaling above 100% (#2a6e6f28). With several devices it fills the screen and scrolls.
 - Launch VR no longer refuses a VR render scale that is too high for your headset (#7f93667d). DiRT3VR can render at most 4096 pixels per side, so with a Quest 3 at Virtual Desktop's 3072 × 3264 the most is 125%. A higher scale now runs at that maximum, and the launch message and **Graphics → VR rendering** say so.
