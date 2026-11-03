@@ -155,8 +155,12 @@ event results) passes `auto_save_check`, a `StateDecisionBool` on the data flag
 (`0x59f3cc`). Run 96 (`--direct-return --data-watch`, research renderer reading the flags
 through the game's own lookup `0xd04300`): `auto_save=0`, `hasEverSaved=0` in the race and
 in the main menu after the return; the Steam Cloud saves were unchanged (runs 95–96). So
-the menus after a return should not save over the player's profile. Positive control (a
-normal start reading `auto_save=1` after its profile load) still to do.
+the menus after a return should not save over the player's profile. Positive control, run
+`20261103-143112` (`--normal-start --data-watch`, Enter at 40 s and 46 s as Press Start and
+its prompt, focus test with iztok's OK): `auto_save=0` and `hasEverSaved=0` until the profile
+loads, then `auto_save=1` (59 s) and both 1 at 70 and 85 s; protected files unchanged. So the
+probe reads the right flags, and the menus after a direct-practice return (both 0, run 96)
+cannot autosave over the player's profile (#f2d0f352).
 
 Pause is blocked deliberately: the race's next-state check (`0x51f3f0`) returns "pause"
 when a pause is requested, except while the benchmark flag is set (`0x51f456`). Direct
