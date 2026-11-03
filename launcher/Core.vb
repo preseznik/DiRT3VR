@@ -208,6 +208,9 @@ Public Class LauncherSettings
     Public Const DefaultHudDistance As Decimal = 2D
     Public Property HudDistance As Decimal = DefaultHudDistance
     Public Property HudFollowView As Boolean
+    ' FPS and GPU usage in the headset (#4896ffd3; Lens's renderer side), and whether that display follows the view.
+    Public Property PerfDisplay As Boolean
+    Public Property PerfFollowView As Boolean
     ' Seat positions on the monitor too (Launch, #b330cc4f): the same camera files, journaled for a desktop session.
     Public Property SeatOnDesktop As Boolean
     ' The in-game seat menu's key (#bd820b32, docs/seat-channel.md): opens it, and saves and closes it; 0 = none.
