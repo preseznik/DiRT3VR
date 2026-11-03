@@ -75,6 +75,17 @@ class SerialRenderTransformTests(unittest.TestCase):
             with self.subTest(unsupported=unsupported), self.assertRaises(ValueError):
                 diagnostic_hardware(original, multisampling=unsupported)
 
+    def test_diagnostic_input_sets_the_requested_size(self):
+        original = (b'<hardware_settings_config version="56"><cpu><threadStrategy parallelUpdateRender="true"/></cpu>'
+                    b'<graphics_card><directx forcedx9="true"/><stereo enabled="true"/><resolution width="1920" height="1080" fullscreen="true"/></graphics_card>'
+                    b'</hardware_settings_config>')
+        resolution = ET.fromstring(diagnostic_hardware(original, size=(3072, 3264), multisampling="4xmsaa")).find("graphics_card/resolution")
+        self.assertEqual((resolution.get("width"), resolution.get("height"), resolution.get("fullscreen"), resolution.get("multisampling")),
+                         ("3072", "3264", "false", "4xmsaa"))
+        for unsupported in ((639, 720), (1280, 4097), (1280,), (1280.0, 720)):
+            with self.subTest(unsupported=unsupported), self.assertRaises(ValueError):
+                diagnostic_hardware(original, size=unsupported)
+
 
 class SerialRenderTransactionTests(unittest.TestCase):
     def setUp(self):

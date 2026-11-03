@@ -216,7 +216,8 @@ def diagnostic_environment(directory: Path, *, scene_observer: bool = False, rep
 
 
 def summarize_benchmark(path: Path, *, serial_render: bool = False, track: str = "aspen", route: str = "route_0",
-                        cars_expected: tuple[str, ...] = ("frx",), multisampling: str = "off") -> dict:
+                        cars_expected: tuple[str, ...] = ("frx",), multisampling: str = "off",
+                        size: tuple[int, int] = (1280, 720)) -> dict:
     """Check game-produced results instead of treating a filename as acceptance."""
     root = ET.parse(path).getroot()
     tracks = root.findall("track")
@@ -231,7 +232,7 @@ def summarize_benchmark(path: Path, *, serial_render: bool = False, track: str =
     hardware = root.find("hardware_settings_config")
     expected = {"graphics_card/directx": {"forcedx9": "false"},
                 "graphics_card/stereo": {"enabled": "false"},
-                "graphics_card/resolution": {"width": "1280", "height": "720", "fullscreen": "false",
+                "graphics_card/resolution": {"width": str(size[0]), "height": str(size[1]), "fullscreen": "false",
                                              "vsync": "0", "multisampling": multisampling}}
     if serial_render:
         expected["cpu/threadStrategy"] = {"parallelUpdateRender": "false"}
@@ -253,7 +254,8 @@ def summarize_benchmark(path: Path, *, serial_render: bool = False, track: str =
             "observedConfiguration": observed, "configurationMismatches": mismatches}
 
 
-def diagnostic_hardware(data: bytes, *, serial_render: bool = False, multisampling: str = "off") -> bytes:
+def diagnostic_hardware(data: bytes, *, serial_render: bool = False, multisampling: str = "off",
+                        size: tuple[int, int] = (1280, 720)) -> bytes:
     """Build the unique diagnostic input without writing the user's settings file."""
     root = ET.fromstring(data)
     required = ["cpu/threadStrategy", "graphics_card/directx", "graphics_card/stereo", "graphics_card/resolution"]
@@ -265,7 +267,9 @@ def diagnostic_hardware(data: bytes, *, serial_render: bool = False, multisampli
     root.find("graphics_card/stereo").set("enabled", "false")
     if multisampling not in MULTISAMPLING:
         raise ValueError(f"Unsupported multisampling {multisampling!r}; no files changed")
-    for key, value in {"width": "1280", "height": "720", "fullscreen": "false", "vsync": "0", "multisampling": multisampling}.items():
+    if len(size) != 2 or not all(isinstance(side, int) and 640 <= side <= 4096 for side in size):
+        raise ValueError(f"Unsupported size {size!r}; no files changed")
+    for key, value in {"width": str(size[0]), "height": str(size[1]), "fullscreen": "false", "vsync": "0", "multisampling": multisampling}.items():
         root.find("graphics_card/resolution").set(key, value)
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
@@ -436,6 +440,16 @@ def parse_seat_offset(text: str) -> tuple[float, float, float]:
     return values
 
 
+def parse_size(text: str) -> tuple[int, int]:
+    try:
+        width, height = (int(part) for part in text.lower().split("x"))
+    except ValueError:
+        raise argparse.ArgumentTypeError("use WIDTHxHEIGHT, e.g. 3072x3264") from None
+    if not (640 <= width <= 4096 and 640 <= height <= 4096):
+        raise argparse.ArgumentTypeError("each side between 640 and 4096")
+    return width, height
+
+
 def choose_scene(route_text: str | None, car: str | None, opponents: int) -> dict:
     """Pick the benchmark track and cars from the event catalog (default: Aspen route_0 with frx, no opponents)."""
     if route_text is None and car is None and not opponents:
@@ -518,6 +532,8 @@ def main() -> int:
                         help="Anisotropic filtering level for the game's samplers (DIRT3VR_ANISOTROPY; 1 = trilinear); unset leaves them as the game made them")
     parser.add_argument("--msaa", choices=MULTISAMPLING, default="off",
                         help="The game's MSAA (graphics_card/resolution@multisampling) for this run; default off, as VR sessions write it")
+    parser.add_argument("--size", type=parse_size, default=(1280, 720), metavar="WIDTHxHEIGHT",
+                        help="The game's windowed size for this run, e.g. 3072x3264 for a headset's pixel count; default 1280x720")
     parser.add_argument("--research-patch", metavar="RVA:ORIGINAL:REPLACEMENT",
                         help="Research only: in-memory code change applied by the research proxy (build/native/bin/research/d3d11.dll, pass it with --proxy) after its original bytes match")
     parser.add_argument("--screenshots", metavar="SECONDS",
@@ -618,6 +634,8 @@ def main() -> int:
         parser.error(str(error) or "no car for that route's discipline")
     if args.direct_laps and not args.direct_practice:
         parser.error("--direct-laps requires --direct-practice")
+    if args.size != (1280, 720) and args.replay_pair:
+        parser.error("--replay-pair checks 1280x720 eye images; use it without --size")
     if args.player_hardware_settings and args.serial_render:
         parser.error("--player-hardware-settings cannot be combined with --serial-render, which needs a modified copy")
     if args.xr_runtime and not 120 <= args.seconds <= 300:
@@ -647,7 +665,8 @@ def main() -> int:
     proxy_bytes = args.proxy.read_bytes()
     hardware_source = hardware_dir / "hardware_settings_config.xml"
     no_links(hardware_source)
-    hardware_bytes = diagnostic_hardware(hardware_source.read_bytes(), serial_render=args.serial_render, multisampling=args.msaa)
+    hardware_bytes = diagnostic_hardware(hardware_source.read_bytes(), serial_render=args.serial_render, multisampling=args.msaa,
+                                         size=args.size)
     restrictions = preflight_serial_render(game) if args.serial_render else None
     xr_runtime = preflight_xr_manifest(args.xr_runtime) if args.xr_runtime else None
     spectator = preflight_replacement(game, SPECTATOR_NAME) if args.spectator_human_switch else None
@@ -672,7 +691,7 @@ def main() -> int:
                  "stereo": False, "sceneObserver": args.scene_observer,
                  "serialRender": args.serial_render, "replayPair": args.replay_pair,
                  "xrRuntime": xr_runtime, "backgroundPlay": args.background_play, "researchPatch": args.research_patch,
-                 "spectatorHumanSwitch": args.spectator_human_switch, "noBloom": args.no_bloom, "seatCockpit": args.seat_cockpit if args.seat_test is not None else None,"anisotropy": args.anisotropy, "multisampling": args.msaa, "directPractice": args.direct_practice,
+                 "spectatorHumanSwitch": args.spectator_human_switch, "noBloom": args.no_bloom, "seatCockpit": args.seat_cockpit if args.seat_test is not None else None,"anisotropy": args.anisotropy, "multisampling": args.msaa, "size": list(args.size), "directPractice": args.direct_practice,
                  "playerHardwareSettings": args.player_hardware_settings, "directLaps": args.direct_laps, "directReturn": args.direct_return, "scene": scene,
                  "durationSeconds": args.seconds}
     if restrictions:
@@ -878,7 +897,7 @@ def main() -> int:
                 report["errors"].append("Background play was requested but the proxy did not install it")
         counts = [int(x) for x in re.findall(r"Present count=(\d+)", logs)]
         report["lastLoggedPresentCount"] = max(counts, default=0)
-        report["requestedSwapchainObserved"] = bool(re.search(r"Swapchain.*size=1280x720\b", logs))
+        report["requestedSwapchainObserved"] = bool(re.search(rf"Swapchain.*size={args.size[0]}x{args.size[1]}\b", logs))
         if args.replay_pair:
             report["replaySummary"] = summarize_replay(logs, run)
             report["errors"].extend(report["replaySummary"]["errors"])
@@ -892,7 +911,8 @@ def main() -> int:
                 kept = run / result.name
                 kept.write_bytes(result.read_bytes())
                 summary = summarize_benchmark(kept, serial_render=args.serial_render, track=scene["track"],
-                                              route=scene["route"], cars_expected=tuple(scene["cars"]), multisampling=args.msaa)
+                                              route=scene["route"], cars_expected=tuple(scene["cars"]), multisampling=args.msaa,
+                                              size=args.size)
                 # The result is this run's own file (its run id is in the name); keep only the copy.
                 if kept.read_bytes() == result.read_bytes():
                     result.unlink()

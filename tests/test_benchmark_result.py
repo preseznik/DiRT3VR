@@ -8,7 +8,8 @@ from run_benchmark import benchmark_completed, summarize_benchmark
 
 
 class BenchmarkResultTests(unittest.TestCase):
-    def summarize(self, parallel="false", route="route_0", *, serial_render=True, written="off", requested="off"):
+    def summarize(self, parallel="false", route="route_0", *, serial_render=True, written="off", requested="off",
+                  written_size=(1280, 720), requested_size=(1280, 720)):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "result.xml"
             path.write_text(f'''<benchmark directx_version="11">
@@ -16,9 +17,9 @@ class BenchmarkResultTests(unittest.TestCase):
                 <results samples="100"/></track>
               <hardware_settings_config><cpu><threadStrategy parallelUpdateRender="{parallel}"/></cpu>
                 <graphics_card><directx forcedx9="false"/><stereo enabled="false"/>
-                  <resolution width="1280" height="720" fullscreen="false" vsync="0" multisampling="{written}"/>
+                  <resolution width="{written_size[0]}" height="{written_size[1]}" fullscreen="false" vsync="0" multisampling="{written}"/>
                 </graphics_card></hardware_settings_config></benchmark>''')
-            return summarize_benchmark(path, serial_render=serial_render, multisampling=requested)
+            return summarize_benchmark(path, serial_render=serial_render, multisampling=requested, size=requested_size)
 
     def test_requested_scene_and_configuration_are_verified(self):
         result = self.summarize()
@@ -39,6 +40,13 @@ class BenchmarkResultTests(unittest.TestCase):
         self.assertFalse(result["requestedConfigurationVerified"])
         self.assertEqual(result["configurationMismatches"], ["graphics_card/resolution/@multisampling"])
         self.assertEqual(result["observedConfiguration"]["graphics_card/resolution/@multisampling"], "off")
+
+    def test_requested_size_must_be_the_one_the_game_ran(self):
+        self.assertTrue(self.summarize(written_size=(3072, 3264), requested_size=(3072, 3264))["requestedConfigurationVerified"])
+        result = self.summarize(written_size=(1280, 720), requested_size=(3072, 3264))
+        self.assertFalse(result["requestedConfigurationVerified"])
+        self.assertEqual(result["configurationMismatches"],
+                         ["graphics_card/resolution/@width", "graphics_card/resolution/@height"])
 
     def test_wrong_scene_is_not_benchmark_acceptance(self):
         result = self.summarize(route="route_9")
