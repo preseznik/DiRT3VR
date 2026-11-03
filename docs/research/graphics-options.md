@@ -151,9 +151,11 @@ none has been tried in the game:
 
 DiRT 3 has **no anisotropic filtering and no bloom setting**. There is nothing in the options,
 restrictions or config files, and no `pc_gfx_*` menu string. `dirt3_game.exe` contains bloom shader
-names (`bloomPrevalence`, `bloom.combine2`), so bloom is part of post-processing. Both
-#15714dd2 (anisotropic filtering) and #3c6d6ffa (bloom on/off) therefore need renderer
-(proxy) work, such as a sampler-state override or skipping the bloom passes. They cannot be done by writing the XML.
+names (`bloomPrevalence`, `bloom.combine2`), so bloom is part of post-processing.
+#15714dd2 (anisotropic filtering) therefore needs renderer (proxy) work, a sampler-state
+override (`src/anisotropic_filter.cpp`); it cannot be done by writing the XML. #3c6d6ffa (bloom
+on/off) turned out to be data after all: the post-processing effect files carry the bloom mixes
+([bloom](bloom.md)).
 
 ## Notes for the launcher graphics UI (#86b1ad13, #8df24f27)
 
