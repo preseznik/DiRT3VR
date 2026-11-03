@@ -29,6 +29,15 @@ Public Class MainForm
     Private ReadOnly recenterKeepLevel As New CheckBox With {.Name = "RecenterKeepLevel", .Text = "Keep the horizon level when recentering", .AutoSize = True, .Checked = True}
     Private recenterDevice As RecenterDeviceBinding
     Private recenterWatcher As RecenterDeviceWatcher
+    ' The in-game seat menu's key and controller button (#c137c681), and its controller reader during VR.
+    Private ReadOnly seatMenuKeyButton As New Button With {.Name = "SeatMenuKey", .AutoSize = True, .AccessibleName = "Seat menu key"}
+    Private ReadOnly noSeatMenuKey As New Button With {.Name = "ClearSeatMenuKey", .Text = "No key", .AutoSize = True}
+    Private ReadOnly seatMenuDeviceButton As New Button With {.Name = "SeatMenuButton", .AutoSize = True}
+    Private ReadOnly clearSeatMenuDevice As New Button With {.Name = "ClearSeatMenuButton", .Text = "Clear", .AutoSize = True}
+    Private seatMenuKey As Integer = LauncherSettings.DefaultSeatMenuKey, seatMenuModifiers As Integer
+    Private capturingSeatMenu As Boolean
+    Private seatMenuDevice As RecenterDeviceBinding
+    Private seatMenuReader As SeatMenuWatcher
     Private ReadOnly experimental As New CheckBox With {.Name = "ExperimentalVR", .Text = "Enable experimental VR (VDXR)", .AutoSize = True}
     Private ReadOnly tabs As New ModernTabs With {.Name = "LauncherTabs", .Dock = DockStyle.Fill}
     ' Both can be selected and copied, for pasting into reports.
@@ -192,6 +201,7 @@ Public Class MainForm
                                                               Dim selected = CurrentSettings()
                                                               interactive = Await InteractiveSession.StartAsync(context, selected, AddressOf ConfirmLayerBypass)
                                                               StartRecenterWatcher(selected.RecenterDevice)
+                                                              StartSeatMenuReader(selected.SeatMenuButton)
                                                               UpdateLayerSummary()
                                                               settings = selected
                                                               RememberSavedSettings()
@@ -556,12 +566,85 @@ Public Class MainForm
         Dim seat = Section(content, "Seat")
         seat.Controls.Add(Info("Moves your eye point in the cockpit, per car, for example to match the headset to your seat and rig: sideways (+ left), height and forward. Launch VR applies it, and Launch too when Also when playing on the monitor is on: DiRT3VR writes the car's camera file for the session and restores it after exit."))
         seatPicker = New SeatPicker(seat)
+        Dim menuKeyRow As New FlowLayoutPanel With {.AutoSize = True, .WrapContents = True, .Margin = New Padding(0)}
+        menuKeyRow.Controls.AddRange({seatMenuKeyButton, noSeatMenuKey})
+        Field(seat, "Seat menu key", menuKeyRow)
+        Dim menuDeviceRow As New FlowLayoutPanel With {.AutoSize = True, .WrapContents = True, .Margin = New Padding(0)}
+        menuDeviceRow.Controls.AddRange({seatMenuDeviceButton, clearSeatMenuDevice})
+        Field(seat, "Seat menu button", menuDeviceRow)
+        seat.Controls.Add(Info("During Launch VR this key, or the optional controller or wheel button, opens a seat menu in the headset; press it again to save and close. In the menu, the arrows, D-pad or hat move the seat, hold Shift or X to move sideways, Enter or A saves and Esc or B cancels. What you save is kept here. DiRT 3 also receives the key or button that opens the menu, so pick one the game doesn't use."))
+        AddHandler seatMenuKeyButton.Click, Sub()
+                                                capturingSeatMenu = True
+                                                UpdateSeatMenuLabels()
+                                                notice.Text = "Press the new seat menu key, with Ctrl, Alt or Shift if you like. Esc cancels."
+                                            End Sub
+        AddHandler seatMenuKeyButton.LostFocus, Sub()
+                                                    If Not capturingSeatMenu Then Return
+                                                    capturingSeatMenu = False : UpdateSeatMenuLabels()
+                                                End Sub
+        AddHandler noSeatMenuKey.Click, Sub() ClearSeatMenuKey()
+        AddHandler seatMenuDeviceButton.Click, Sub()
+                                                   Using dialog As New RecenterDeviceForm(DrivingInput.LibraryPath(context), "Seat menu button",
+                                                                                          "Press the button on your controller, wheel or button box that should open the in-game seat menu. On an Xbox controller the D-pad, A, B and X are the menu's own buttons.")
+                                                       If dialog.ShowDialog(Me) = DialogResult.OK AndAlso dialog.Binding IsNot Nothing Then SetSeatMenuDevice(dialog.Binding)
+                                                   End Using
+                                               End Sub
+        AddHandler clearSeatMenuDevice.Click, Sub() SetSeatMenuDevice(Nothing)
+        tips.SetToolTip(seatMenuKeyButton, "Click, then press the key or key combination that opens the in-game seat menu while DiRT 3 is in front.")
+        UpdateSeatMenuLabels()
         content.Controls.Add(TopicLink(HelpControls))
+    End Sub
+
+    ' Public for the launcher tests: removes the seat menu key (the controller button, if any, still opens it).
+    Public Sub ClearSeatMenuKey()
+        seatMenuKey = 0 : seatMenuModifiers = 0 : capturingSeatMenu = False
+        UpdateSeatMenuLabels()
+        notice.Text = If(seatMenuDevice Is Nothing, "Seat menu key removed: the in-game seat menu is off.", "Seat menu key removed; the controller button still opens the menu.") & " Save settings or Launch to keep it."
+    End Sub
+
+    ' Public for the launcher tests; the dialog sets it after a button press.
+    Public Sub SetSeatMenuDevice(value As RecenterDeviceBinding)
+        If value IsNot Nothing Then
+            value.Validate("seat menu")
+            Dim problem = SeatMenuInput.Reserved(value)
+            If problem = "" AndAlso value.SameInput(recenterDevice) Then problem = value.Control() & " recenters the view. Choose another button for the seat menu."
+            If problem <> "" Then
+                notice.Text = problem
+                Return
+            End If
+        End If
+        seatMenuDevice = value
+        UpdateSeatMenuLabels()
+        notice.Text = If(value Is Nothing, "Seat menu button cleared.", "Seat menu button set to " & value.Describe() & ".") & " Save settings or Launch to keep it."
+    End Sub
+
+    Private Sub UpdateSeatMenuLabels()
+        seatMenuKeyButton.Text = If(capturingSeatMenu, "Press a key…", If(seatMenuKey = 0, "None", RecenterShortcut.Describe(seatMenuKey, seatMenuModifiers)))
+        noSeatMenuKey.Enabled = seatMenuKey <> 0
+        seatMenuDeviceButton.Text = If(seatMenuDevice Is Nothing, "Bind a button…", seatMenuDevice.Describe())
+        clearSeatMenuDevice.Enabled = seatMenuDevice IsNot Nothing
+    End Sub
+
+    ' Reads controllers for the in-game seat menu while this VR session runs.
+    Private Sub StartSeatMenuReader(button As RecenterDeviceBinding)
+        seatMenuReader?.Dispose() : seatMenuReader = Nothing
+        If interactive?.SeatMenu Is Nothing Then Return
+        Try
+            Dim gameId = interactive.Game.Id
+            seatMenuReader = New SeatMenuWatcher(DrivingInput.LibraryPath(context), Handle, interactive.SeatMenu, button, Function() RecenterDeviceWatcher.InFront(gameId), interactive.LogDirectory)
+            seatMenuReader.Start()
+        Catch ex As Exception When TypeOf ex Is IOException OrElse TypeOf ex Is DllNotFoundException OrElse TypeOf ex Is BadImageFormatException OrElse TypeOf ex Is EntryPointNotFoundException
+            notice.Text &= " Controllers can't be used in the seat menu: " & ex.Message
+        End Try
     End Sub
 
     ' Public for the launcher tests; the dialog sets it after a button press.
     Public Sub SetRecenterDevice(value As RecenterDeviceBinding)
         value?.Validate()
+        If value IsNot Nothing AndAlso value.SameInput(seatMenuDevice) Then
+            notice.Text = value.Control() & " opens the seat menu. Choose another button for recentering."
+            Return
+        End If
         recenterDevice = value
         UpdateRecenterDeviceLabel()
         notice.Text = If(value Is Nothing, "Controller / wheel recenter cleared.", "Recenter button set to " & value.Describe() & ".") & " Save settings or Launch to keep it."
@@ -591,8 +674,29 @@ Public Class MainForm
     End Sub
 
     Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
-        If CaptureRecenterKey(keyData) Then Return True
+        If CaptureRecenterKey(keyData) OrElse CaptureSeatMenuKey(keyData) Then Return True
         Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    ' Handles one key press while the seat menu key button waits for a key (public for the launcher tests).
+    Public Function CaptureSeatMenuKey(keyData As Keys) As Boolean
+        If Not capturingSeatMenu Then Return False
+        If RecenterShortcut.IsModifierOnly(keyData) Then Return True
+        If keyData = Keys.Escape Then
+            capturingSeatMenu = False : UpdateSeatMenuLabels()
+            notice.Text = "Seat menu key unchanged."
+            Return True
+        End If
+        Dim key = CInt(keyData And Keys.KeyCode), modifiers = RecenterShortcut.Modifiers(keyData)
+        Dim problem = LauncherSettings.SeatMenuKeyProblem(key, modifiers, recenterKey, recenterModifiers)
+        If problem <> "" Then
+            notice.Text = RecenterShortcut.Describe(key, modifiers) & " can't be used. " & problem & " Esc cancels."
+            Return True
+        End If
+        seatMenuKey = key : seatMenuModifiers = modifiers : capturingSeatMenu = False
+        UpdateSeatMenuLabels()
+        notice.Text = "Seat menu key set to " & RecenterShortcut.Describe(key, modifiers) & ". Save settings or Launch to keep it."
+        Return True
     End Function
 
     ' Handles one key press while the recenter button waits for a key (public for the launcher tests).
@@ -607,6 +711,10 @@ Public Class MainForm
         Dim key = CInt(keyData And Keys.KeyCode), modifiers = RecenterShortcut.Modifiers(keyData)
         If Not RecenterShortcut.Valid(key, modifiers) Then
             notice.Text = RecenterShortcut.Describe(key, modifiers) & " can't be used. Choose another key; Windows shortcuts such as Alt+Tab are reserved. Esc cancels."
+            Return True
+        End If
+        If seatMenuKey <> 0 AndAlso key = seatMenuKey AndAlso modifiers = seatMenuModifiers Then
+            notice.Text = RecenterShortcut.Describe(key, modifiers) & " opens the seat menu. Choose another recenter key. Esc cancels."
             Return True
         End If
         recenterKey = key : recenterModifiers = modifiers : capturingRecenter = False
@@ -708,6 +816,7 @@ Public Class MainForm
         skipStartupMovies.Checked = settings.SkipStartupMovies
         recenterKey = settings.RecenterKey : recenterModifiers = settings.RecenterModifiers : capturingRecenter = False : UpdateRecenterLabel()
         recenterDevice = settings.RecenterDevice : UpdateRecenterDeviceLabel()
+        seatMenuKey = settings.SeatMenuKey : seatMenuModifiers = settings.SeatMenuModifiers : seatMenuDevice = settings.SeatMenuButton : capturingSeatMenu = False : UpdateSeatMenuLabels()
         recenterKeepLevel.Checked = settings.RecenterKeepLevel
         renderScale.Value = settings.VrRenderScale
         applyingPreset = True
@@ -736,6 +845,7 @@ Public Class MainForm
             .DesktopWidth = If(resolution Is Nothing, 0, resolution.Size.Width), .DesktopHeight = If(resolution Is Nothing, 0, resolution.Size.Height),
             .DesktopDisplayMode = {"game", "windowed", "fullscreen", "borderless"}(Math.Max(0, desktopMode.SelectedIndex)), .DesktopVSync = {"game", "off", "on"}(Math.Max(0, desktopVSync.SelectedIndex)), .SkipStartupMovies = skipStartupMovies.Checked,
             .RecenterKey = recenterKey, .RecenterModifiers = recenterModifiers, .RecenterDevice = recenterDevice, .RecenterKeepLevel = recenterKeepLevel.Checked,
+            .SeatMenuKey = seatMenuKey, .SeatMenuModifiers = seatMenuModifiers, .SeatMenuButton = seatMenuDevice,
             .GraphicsQuality = desktopQuality.Values, .VrGraphicsQuality = vrQuality.Values,
             .LaunchMode = directPicker.Mode, .DirectRoute = directPicker.RouteId, .DirectCar = directPicker.CarCode, .DirectLaps = directPicker.LapCount,
             .DirectOpponents = directPicker.OpponentCount, .DirectOpponentCars = directPicker.OpponentCars, .DirectDifficulty = directPicker.DifficultyLevel, .DirectAfterFinish = directPicker.AfterFinish,
@@ -861,6 +971,7 @@ Public Class MainForm
             failed = True
         Finally
             recenterWatcher?.Dispose() : recenterWatcher = Nothing
+            seatMenuReader?.Dispose() : seatMenuReader = Nothing
             launchProgress?.Dispose() : launchProgress = Nothing
             If Not IsDisposed AndAlso owned.FinalSeatCommit IsNot Nothing Then ShowSeatCommit(owned.FinalSeatCommit)
             interactive = Nothing
@@ -1130,6 +1241,7 @@ Public Class MainForm
                 "Bind a button… adds a controller, wheel or button-box button, or a D-pad / hat direction, as another way to recenter. During VR the launcher watches it only while DiRT 3 is in front, without taking the device over. Clear removes it." & vbCrLf & vbCrLf &
                 "Keep the horizon level when recentering is on by default: recentering turns the view to face forward but leaves pitch and roll alone. Turn it off if your headset sits tilted; the key or button then also makes the way you hold your head level. The automatic centering at the start of VR always keeps the horizon level." & vbCrLf & vbCrLf &
                 "Seat moves your eye point in the cockpit, for each car, up to 50 cm in each direction: sideways (+ left), height and forward. Pick the car (cars with their own position say adjusted), move the sliders, and Reset this car to go back to DiRT 3's seat. Same position for all cars uses one position everywhere. Launch VR writes each adjusted car's camera file (cars\models\<car>\cameras.xml) for the session and restores it after exit, like DiRT3VR's other temporary changes; a car whose camera file isn't in the expected format keeps its own seat, and the launcher names it. Also when playing on the monitor (off by default) does the same for Launch, including direct practice on the monitor; without it desktop play keeps DiRT 3's seat. Seat positions stay with this PC: settings profiles and Restore launcher defaults keep them." & vbCrLf & vbCrLf &
+                "Seat menu key (F11 by default) opens a seat menu in the headset during Launch VR; press it again to save and close. In the menu the arrows move the seat (hold Shift to move sideways), Enter saves and Esc cancels; on an Xbox controller the D-pad, X, A and B do the same, and on a wheel or button box its first hat moves the seat. Seat menu button adds a controller, wheel or button-box button that opens the menu too; the launcher reads it only while DiRT 3 is in front, without taking the device over. What you save is kept under Seat. No key removes the key; without a key or button there is no menu. DiRT 3 also receives the key or button that opens the menu, so pick one the game doesn't use." & vbCrLf & vbCrLf &
                 "Cockpit view only (off by default): DiRT 3 starts a race with the first view in each car's camera list (chase close, chase far, bumper, bonnet, then cockpit), so for the VR session DiRT3VR hides those four views in every car's camera file. Races then start in the cockpit and Change View stays there. It is restored after exit with the seat changes."),
             New HelpTopic(HelpRuntime,
                 "Settings → Check runtime and headset runs a small 32-bit OpenXR check without starting the game. A successful check does not mean VR driving is ready." & vbCrLf & vbCrLf &
@@ -1236,7 +1348,7 @@ Public Class MainForm
         If disposing AndAlso Not resourcesDisposed Then
             resourcesDisposed = True
             lifetime.Cancel() : lifetime.Dispose()
-            timer.Dispose() : tips.Dispose() : launchProgress?.Dispose() : recenterWatcher?.Dispose()
+            timer.Dispose() : tips.Dispose() : launchProgress?.Dispose() : recenterWatcher?.Dispose() : seatMenuReader?.Dispose()
             exitTimer.Dispose() : background.Dispose() : launchTips.Dispose()
         End If
         MyBase.Dispose(disposing)
