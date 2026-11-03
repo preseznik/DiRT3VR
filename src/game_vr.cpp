@@ -14,7 +14,7 @@
 #include "recenter_shortcut.h"
 #include "seat_menu.h"
 #include "seat_panel.h"
-#include "seat_input.h"
+#include "seat_session.h"
 #include "hud_placement.h"
 #include "frame_timing.h"
 #include "performance_display.h"
@@ -74,7 +74,7 @@ struct PrototypeState {
     WNDPROC previousWindowProc{};
     bool attempted{}, stopped{}, stopPathChecked{}, waitingReported{};
     // In-game seat menu (#35826889), when the launcher passes DIRT3VR_SEAT_CHANNEL.
-    std::optional<seat::Menu> seat;
+    seat::Menu* seat{};
     SeatPanelImage seatImage;
     TexturePresenter seatPresenter{RuntimeLog};
     XrPosef seatPanelPose{{0,0,0,1},{0,0,-1}};
@@ -322,50 +322,17 @@ const HudPlacement& ConfiguredHudPlacement() {
     }();
     return placement;
 }
-// The launcher's seat channel (docs/seat-channel.md). A missing or invalid channel leaves the menu off.
+// The launcher's seat channel (docs/seat-channel.md), shared with monitor sessions (src/seat_session.*).
 void OpenSeatChannel(PrototypeState& state,ID3D11Device* device) {
-    wchar_t name[96]{};
-    const DWORD length=GetEnvironmentVariableW(L"DIRT3VR_SEAT_CHANNEL",name,96);
-    if(!length) return;
-    if(length>=96 || wcsncmp(name,L"Local\\DiRT3VR.Seat.",19)) { RuntimeLog("Seat menu off: channel name rejected"); return; }
-    const HANDLE mapping=OpenFileMappingW(FILE_MAP_ALL_ACCESS,FALSE,name);
-    auto* view=mapping ? static_cast<unsigned char*>(MapViewOfFile(mapping,FILE_MAP_ALL_ACCESS,0,0,seat::Channel::Bytes)) : nullptr;
-    if(mapping) CloseHandle(mapping);
-    if(!view || !seat::Channel::Acceptable(view) || !state.seatPresenter.Initialize(device)) {
-        if(view) UnmapViewOfFile(view);
-        RuntimeLog("Seat menu off: channel unavailable or invalid"); return;
-    }
-    // The mapping and the menu stay for the process: the launcher reads commits until it exits.
-    auto& menu=state.seat.emplace(seat::Channel(view),false,[](unsigned key) { return (GetAsyncKeyState(int(key))&0x8000)!=0; });
-    // The menu's keys and buttons must not reach the game (src/seat_input.*). Without every
-    // filter it stays closed (status 2) and only the saved seat positions apply.
-    seatinput::Policy policy;
-    policy.blocksKey=[&menu](unsigned key) { return menu.BlocksKey(key); };
-    policy.filterXbox=[&menu](unsigned slot,WORD& buttons) { menu.FilterXbox(slot,buttons); };
-    policy.blocksButton=[&menu](const GUID& device,unsigned button,bool pressed) { return menu.BlocksButton(device,button,pressed); };
-    policy.blocksHat=[&menu](const GUID& device,unsigned hat,bool centred) { return menu.BlocksHat(device,hat,centred); };
-    const bool filtering=state.log && seatinput::Install(std::move(policy),state.log);
-    menu.SetInputReady(filtering);
-    if(state.log) state.log("Seat menu channel open cars=%u every_car=%u input_filtering=%u",
-        menu.View().Cars(),unsigned(menu.View().Universal()),unsigned(filtering));
+    auto* menu=OpenSeatMenu(state.log);
+    if(!menu || menu->Desktop()) return;
+    if(!state.seatPresenter.Initialize(device)) { RuntimeLog("Seat menu panel unavailable: presenter"); return; }
+    state.seat=menu;
 }
 // 1 m ahead of the head, upright and facing it, where the menu opened (DiRT2VR's panel placement).
 XrPosef SeatPanelPose(const std::array<XrView,2>& views) {
     const auto head=math::RecenterPose(math::CenterPose(views),{{0,0,0,1},{0,0,0}});
     return math::OffsetPose(head,{0,-.1f,-1.f});
-}
-// The player's car code (#88b7f778, docs/research/seat-adjustment.md): entry 0 of the race's
-// vehicle table, 16-byte "<code>_<livery> <tag>" names at 0xf9fc08 counted by
-// [[0xf9fbfc]+0xb234]. Checked for direct starts; races from the menus aren't yet. Read
-// through ReadProcessMemory, so a missing table only fails the read; empty then.
-std::string PlayerCarCode() {
-    const auto* image=reinterpret_cast<const unsigned char*>(GetModuleHandleW(nullptr));
-    const auto process=GetCurrentProcess();
-    uintptr_t owner{}; int count{}; char name[17]{}; SIZE_T read{};
-    if(!ReadProcessMemory(process,image+(0xf9fbfc-0x400000),&owner,sizeof(owner),&read) || !owner ||
-       !ReadProcessMemory(process,reinterpret_cast<const void*>(owner+0xb234),&count,sizeof(count),&read) || count<1 || count>64 ||
-       !ReadProcessMemory(process,image+(0xf9fc08-0x400000),name,16,&read)) return {};
-    return seat::CarCodeFromVehicleName(std::string_view(name,strnlen_s(name,16)));
 }
 // One stereo frame's seat menu step: cockpit frames run the menu, others close it once.
 seat::Position UpdateSeat(PrototypeState& state,const XrRuntime::Frame& frame,bool cockpit) {
@@ -442,7 +409,7 @@ bool Prepare(PrototypeState& state,ID3D11Texture2D* back) {
     if(!state.presenter.Initialize(device.Get()) ||
        (state.resolution.width && !state.hudPresenter.Initialize(device.Get())) ||
        !state.xr.Initialize(device.Get(),state.resolution.width ? 1.f : .5f,state.resolution.width,state.resolution.height,state.resolution.width!=0,
-                            state.seat.has_value(),state.perfDisplay)) {
+                            state.seat!=nullptr,state.perfDisplay)) {
         Stop(state,"initialization"); return false;
     }
     state.device=device;

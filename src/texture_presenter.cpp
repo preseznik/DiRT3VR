@@ -108,6 +108,12 @@ bool TexturePresenter::PrepareSource(ID3D11Texture2D* source,const D3D11_TEXTURE
     return true;
 }
 bool TexturePresenter::Draw(ID3D11Texture2D* source,ID3D11RenderTargetView* target,unsigned width,unsigned height,Mode mode) noexcept {
+    return DrawInto(source,target,0,0,width,height,mode,true);
+}
+bool TexturePresenter::DrawRegion(ID3D11Texture2D* source,ID3D11RenderTargetView* target,unsigned left,unsigned top,unsigned width,unsigned height,Mode mode) noexcept {
+    return DrawInto(source,target,left,top,width,height,mode,false);
+}
+bool TexturePresenter::DrawInto(ID3D11Texture2D* source,ID3D11RenderTargetView* target,unsigned left,unsigned top,unsigned width,unsigned height,Mode mode,bool exact) noexcept {
     PausePresentationTrace tracePause;
     if(!device_ || !source || !target || !width || !height) return false;
     try {
@@ -123,14 +129,16 @@ bool TexturePresenter::Draw(ID3D11Texture2D* source,ID3D11RenderTargetView* targ
         ComPtr<ID3D11Resource> outputResource; target->GetResource(&outputResource);
         ComPtr<ID3D11Texture2D> output; if(FAILED(outputResource.As(&output)) || output.Get()==source) return false;
         D3D11_TEXTURE2D_DESC outputDesc{}; output->GetDesc(&outputDesc);
-        if(outputDesc.ArraySize!=1 || outputDesc.SampleDesc.Count!=1 || outputDesc.Width!=width || outputDesc.Height!=height) return false;
+        if(outputDesc.ArraySize!=1 || outputDesc.SampleDesc.Count!=1) return false;
+        if(exact ? outputDesc.Width!=width || outputDesc.Height!=height :
+                   left>=outputDesc.Width || top>=outputDesc.Height || width>outputDesc.Width-left || height>outputDesc.Height-top) return false;
         // Copy/resolve first: game backbuffers need not have shader-resource bind
         // flags, and the presenter must not retain a buffer across ResizeBuffers.
         if(!PrepareSource(source,input)) { Report("Texture presenter source allocation failed"); return false; }
         ContextRestore restore(context_.Get(),state_.Get());
         context_->OMSetRenderTargets(1,&target,nullptr); context_->OMSetDepthStencilState(depth_.Get(),0);
         context_->OMSetBlendState(mode==Mode::Composite ? compositeBlend_.Get() : nullptr,nullptr,0xffffffff);
-        D3D11_VIEWPORT viewport{0,0,float(width),float(height),0,1};
+        D3D11_VIEWPORT viewport{float(left),float(top),float(width),float(height),0,1};
         context_->RSSetViewports(1,&viewport); context_->RSSetState(raster_.Get());
         context_->IASetInputLayout(nullptr); context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         context_->VSSetShader(vertex_.Get(),nullptr,0);

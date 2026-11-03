@@ -14,8 +14,11 @@ public:
     TexturePresenter& operator=(const TexturePresenter&)=delete;
     bool Initialize(ID3D11Device* device) noexcept;
     bool Draw(ID3D11Texture2D* source,ID3D11RenderTargetView* target,unsigned width,unsigned height,Mode mode=Mode::Opaque) noexcept;
+    // Into a rectangle of a larger target, e.g. a panel over the game image on the monitor.
+    bool DrawRegion(ID3D11Texture2D* source,ID3D11RenderTargetView* target,unsigned left,unsigned top,unsigned width,unsigned height,Mode mode) noexcept;
     void Reset() noexcept;
 private:
+    bool DrawInto(ID3D11Texture2D* source,ID3D11RenderTargetView* target,unsigned left,unsigned top,unsigned width,unsigned height,Mode mode,bool exact) noexcept;
     bool PrepareSource(ID3D11Texture2D* source,const D3D11_TEXTURE2D_DESC& desc);
     void Report(const char*) noexcept;
     Logger logger_{};

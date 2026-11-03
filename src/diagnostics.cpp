@@ -7,6 +7,7 @@
 #include "direct_practice.h"
 #include "screenshot.h"
 #include "frame_timing.h"
+#include "desktop_seat.h"
 #if defined(DIRT3VR_RESEARCH_PATCHES)
 #include "research_patch.h"
 #endif
@@ -198,6 +199,7 @@ bool Observed(IDXGISwapChain* chain) {
 }
 HRESULT STDMETHODCALLTYPE Present(IDXGISwapChain* chain, UINT interval, UINT flags) {
     try { if(Observed(chain) && !(flags & DXGI_PRESENT_TEST)) VrBeforePresent(chain); } catch(...) { }
+    try { if(Observed(chain) && !(flags & DXGI_PRESENT_TEST)) desktopseat::BeforePresent(chain, Log); } catch(...) { }
     try { if(Observed(chain) && !(flags & DXGI_PRESENT_TEST)) screenshot::BeforePresent(chain, Log); } catch(...) { }
     const auto presentStarted = frametiming::Now();
     const HRESULT result = realPresent(chain, interval, flags);
