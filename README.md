@@ -1,6 +1,6 @@
 # DiRT3VR
 
-[**Download**](https://github.com/preseznik/DiRT3VR/releases) · [Changelog](https://github.com/preseznik/DiRT3VR/blob/main/CHANGELOG.md) · [Full launcher guide](https://github.com/preseznik/DiRT3VR/blob/main/docs/launcher-guide.md)
+[**Download**](https://github.com/preseznik/DiRT3VR/releases) · [Changelog](https://github.com/preseznik/DiRT3VR/blob/main/CHANGELOG.md)
 
 Open the newest release, then **Assets**, and choose the Setup EXE (or the
 ZIP). All releases so far are **Experimental** pre-releases.
@@ -84,7 +84,5 @@ from that session's frame rate.
   folder.
 - Leave **Skip startup logo movies** off for multiplayer.
 
-The [full launcher guide](https://github.com/preseznik/DiRT3VR/blob/main/docs/launcher-guide.md)
-covers every option, how DiRT3VR changes and restores game files, and the
-current limits. Build instructions are in
-[docs/development.md](https://github.com/preseznik/DiRT3VR/blob/main/docs/development.md).
+Every option is explained in the launcher itself: **?** → **Instructions**, or the
+**Instructions** link on each tab.

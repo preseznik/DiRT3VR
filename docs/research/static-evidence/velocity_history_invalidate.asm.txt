@@ -1,9 +1,0 @@
-
-C:\Program Files (x86)\Steam\steamapps\common\DiRT 3 Complete Edition\dirt3_game.exe:     file format pei-i386
-
-
-Disassembly of section .text:
-
-00732c50 <.text+0x331c50>:
-  732c50:	c6 81 90 00 00 00 00 	mov    BYTE PTR [ecx+0x90],0x0
-  732c57:	c3                   	ret

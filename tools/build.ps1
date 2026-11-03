@@ -26,7 +26,8 @@ $batchPath = "$root/build/native-build.cmd"
 [IO.File]::WriteAllText($batchPath, $batch, [Text.Encoding]::ASCII)
 & $env:ComSpec /d /c $batchPath
 if ($LASTEXITCODE) { throw 'Native build failed.' }
-if (!$SkipTests) {
+# Tests live in the development checkout only (not published); a fresh clone builds without them.
+if (!$SkipTests -and (Test-Path -LiteralPath "$root/tests/native")) {
     & (Join-Path (Split-Path $cmake) 'ctest.exe') --test-dir "$root/build/native" --output-on-failure
     if ($LASTEXITCODE) { throw 'Native tests failed.' }
 }
@@ -45,7 +46,7 @@ exit /b %errorlevel%
     [IO.File]::WriteAllText($inputBatchPath, $inputBatch, [Text.Encoding]::ASCII)
     & $env:ComSpec /d /c $inputBatchPath
     if ($LASTEXITCODE) { throw 'Controller input build failed.' }
-    if (!$SkipTests) {
+    if (!$SkipTests -and (Test-Path -LiteralPath "$root/tools/driving-input/axes_test.cpp")) {
         & (Join-Path (Split-Path $cmake) 'ctest.exe') --test-dir "$root/build/driving-input" --output-on-failure
         if ($LASTEXITCODE) { throw 'Controller input tests failed.' }
     }
@@ -53,7 +54,7 @@ exit /b %errorlevel%
 if (!$NativeOnly) {
     & dotnet build "$root/launcher/DiRT3VR.vbproj" -c Release --nologo
     if ($LASTEXITCODE) { throw 'Launcher build failed.' }
-    if (!$SkipTests) {
+    if (!$SkipTests -and (Test-Path -LiteralPath "$root/tests/launcher")) {
         & dotnet run --project "$root/tests/launcher/LauncherTests.vbproj" -c Release -- --ui
         if ($LASTEXITCODE) { throw 'Launcher tests failed.' }
         & $python -m unittest discover -s "$root/tests" -p 'test_*.py' -v

@@ -46,7 +46,14 @@ target_compile_definitions(runtime_probe PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX XR
 target_compile_options(runtime_probe PRIVATE /W4 /EHsc)
 target_link_libraries(runtime_probe PRIVATE openxr_loader)
 
-option(DIRT3VR_BUILD_NATIVE_TESTS "Build synthetic D3D11 tests (never installed with the game)" ON)
+# The tests are kept in the development checkout only (not published), so a fresh clone builds
+# the game files and installer without them.
+if(EXISTS "${CMAKE_SOURCE_DIR}/tests/native")
+  set(DIRT3VR_TESTS_PRESENT ON)
+else()
+  set(DIRT3VR_TESTS_PRESENT OFF)
+endif()
+option(DIRT3VR_BUILD_NATIVE_TESTS "Build synthetic D3D11 tests (never installed with the game)" ${DIRT3VR_TESTS_PRESENT})
 if(DIRT3VR_BUILD_NATIVE_TESTS)
   enable_testing()
   add_executable(frontend_shadow_test tests/native/frontend_shadow_test.cpp src/frontend_shadow.cpp)
