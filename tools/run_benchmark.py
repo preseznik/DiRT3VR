@@ -22,7 +22,8 @@ import xml.etree.ElementTree as ET
 import zlib
 
 import diagnostic_files
-from diagnostic_files import (BLOOM_NAMES, EFFECTS_NAME, DiagnosticFiles, FLOW_NAME, KEYBOARD_NAME, PATHS_NAME, SESSION_MAP, SESSION_MAP_NAME,
+import startup_skip
+from diagnostic_files import (BLOOM_NAMES, EFFECTS_NAME, STATES_NAME, DiagnosticFiles, FLOW_NAME, KEYBOARD_NAME, PATHS_NAME, SESSION_MAP, SESSION_MAP_NAME,
                               RESTRICTIONS_NAME, SEAT_NAME, SPECTATOR_NAME, preflight_replacement, no_links,
                               preflight_serial_render, replace_verified, restore_xml_formatting, save_json, sha256)
 
@@ -505,7 +506,7 @@ def restore_player_hardware(target: Path, backup: Path, original_hash: str, reta
 def protected_state(game: Path) -> dict[str, str]:
     paths = [game / "dirt3_game.exe", game / "steam_api.dll",
              game / RESTRICTIONS_NAME, game / SPECTATOR_NAME, game / SEAT_NAME, game / FLOW_NAME,
-             game / KEYBOARD_NAME, game / PATHS_NAME, *(game / name for name in BLOOM_NAMES),
+             game / KEYBOARD_NAME, game / PATHS_NAME, *(game / name for name in BLOOM_NAMES), game / STATES_NAME,
              game / "hardwaresettings/hardware_settings_config.xml",
              game / "hardwaresettings/hardware_settings_info.xml"]
     documents = documents_dir() / "My Games/DiRT3"
@@ -543,6 +544,11 @@ def main() -> int:
     parser.add_argument("--no-glare", action="store_true",
                         help="Research: zero the light streak and lens flare multipliers of postprocess/effects.xml (tools/glare.py; journaled and restored); "
                              "with --no-bloom the file gets both edits, and a --recover needs the same flags")
+    parser.add_argument("--skip-startup", metavar="PARTS",
+                        type=lambda text: tuple(part for part in text.split(",") if part),
+                        help="Research, with --normal-start: turn startup states into waypoints in system/states.bin "
+                             "(tools/startup_skip.py; journaled and restored): movies,legal,cutscene or any of them; "
+                             "a --recover needs the same value")
     parser.add_argument("--start-in-cockpit", action="store_true",
                         help="The renderer skips DiRT 3's race-start switch to the chase view (DIRT3VR_START_IN_COCKPIT); "
                              "with --seat-test 0,0,0 --seat-cockpit first the race starts in the cockpit with every view kept")
@@ -696,6 +702,11 @@ def main() -> int:
     diagnostic_files.EFFECTS_EDITS = tuple(edit for edit, on in (("bloom", args.no_bloom), ("glare", args.no_glare)) if on)
     effect_names = BLOOM_NAMES if args.no_bloom else (EFFECTS_NAME,) if args.no_glare else ()
     no_bloom = [(name, preflight_replacement(game, name)[0]) for name in effect_names]
+    if args.skip_startup:
+        if not args.normal_start or any(part not in startup_skip.NODES for part in args.skip_startup):
+            parser.error("--skip-startup needs --normal-start and parts from movies,legal,cutscene")
+        diagnostic_files.STARTUP_SKIP = args.skip_startup
+        no_bloom.append((STATES_NAME, preflight_replacement(game, STATES_NAME)[0]))
     if args.seat_test is not None:
         if "frx" not in scene["cars"][:1]:
             parser.error("--seat-test changes the frx camera file; use the frx as the (first) car")
@@ -716,7 +727,7 @@ def main() -> int:
                  "stereo": False, "sceneObserver": args.scene_observer,
                  "serialRender": args.serial_render, "replayPair": args.replay_pair,
                  "xrRuntime": xr_runtime, "backgroundPlay": args.background_play, "researchPatch": args.research_patch,
-                 "spectatorHumanSwitch": args.spectator_human_switch, "noBloom": args.no_bloom, "noGlare": args.no_glare, "startInCockpit": args.start_in_cockpit, "seatCockpit": args.seat_cockpit if args.seat_test is not None else None,"anisotropy": args.anisotropy, "multisampling": args.msaa, "size": list(args.size), "directPractice": args.direct_practice,
+                 "spectatorHumanSwitch": args.spectator_human_switch, "noBloom": args.no_bloom, "noGlare": args.no_glare, "startInCockpit": args.start_in_cockpit, "skipStartup": list(args.skip_startup or ()),"seatCockpit": args.seat_cockpit if args.seat_test is not None else None,"anisotropy": args.anisotropy, "multisampling": args.msaa, "size": list(args.size), "directPractice": args.direct_practice,
                  "playerHardwareSettings": args.player_hardware_settings, "directLaps": args.direct_laps, "directReturn": args.direct_return, "scene": scene,
                  "durationSeconds": args.seconds}
     if restrictions:

@@ -18,6 +18,7 @@ import xml.etree.ElementTree as ET
 import bloom
 import glare
 import seat_cameras
+import startup_skip
 
 RESTRICTIONS_NAME = "system/hardware_settings_restrictions.xml"
 RESTRICTIONS_SHA256 = "45257db5fa64d833575d569ec6f3b03344b5f40be25830960a8d11783276470b"
@@ -282,6 +283,19 @@ BLOOM_NAMES = (EFFECTS_NAME, GENERIC_EFFECTS_NAME, NIGHT_EFFECTS_NAME)
 EFFECTS_EDITS: tuple[str, ...] = ("bloom",)
 
 
+# Research startup skip (#0ed1f030): which states.bin nodes become waypoints (startup_skip.py);
+# set by --skip-startup, needed again by a --recover.
+STATES_NAME = "system/states.bin"
+STATES_SHA256 = "353f2b8fd00a8b26d47c74c446f07f1ec1ae38cf497482b426c0547bf2159996"
+STARTUP_SKIP: tuple[str, ...] = ("movies",)
+
+
+def startup_skip_states(data: bytes) -> bytes:
+    if hashlib.sha256(data).hexdigest() != STATES_SHA256:
+        raise ValueError("Unexpected states.bin")
+    return startup_skip.skip_startup(data, STARTUP_SKIP)
+
+
 def _bloom_off(pin: str):
     def transform(data: bytes) -> bytes:
         if hashlib.sha256(data).hexdigest() != globals()[pin]:
@@ -307,6 +321,7 @@ REPLACEMENTS = {
     EFFECTS_NAME: ("EFFECTS_SHA256", "effects-original", _bloom_off("EFFECTS_SHA256")),
     GENERIC_EFFECTS_NAME: ("GENERIC_EFFECTS_SHA256", "generic-effects-original", _bloom_off("GENERIC_EFFECTS_SHA256")),
     NIGHT_EFFECTS_NAME: ("NIGHT_EFFECTS_SHA256", "night-effects-original", _bloom_off("NIGHT_EFFECTS_SHA256")),
+    STATES_NAME: ("STATES_SHA256", "states-original", startup_skip_states),
 }
 
 
