@@ -52,6 +52,60 @@ def build() -> bytes:
     return sc.encode(sc.BinXml(strings, elements, attributes))
 
 
+def build_comfort() -> bytes:
+    """A cockpit view with the head-cam parameters of Wrench's stock-car inventory (mex, frx; #cd56379b):
+    shake and distortion groups, the G-force head and body movement, and the driver switches; the
+    look-back view has a driver switch of its own that the comfort edit leaves alone."""
+    strings: list[str] = []
+
+    def s(value: str) -> int:
+        if value not in strings:
+            strings.append(value)
+        return strings.index(value)
+
+    elements: list[list[int]] = []
+    attributes: list[list[int]] = []
+
+    def element(name: str, attrs: dict[str, str]) -> int:
+        first = len(attributes)
+        for key, value in attrs.items():
+            attributes.append([s(key), s(value)])
+        elements.append([s(name), s(""), len(attrs), first if attrs else 0, 0, 0])
+        return len(elements) - 1
+
+    def scalar(name: str, value: str) -> int:
+        return element("Parameter", {"name": name, "type": "scalar", "value": value})
+
+    def flag(name: str, value: str) -> int:
+        return element("Parameter", {"name": name, "type": "bool", "value": value})
+
+    def children(parent: int, first: int, count: int) -> None:
+        elements[parent][4] = count
+        elements[parent][5] = first
+
+    root = element("VehicleViewDefinition", {})
+    manager = element("ViewManager", {"version": "1.0000"})
+    head = element("View", {"ident": "head-cam", "type": "Head", "reverseCamera": "head-cam_reverse", "hidden": "false"})
+    reverse = element("View", {"ident": "head-cam_reverse", "type": "Mounted", "hidden": "true"})
+    shake = element("AccelerationBasedShake", {})
+    distortion = element("Distortion", {})
+    head_params = [scalar("fov", "50.0000"), scalar("nearPlane", "0.0750"), flag("DisableDriverHead", "true"), flag("DisableDriver", "false"),
+                   flag("DisableCoDriver", "false"), scalar("maxBodyOffset", "0.0060"), scalar("maxHeadOffset", "0.1350"), scalar("headDamping", "1.7000"),
+                   flag("headBuffeting", "true"), element("Parameter", {"name": "position", "type": "vector3", "x": "0.3460", "y": "1.0680", "z": "-0.3170"})]
+    reverse_params = [flag("DisableDriver", "false"), element("Parameter", {"name": "position", "type": "vector3", "x": "0.3460", "y": "1.0680", "z": "-0.3170"})]
+    shake_params = [scalar("shakeAngleScalingX", "0.0002"), scalar("minShakeAngleX", "0.1422"), scalar("maxShakeAngleX", "0.2000"),
+                    scalar("shakeAngleScalingY", "0.0004"), scalar("minShakeAngleY", "0.1422"), scalar("maxShakeAngleY", "0.2000"),
+                    scalar("shakeMovementScalingX", "0.0000"), flag("delayEnabled", "false")]
+    distortion_params = [flag("cdEnabled", "true"), scalar("cdLowAcceleration", "5.0000")]
+    children(root, manager, 1)
+    children(manager, head, 2)
+    children(head, shake, 2 + len(head_params))
+    children(reverse, reverse_params[0], len(reverse_params))
+    children(shake, shake_params[0], len(shake_params))
+    children(distortion, distortion_params[0], len(distortion_params))
+    return sc.encode(sc.BinXml(strings, elements, attributes))
+
+
 def main() -> None:
     original = build()
     assert sc.encode(sc.decode(original)) == original
@@ -61,6 +115,9 @@ def main() -> None:
     # Start in the cockpit view: after the seat offset (zero offset re-encodes the original unchanged).
     (HERE / "cameras-cockpit.bin").write_bytes(sc.start_in_cockpit(sc.offset_seat(original, 0, 0, 0)))
     (HERE / "cameras-left-up-forward-cockpit.bin").write_bytes(sc.start_in_cockpit(sc.offset_seat(original, 0.1, 0.05, 0.3)))
+    comfort = build_comfort()
+    assert sc.encode(sc.decode(comfort)) == comfort
+    (HERE / "cameras-comfort.bin").write_bytes(comfort)
     print("wrote", sorted(p.name for p in HERE.glob("*.bin")))
 
 

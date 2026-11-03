@@ -10,6 +10,26 @@ Public Class SeatOffset
     ' Session journal only: the car also starts in the cockpit view (LauncherSettings.StartInCockpit).
     <JsonIgnore(Condition:=JsonIgnoreCondition.WhenWritingDefault)>
     Public Property Cockpit As Boolean
+    ' Session journal only, VR cockpit comfort (LauncherSettings.CockpitSteady, CockpitHideDriver, CockpitHideCoDriver).
+    <JsonIgnore(Condition:=JsonIgnoreCondition.WhenWritingDefault)>
+    Public Property Steady As Boolean
+    <JsonIgnore(Condition:=JsonIgnoreCondition.WhenWritingDefault)>
+    Public Property HideDriver As Boolean
+    <JsonIgnore(Condition:=JsonIgnoreCondition.WhenWritingDefault)>
+    Public Property HideCoDriver As Boolean
+
+    ' A VR session's own change besides the offset: the cockpit start or cockpit comfort.
+    <JsonIgnore>
+    Public ReadOnly Property VrOnly As Boolean
+        Get
+            Return Cockpit OrElse Steady OrElse HideDriver OrElse HideCoDriver
+        End Get
+    End Property
+
+    ' Stored positions carry only the offset; the session flags come from the settings.
+    Public Sub ClearSessionFlags()
+        Cockpit = False : Steady = False : HideDriver = False : HideCoDriver = False
+    End Sub
 
     <JsonIgnore>
     Public ReadOnly Property IsZero As Boolean
@@ -22,7 +42,7 @@ Public Class SeatOffset
     <JsonIgnore>
     Public ReadOnly Property IsUnchanged As Boolean
         Get
-            Return IsZero AndAlso Not Cockpit
+            Return IsZero AndAlso Not VrOnly
         End Get
     End Property
 
@@ -31,7 +51,7 @@ Public Class SeatOffset
     End Sub
 
     Public Function Copy() As SeatOffset
-        Return New SeatOffset With {.Sideways = Sideways, .Up = Up, .Forward = Forward, .Cockpit = Cockpit}
+        Return New SeatOffset With {.Sideways = Sideways, .Up = Up, .Forward = Forward, .Cockpit = Cockpit, .Steady = Steady, .HideDriver = HideDriver, .HideCoDriver = HideCoDriver}
     End Function
 
     Public Function SameAs(other As SeatOffset) As Boolean
@@ -77,15 +97,18 @@ Public NotInheritable Class SeatPositions
         Return Path.Combine(context.GameRoot, "cars", "models", code, "cameras.xml")
     End Function
 
-    ' The seat offset, then (when asked) the cockpit start: start_in_cockpit(offset_seat(data, …)).
+    ' The seat offset, then (when asked) the cockpit start: start_in_cockpit(offset_seat(data, …)), then
+    ' cockpit comfort.
     Public Shared Function Apply(original As Byte(), offset As SeatOffset) As Byte()
         offset.Validate()
         Dim moved = SeatCameras.Offset(original, offset.Sideways / 100.0, offset.Up / 100.0, offset.Forward / 100.0)
-        Return If(offset.Cockpit, SeatCameras.StartInCockpit(moved), moved)
+        If offset.Cockpit Then moved = SeatCameras.StartInCockpit(moved)
+        If offset.Steady OrElse offset.HideDriver OrElse offset.HideCoDriver Then moved = SeatCameras.Comfort(moved, offset.HideDriver, offset.HideCoDriver, offset.Steady)
+        Return moved
     End Function
 
     ' The offset each car gets in a session: the shared one for every catalog car, or each car's own;
-    ' cars left unchanged are not listed. The cockpit-only start is a VR option.
+    ' cars left unchanged are not listed. The cockpit-only start and cockpit comfort are VR options.
     Public Shared Function Effective(settings As LauncherSettings, Optional vr As Boolean = True) As SortedDictionary(Of String, SeatOffset)
         Dim result As New SortedDictionary(Of String, SeatOffset)(StringComparer.Ordinal)
         If settings.SeatSameForAll Then
@@ -100,12 +123,14 @@ Public NotInheritable Class SeatPositions
             Next
         End If
         For Each item In result.Values
-            item.Cockpit = False
+            item.ClearSessionFlags()
         Next
-        If vr AndAlso settings.StartInCockpit Then
+        If vr AndAlso (settings.StartInCockpit OrElse settings.CockpitSteady OrElse settings.CockpitHideDriver OrElse settings.CockpitHideCoDriver) Then
             For Each car In EventCatalog.Current.Cars
                 If Not result.ContainsKey(car.Code) Then result(car.Code) = New SeatOffset
-                result(car.Code).Cockpit = True
+                Dim item = result(car.Code)
+                item.Cockpit = settings.StartInCockpit : item.Steady = settings.CockpitSteady
+                item.HideDriver = settings.CockpitHideDriver : item.HideCoDriver = settings.CockpitHideCoDriver
             Next
         End If
         Return result

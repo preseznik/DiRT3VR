@@ -111,7 +111,7 @@ Public Class OwnedFileTransaction
         If hasMaps AndAlso (Not changes.ContainsKey(SessionActionMaps.PathsTarget) OrElse Not Enumerable.Range(1, mapCount).All(Function(index) changes.ContainsKey(SessionActionMaps.MapTarget(index)))) Then Throw New IOException("Session action maps need their list and consecutive numbers.")
         Dim fixedChanges = changes.Keys.Where(Function(key) Not SeatPositions.IsTarget(key) AndAlso Not SessionActionMaps.IsMapTarget(key) AndAlso key <> SessionActionMaps.PathsTarget)
         ' Schema 9: a desktop session (Launch) that moves seats, alone or with startup and/or direct practice (#b330cc4f).
-        If hasSeats AndAlso Not experimental AndAlso seats IsNot Nothing AndAlso seats.Values.Any(Function(offset) offset IsNot Nothing AndAlso offset.Cockpit) Then Throw New IOException("The cockpit-only start belongs to a VR session.")
+        If hasSeats AndAlso Not experimental AndAlso seats IsNot Nothing AndAlso seats.Values.Any(Function(offset) offset IsNot Nothing AndAlso offset.VrOnly) Then Throw New IOException("The cockpit-only start and cockpit comfort belong to a VR session.")
         Dim journal As New RecoveryJournal With {.Schema = If(hasSeats AndAlso Not experimental, 9, If(hasMaps, 8, If(hasEffects, 7, If(hasSeats, 6, If(hasDirect, If(experimental, 4, 5), If(hasStartup, 3, If(experimental, 2, 1))))))), .InstallId = context.Id, .GraphicsPath = context.GraphicsPath, .GraphicsQuality = If(quality.Count > 0, quality, Nothing),
                                                  .Seats = If(hasSeats, seats.ToDictionary(Function(pair) pair.Key, Function(pair) pair.Value.Copy(), StringComparer.Ordinal), Nothing),
                                                  .ActionMaps = If(hasMaps, mapCount, CType(Nothing, Integer?))}
@@ -278,7 +278,7 @@ Public Class OwnedFileTransaction
                 Dim desktop = New String()() {Array.Empty(Of String)(), New String() {"startup"}, New String() {"direct", "proxy"}, New String() {"direct", "proxy", "startup"}}
                 If Not desktop.Any(Function(session) fixedTargets.SequenceEqual(session)) Then Throw New IOException("Incomplete desktop seat recovery journal.")
                 If seatCodes.Length = 0 OrElse journal.Seats Is Nothing OrElse Not journal.Seats.Keys.OrderBy(Function(code) code, StringComparer.Ordinal).SequenceEqual(seatCodes) OrElse
-                   journal.Seats.Values.Any(Function(offset) offset Is Nothing OrElse offset.IsZero OrElse offset.Cockpit) Then Throw New IOException("Incomplete seat recovery journal.")
+                   journal.Seats.Values.Any(Function(offset) offset Is Nothing OrElse offset.IsZero OrElse offset.VrOnly) Then Throw New IOException("Incomplete seat recovery journal.")
                 For Each offset In journal.Seats.Values
                     offset.Validate()
                 Next

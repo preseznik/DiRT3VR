@@ -195,6 +195,11 @@ Public Class LauncherSettings
     Public Property SeatAllCars As New SeatOffset
     ' VR: start races in the cockpit view (each car's views before head-cam hidden for the session).
     Public Property StartInCockpit As Boolean
+    ' VR cockpit comfort (#cd56379b): the session's cockpit view without DiRT 3's own G-force head movement,
+    ' shake and distortion (on by default), and the driver or co-driver hidden. Kept with the seat settings.
+    Public Property CockpitSteady As Boolean = True
+    Public Property CockpitHideDriver As Boolean
+    Public Property CockpitHideCoDriver As Boolean
     ' Seat positions on the monitor too (Launch, #b330cc4f): the same camera files, journaled for a desktop session.
     Public Property SeatOnDesktop As Boolean
     ' The in-game seat menu's key (#bd820b32, docs/seat-channel.md): opens it, and saves and closes it; 0 = none.
@@ -246,13 +251,13 @@ Public Class LauncherSettings
         If DirectDifficulty < -1 OrElse DirectDifficulty > DirectPractice.MaxDifficulty Then Throw New IOException("Choose the AI difficulty for direct practice.")
         If Not DirectPractice.AfterFinishChoices.Contains(DirectAfterFinish) Then Throw New IOException("Choose what happens after the finish.")
         If Not DirectPractice.GearboxChoices.Contains(DirectGearbox) Then Throw New IOException("Choose the gearbox for direct practice.")
-        SeatAllCars = If(SeatAllCars, New SeatOffset) : SeatAllCars.Validate() : SeatAllCars.Cockpit = False
+        SeatAllCars = If(SeatAllCars, New SeatOffset) : SeatAllCars.Validate() : SeatAllCars.ClearSessionFlags()
         Dim seats As New Dictionary(Of String, SeatOffset)(StringComparer.Ordinal)
         For Each pair In If(SeatOffsets, New Dictionary(Of String, SeatOffset)).OrderBy(Function(item) item.Key, StringComparer.Ordinal)
             If EventCatalog.Current.FindCar(pair.Key) Is Nothing Then Throw New IOException("Seat positions name an unknown car.")
             If pair.Value Is Nothing OrElse pair.Value.IsZero Then Continue For
             pair.Value.Validate()
-            pair.Value.Cockpit = False
+            pair.Value.ClearSessionFlags()
             seats.Add(pair.Key, pair.Value)
         Next
         SeatOffsets = seats

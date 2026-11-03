@@ -35,9 +35,12 @@ SteamVR can be used for Launch VR again; it is new and still being checked
    extract the portable ZIP to a writable folder.
 2. Open DiRT3VR and select your DiRT 3 Complete Edition folder if needed.
    **Controls → Seat** moves your eye point per car (or for all cars) to
-   match your seat and rig, and for VR can keep you in the cockpit view;
-   Launch VR applies both for the session, and Launch applies the seat too
-   with **Also when playing on the monitor**.
+   match your seat and rig. For VR it can also start races in the cockpit
+   view, keep the cockpit camera steady (on by default) and hide the driver
+   or co-driver. Launch VR applies these for the session, and Launch applies
+   the seat too with **Also when playing on the monitor**. During Launch VR,
+   **F11** (or a controller or wheel button you choose there) opens a seat
+   menu in the headset.
    The **Simple | Advanced** switch beside **?** picks the view: Advanced
    (the default) shows every tab; Simple shows one **Quick start** page with
    the essentials (launch mode and direct practice, startup logo skipping,
@@ -267,7 +270,6 @@ restricted to VDXR.
   Shared shaders with scene depth,
   depth-writing geometry, additive effects and unrecognized shaders retain their
   original rendering; missed UI elements need further classification.
-- Direct event selection and seat adjustment are not available in this prototype.
 - Version 0.1.7's live test found that DiRT 3 replaced the requested resolution
   with 1280×720. Version 0.1.8 adds guarded native buffer sizing; 100% output
   and driving passed the live check. Other scales and resets remain untested.
