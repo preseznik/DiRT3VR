@@ -107,7 +107,8 @@ while every quality value matches Ultra. Don't use it to detect the active prese
 - **Multisampling** (`graphics_card/resolution@multisampling`): `off`, `2xmsaa`, `4xmsaa`, `8xmsaa`,
   `16xmsaa`, `8xcsaa`, `16xcsaa`, `8xqcsaa`, `16xqcsaa`, and the vendor-neutral levels `1`–`8`.
   `hardware_settings_info.xml` lists what the GPU supports (here off/2x/4x/8x). VR sessions force `off`
-  (`ExperimentalFiles.vb`). VR anti-aliasing (#c8076a1e) needs renderer work.
+  (`ExperimentalFiles.vb`). VR anti-aliasing (#c8076a1e) needs no renderer work for 2× and 4×:
+  see [VR MSAA](vr-msaa.md).
 - **Gamma** (`graphics_card/gamma@level`): 0.5–2.5 in 0.1 steps.
 - **Aspect**: auto, 4:3, 5:4, 16:9, 16:10, 5:3.
 - **Physics** (`physics@environmentalDamage`, `@vehicleDamage`): low false/false, medium false/true,
