@@ -8,7 +8,7 @@ from run_benchmark import benchmark_completed, summarize_benchmark
 
 
 class BenchmarkResultTests(unittest.TestCase):
-    def summarize(self, parallel="false", route="route_0", *, serial_render=True):
+    def summarize(self, parallel="false", route="route_0", *, serial_render=True, written="off", requested="off"):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "result.xml"
             path.write_text(f'''<benchmark directx_version="11">
@@ -16,9 +16,9 @@ class BenchmarkResultTests(unittest.TestCase):
                 <results samples="100"/></track>
               <hardware_settings_config><cpu><threadStrategy parallelUpdateRender="{parallel}"/></cpu>
                 <graphics_card><directx forcedx9="false"/><stereo enabled="false"/>
-                  <resolution width="1280" height="720" fullscreen="false" vsync="0" multisampling="off"/>
+                  <resolution width="1280" height="720" fullscreen="false" vsync="0" multisampling="{written}"/>
                 </graphics_card></hardware_settings_config></benchmark>''')
-            return summarize_benchmark(path, serial_render=serial_render)
+            return summarize_benchmark(path, serial_render=serial_render, multisampling=requested)
 
     def test_requested_scene_and_configuration_are_verified(self):
         result = self.summarize()
@@ -32,6 +32,13 @@ class BenchmarkResultTests(unittest.TestCase):
         self.assertFalse(result["requestedConfigurationVerified"])
         self.assertEqual(result["configurationMismatches"], ["cpu/threadStrategy/@parallelUpdateRender"])
         self.assertFalse(result["serialRenderVerified"])
+
+    def test_requested_msaa_must_be_the_one_the_game_ran(self):
+        self.assertTrue(self.summarize(written="4xmsaa", requested="4xmsaa")["requestedConfigurationVerified"])
+        result = self.summarize(written="off", requested="2xmsaa")
+        self.assertFalse(result["requestedConfigurationVerified"])
+        self.assertEqual(result["configurationMismatches"], ["graphics_card/resolution/@multisampling"])
+        self.assertEqual(result["observedConfiguration"]["graphics_card/resolution/@multisampling"], "off")
 
     def test_wrong_scene_is_not_benchmark_acceptance(self):
         result = self.summarize(route="route_9")
