@@ -34,12 +34,26 @@ Public Class HeadsetResolution
         End Get
     End Property
 
+    ' The scale a VR session uses (#7f93667d): the chosen one, or the largest this headset's recommended
+    ' size allows within the renderer's 4096 per dimension, rather than refusing the launch.
+    Public Function EffectiveScale(scale As Integer) As Integer
+        If scale < 50 OrElse scale > 300 Then Throw New IOException("Choose a VR render scale between 50% and 300%.")
+        Return Math.Min(scale, MaximumScale)
+    End Function
+
+    ' For the launch message: why the session runs at a lower scale than chosen, or "".
+    Public Function ScaleNote(scale As Integer) As String
+        Dim used = EffectiveScale(scale)
+        Return If(used < scale, $"VR render scale {scale}% is above the {used}% this headset's {Width} × {Height} allows (4096 per dimension), so this session uses {used}%.", "")
+    End Function
+
     Public Function Summary(scale As Integer) As String
         Dim text = $"{Headset} · {If(RuntimeMode = "vdxr", "VDXR", "SteamVR")}" & Environment.NewLine &
             $"Output: {Width} × {Height} per eye (100% baseline)." & Environment.NewLine
         Try
-            Dim size = SceneSize(scale)
-            text &= $"Render: {size.Width} × {size.Height} per eye at {scale}%."
+            Dim used = EffectiveScale(scale)
+            Dim size = SceneSize(used)
+            text &= $"Render: {size.Width} × {size.Height} per eye at {used}%." & If(used < scale, $" {scale}% is above this headset's maximum, so Launch VR uses {used}%.", "")
         Catch ex As IOException
             text &= "Requested render size is unsupported. Lower VR render scale."
         End Try

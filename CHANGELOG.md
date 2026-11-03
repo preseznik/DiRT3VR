@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Launch VR no longer refuses a VR render scale that is too high for your headset (#7f93667d). DiRT3VR can render at most 4096 pixels per side, so with a Quest 3 at Virtual Desktop's 3072 × 3264 the most is 125%. A higher scale now runs at that maximum, and the launch message and **Graphics → VR rendering** say so.
 - **Recommend for this PC** (#68e16dc9) under **Graphics → Quality**: after a VR session, it suggests a VR render scale, or the VR Balanced or Potato preset, from that session's measured frame rate. It only changes the controls; Undo preset brings them back.
 - FPS in VR (#4896ffd3): **Graphics → VR HUD → Show FPS and GPU usage in the headset** adds a small performance display, and the last VR session's measured frame rate (median, low, GPU usage and what held it back) shows under **Graphics → VR rendering**.
 - Toggle VR (#288ceec1): press **F6** during Launch VR to switch the headset between VR and a flat screen in front of you, for a view that looks wrong or uncomfortable; press it again to go back. Change the key, or add a controller or wheel button, under **Controls → VR and seat controls**.
