@@ -76,6 +76,9 @@ Public Class MainForm
     Private ReadOnly vrAnisotropy As New ComboBox With {.Name = "VrAnisotropy", .DropDownStyle = ComboBoxStyle.DropDownList}
     ' VR anti-aliasing (#c8076a1e), LauncherSettings.VrAntiAliasingChoices order.
     Private ReadOnly vrAntiAliasing As New ComboBox With {.Name = "VrAntiAliasing", .DropDownStyle = ComboBoxStyle.DropDownList}
+    ' VR field of view and helmet view (#16a86c75, #47d16d40).
+    Private ReadOnly vrFieldOfView As New ValueSlider("VrFieldOfView", LauncherSettings.MinimumVrFieldOfView, 100, 100, "%")
+    Private ReadOnly vrHelmetView As New CheckBox With {.Name = "VrHelmetView", .Text = "Helmet view: crop only the top and bottom", .AutoSize = True, .Enabled = False}
     Private headsetResolution As HeadsetResolution
     Private ReadOnly resolutionSummary As New Label With {.Name = "VrResolutionSummary", .AutoSize = True}
     Private ReadOnly lastSessionSummary As New Label With {.Name = "LastVrSession", .AutoSize = True, .UseMnemonic = False, .Margin = New Padding(0, 4, 0, 12)}
@@ -405,6 +408,14 @@ Public Class MainForm
         vrAntiAliasing.Items.AddRange({"Off", "2× MSAA", "4× MSAA"})
         Field(vrSettings, "Anti-aliasing", vrAntiAliasing)
         StyleChoice(vrAntiAliasing, vrSettings)
+        Field(vrSettings, "Field of view", vrFieldOfView)
+        vrSettings.Controls.Add(vrHelmetView)
+        vrSettings.Controls.Add(Info("Below 100% the edges of each eye's view are cut off and that many fewer pixels are rendered, without stretching the picture, to save GPU time. Helmet view cuts only the top and bottom, like looking out of a helmet."))
+        AddHandler vrFieldOfView.ValueChanged, Sub()
+                                                   vrHelmetView.Enabled = vrFieldOfView.Value < 100
+                                                   UpdateResolutionLabels()
+                                               End Sub
+        AddHandler vrHelmetView.CheckedChanged, Sub() UpdateResolutionLabels()
         vrSettings.Controls.Add(Info("Anti-aliasing smooths jagged edges in the headset. 2× costs about 7% of the frame rate and 4× about 12% (measured on an RTX 4080 SUPER); lower the render scale if the frame rate drops."))
         vrSettings.Controls.Add(Info("100% renders at the connected headset's recommended resolution per eye. Output stays at that recommendation; this slider changes scene detail. Applies on the next VR launch. Unsupported sizes are refused, and original game settings are restored afterward."))
         vrSettings.Controls.Add(resolutionSummary)
@@ -542,7 +553,7 @@ Public Class MainForm
     Private Sub UpdateResolutionLabels()
         resolutionSummary.Text = If(headsetResolution Is Nothing,
             "Connect your headset and refresh to see the recommended and rendered dimensions. The selected runtime is checked again before every VR launch.",
-            headsetResolution.Summary(renderScale.Value))
+            headsetResolution.Summary(renderScale.Value, If(vrHelmetView.Checked, 100, vrFieldOfView.Value), vrFieldOfView.Value))
         RefreshLabelWidths(Me)
     End Sub
 
@@ -1020,6 +1031,7 @@ Public Class MainForm
         desktopAnisotropy.SelectedIndex = Math.Max(0, Array.IndexOf(LauncherSettings.AnisotropyLevels, settings.DesktopAnisotropy))
         vrAnisotropy.SelectedIndex = Math.Max(0, Array.IndexOf(LauncherSettings.AnisotropyLevels, settings.VrAnisotropy))
         vrAntiAliasing.SelectedIndex = Math.Max(0, Array.IndexOf(LauncherSettings.VrAntiAliasingChoices, settings.VrAntiAliasing))
+        vrFieldOfView.Value = settings.VrFieldOfView : vrHelmetView.Checked = settings.VrHelmetView : vrHelmetView.Enabled = settings.VrFieldOfView < 100
         desktopResolution.Items.Clear()
         Dim chosen = New Size(settings.DesktopWidth, settings.DesktopHeight)
         Dim sizes = DesktopDisplay.Resolutions().Append(chosen).Append(Size.Empty).Distinct().OrderBy(Function(s) s.Width).ThenBy(Function(s) s.Height)
@@ -1034,7 +1046,7 @@ Public Class MainForm
     Public Function CurrentSettings() As LauncherSettings
         Dim resolution = TryCast(desktopResolution.SelectedItem, DesktopResolutionChoice)
         Return New LauncherSettings With {.ModernInterface = modern.Checked, .RuntimeMode = VrRuntime.Modes(Math.Max(0, runtime.SelectedIndex)), .SteamRuntimeManifest = manifest.Text, .VdxrRuntimeManifest = vdxrManifest.Text, .OtherRuntimeManifest = otherManifest.Text, .DiagnosticLogging = logging.Checked, .ExperimentalVrEnabled = experimental.Checked, .VrRenderScale = renderScale.Value, .HudDistance = hudDistance.Value / 2D, .HudFollowView = hudFollow.Checked, .PerfDisplay = perfDisplay.Checked, .PerfFollowView = perfFollow.Checked,
-            .DesktopAnisotropy = LauncherSettings.AnisotropyLevels(Math.Max(0, desktopAnisotropy.SelectedIndex)), .VrAnisotropy = LauncherSettings.AnisotropyLevels(Math.Max(0, vrAnisotropy.SelectedIndex)), .VrAntiAliasing = LauncherSettings.VrAntiAliasingChoices(Math.Max(0, vrAntiAliasing.SelectedIndex)),
+            .DesktopAnisotropy = LauncherSettings.AnisotropyLevels(Math.Max(0, desktopAnisotropy.SelectedIndex)), .VrAnisotropy = LauncherSettings.AnisotropyLevels(Math.Max(0, vrAnisotropy.SelectedIndex)), .VrAntiAliasing = LauncherSettings.VrAntiAliasingChoices(Math.Max(0, vrAntiAliasing.SelectedIndex)), .VrFieldOfView = vrFieldOfView.Value, .VrHelmetView = vrHelmetView.Checked,
             .DesktopWidth = If(resolution Is Nothing, 0, resolution.Size.Width), .DesktopHeight = If(resolution Is Nothing, 0, resolution.Size.Height),
             .DesktopDisplayMode = {"game", "windowed", "fullscreen", "borderless"}(Math.Max(0, desktopMode.SelectedIndex)), .DesktopVSync = {"game", "off", "on"}(Math.Max(0, desktopVSync.SelectedIndex)), .SkipStartupMovies = skipStartupMovies.Checked,
             .RecenterKey = recenterKey, .RecenterModifiers = recenterModifiers, .RecenterDevice = recenterDevice, .RecenterKeepLevel = recenterKeepLevel.Checked,
@@ -1077,7 +1089,7 @@ Public Class MainForm
             Return False
         End If
         Dim question = If(graphicsOnly,
-                      "Set desktop display mode, resolution, VSync, anisotropic filtering and every desktop quality option to Use game setting, every VR quality option to Same as desktop, VR anisotropic filtering to Use game setting, VR anti-aliasing off and VR render scale to 100%?",
+                      "Set desktop display mode, resolution, VSync, anisotropic filtering and every desktop quality option to Use game setting, every VR quality option to Same as desktop, VR anisotropic filtering to Use game setting, VR anti-aliasing off, VR field of view to 100% and VR render scale to 100%?",
                       "Reset every launcher choice to its default: appearance, VR runtime, logging, startup, graphics, recenter key and controller button? VR runtime locations, the experimental VR opt-in and seat positions are kept.") &
                    If(HasUnsavedSettings(), " Your unsaved changes in the launcher controls are replaced.", "") &
                    " Nothing is saved until you choose Save settings or Launch; game files and settings profiles are not changed."
@@ -1434,11 +1446,12 @@ Public Class MainForm
                 "VR rendering: one VR render scale from 50% to 300%. At 100% the scene matches the connected headset's recommended resolution per eye; output stays at that recommendation while the slider changes scene detail. Refresh headset resolution shows the detected sizes. The launcher checks the headset again before every VR launch and refuses unsupported sizes." & vbCrLf & vbCrLf &
                 "Anisotropic filtering, under Desktop and under VR rendering, sharpens road and ground textures seen at an angle. DiRT 3 has no option for it, so a choice other than Use game setting is applied by DiRT3VR's renderer: Off is plain trilinear filtering, 2× to 16× are stronger. On the monitor this installs the renderer for that Launch session, without VR, and removes it after DiRT 3 closes." & vbCrLf & vbCrLf &
                 "Anti-aliasing under VR rendering smooths jagged edges in the headset with DiRT 3's own MSAA: Off (as before), 2× or 4×. 2× costs about 7% of the frame rate and 4× about 12% (Lens's measurement on an RTX 4080 SUPER), so lower the render scale if the frame rate drops; Recommend for this PC only uses a session that ran with the same anti-aliasing." & vbCrLf & vbCrLf &
+                "Field of view under VR rendering keeps 70% to 100% of each eye's view: below 100% the edges are cut off and DiRT 3 renders that many fewer pixels, without stretching the picture, to save GPU time. Helmet view cuts only the top and bottom. Recommend for this PC only uses a session with the same field of view." & vbCrLf & vbCrLf &
                 "Below it, Last VR session shows the headset refresh rate (when the runtime reports it) and whether DiRT 3 rendered the scene size DiRT3VR asked for, read from that session's log." & vbCrLf & vbCrLf &
                 "Quality has separate Desktop and VR columns. Choose one of DiRT 3's presets or set each option; the preset shows Custom when the options match none of them. The values are DiRT 3's DirectX 11 options; Medium is the game's default." & vbCrLf & vbCrLf &
                 "Desktop quality is written into DiRT 3's graphics file at every launch, so options not set to Use game setting replace changes made in the game's own menu. VR quality is applied only while a VR session runs, with DiRT3VR's other temporary changes, and undone afterwards; options on Same as desktop use the desktop choice." & vbCrLf & vbCrLf &
                 "Quick VR presets: Potato / Low-End sets VR quality to Ultra Low and VR render scale to 70%; VR Balanced keeps High's look with the crowd one step lower. Undo preset brings back the controls from before the last preset, until you change an option or the render scale yourself." & vbCrLf & vbCrLf &
-                "Restore graphics defaults sets the desktop, anisotropic filtering and quality choices to Use game setting, VR anti-aliasing off and the render scale to 100%. It asks first and changes only the controls until Save settings or Launch."),
+                "Restore graphics defaults sets the desktop, anisotropic filtering and quality choices to Use game setting, VR anti-aliasing off, the VR field of view and the render scale to 100%. It asks first and changes only the controls until Save settings or Launch."),
             New HelpTopic(HelpControls,
                 "Use your existing keyboard, controller or wheel bindings in DiRT 3." & vbCrLf & vbCrLf &
                 "Driving controls… binds your wheel, pedals, shifter, controller and keys for direct practice, with Launch and Launch VR. A direct start doesn't load your DiRT 3 profile, so DiRT 3 would otherwise use its default preset for each device. It also skips the Press Start screen, where DiRT 3 normally picks your controller, so DiRT3VR gives the player one device: the one you pick under Drives with, else the device you bound steering to (or the one with most bindings), since DiRT 3 drives with one device per player; without bindings here DiRT 3 picks the keyboard. The Binding wizard asks for the essentials (steering, pedals, clutch, handbrake, gear up and down, change view, look back and pause), then offers the H-pattern shifter, flashback and replays, menus, and look and horn; Skip keeps an action's current binding, and only finished groups are kept. Key… and Device… rebind one action, Calibrate… sets an axis's direction, dead zone and saturation, Wheel rotation… sets how far you turn your wheel for full steering lock (your wheel's rotation and the rotation you want in DiRT 3 set the steering saturation), and Xbox preset loads DiRT 3's own Xbox controller layout. Presets save and load whole binding sets. For each bound device the session writes a complete action map (DiRT 3's own map for that device with your bindings in place) and lists it in actionmap\actionMapPaths.xml; both are removed after exit, like DiRT3VR's other temporary changes. Two identical devices share one map, as DiRT 3 tells devices apart by name." & vbCrLf & vbCrLf &

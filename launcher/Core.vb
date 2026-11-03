@@ -225,6 +225,21 @@ Public Class LauncherSettings
     ' 8× isn't tested, so it isn't offered. Off by default, as every VR session ran before.
     Public Shared ReadOnly VrAntiAliasingChoices As String() = {"off", "2xmsaa", "4xmsaa"}
     Public Property VrAntiAliasing As String = "off"
+    ' VR field of view (#16a86c75, as DiRT2VR's 70–100%) and helmet view (#47d16d40, GRID2VR issue #3; Lens's renderer
+    ' side): the share of each eye's field of view kept, which crops the scene size the same way; helmet view
+    ' crops only the top and bottom. Passed as DIRT3VR_VR_FOV_WIDTH / DIRT3VR_VR_FOV_HEIGHT when under 100.
+    Public Const MinimumVrFieldOfView As Integer = 70
+    Public Property VrFieldOfView As Integer = 100
+    Public Property VrHelmetView As Boolean
+
+    ' The kept width and height of each eye's field of view, in percent.
+    Public Function VrFovWidth() As Integer
+        Return If(VrHelmetView, 100, VrFieldOfView)
+    End Function
+
+    Public Function VrFovHeight() As Integer
+        Return VrFieldOfView
+    End Function
     ' Seat positions on the monitor too (Launch, #b330cc4f): the same camera files, journaled for a desktop session.
     Public Property SeatOnDesktop As Boolean
     ' The in-game seat menu's key (#bd820b32, docs/seat-channel.md): opens it, and saves and closes it; 0 = none.
@@ -306,6 +321,7 @@ Public Class LauncherSettings
         If Not DirectPractice.GearboxChoices.Contains(DirectGearbox) Then Throw New IOException("Choose the gearbox for direct practice.")
         SeatAllCars = If(SeatAllCars, New SeatOffset) : SeatAllCars.ClearSessionFlags() : SeatAllCars.Validate()
         If HudDistance < 1D OrElse HudDistance > 5D OrElse HudDistance * 2D <> Decimal.Truncate(HudDistance * 2D) Then Throw New IOException("Choose a VR HUD distance from 1 to 5 m, in 0.5 m steps.")
+        If VrFieldOfView < MinimumVrFieldOfView OrElse VrFieldOfView > 100 Then Throw New IOException("Choose a VR field of view from " & MinimumVrFieldOfView & "% to 100%.")
         If Not VrAntiAliasingChoices.Contains(VrAntiAliasing) Then Throw New IOException("Choose Off, 2× or 4× VR anti-aliasing.")
         If Not AnisotropyLevels.Contains(DesktopAnisotropy) OrElse Not AnisotropyLevels.Contains(VrAnisotropy) Then Throw New IOException("Choose Use game setting, Off, 2×, 4×, 8× or 16× anisotropic filtering.")
         If DesktopFov < -SeatOffset.FovNarrower OrElse DesktopFov > SeatOffset.FovWider Then Throw New IOException("Choose a cockpit field of view between " & SeatOffset.FovNarrower & "° narrower and " & SeatOffset.FovWider & "° wider.")
