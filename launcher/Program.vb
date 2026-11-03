@@ -48,6 +48,8 @@ Public Module Program
                 Console.WriteLine(VrRuntime.ProbeAsync(context, settings).GetAwaiter().GetResult())
                 Return 0
             End If
+            ' A session with the saved settings and no window (CommandLineLaunch), e.g. for fake-headset test runs.
+            If arguments.Contains("--launch") Then Return CommandLineLaunch.Run(context, arguments, Console.Out, Console.Error)
             Application.SetCompatibleTextRenderingDefault(False)
             Application.SetHighDpiMode(HighDpiMode.PerMonitorV2)
             Application.SetColorMode(SystemColorMode.System)
@@ -78,7 +80,7 @@ Public Module Program
                         ' The original nonzero exit remains available when even logging is denied.
                     End Try
                 End If
-            ElseIf arguments.Any(Function(a) a.StartsWith("--check", StringComparison.Ordinal) OrElse a = "--probe-runtime" OrElse a = "--discover") Then
+            ElseIf arguments.Any(Function(a) a.StartsWith("--check", StringComparison.Ordinal) OrElse a = "--probe-runtime" OrElse a = "--discover" OrElse a = "--launch") Then
                 Console.Error.WriteLine(ex.Message)
             Else
                 MessageBox.Show(ex.Message, "DiRT3VR", MessageBoxButtons.OK, MessageBoxIcon.Error)

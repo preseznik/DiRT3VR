@@ -52,6 +52,7 @@ Module Program
             OtherRuntimeTests.Run(root, AddressOf Check)
             VrAntiAliasingTests.Run(root, AddressOf Check)
             VrFieldOfViewTests.Run(root, AddressOf Check)
+            CommandLineLaunchTests.Run(root, AddressOf Check)
             StartupTests.Run(root, AddressOf Check)
             InstallerTests.Run(root, AddressOf Check)
             TestHeadsetResolution(root)
