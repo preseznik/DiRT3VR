@@ -1,6 +1,7 @@
 #include "direct_practice.h"
 #include <windows.h>
 #include <MinHook.h>
+#include <intrin.h>
 #include <atomic>
 #include <mutex>
 #include <string>
@@ -204,6 +205,82 @@ bool InstallAssists(void (*log)(const char*,...)) {
         for(size_t i=0;i<assistCount;++i)
             if(requestedAssists[i]>=0) requested+=(requested.empty() ? "" : ", ")+std::string(assistSettings[i].name)+"="+std::to_string(requestedAssists[i]);
         log("Direct practice assists: %s during the benchmark start",requested.c_str());
+    });
+    return hooked.load(std::memory_order_acquire);
+}
+
+namespace {
+bool ReadDevices(std::vector<std::string>& names) {
+    char text[(maxDeviceNameLength+1)*maxDeviceNames+1]{};
+    const auto length=GetEnvironmentVariableA("DIRT3VR_DIRECT_DEVICES",text,sizeof(text));
+    return length && length<sizeof(text) && ParseDeviceNames(text,names);
+}
+using DeviceListFn=int (__thiscall*)(void*,void*);
+DeviceListFn realDeviceList{};
+void (*devicesLog)(const char*,...){};
+std::vector<std::string> deviceNames;
+std::atomic<unsigned> deviceReports{};
+
+// The game's id for a name (0xccfe30 fills a 4-byte id object); its table exists once the
+// game lists devices, so this runs inside the hook.
+uint32_t Intern(const uint8_t* image,const char* name) {
+    using InternFn=void* (__thiscall*)(void*,const char*);
+    uint32_t id{};
+    reinterpret_cast<InternFn>(const_cast<uint8_t*>(image)+internRva)(&id,name);
+    return id;
+}
+
+int __fastcall DeviceList(void* service,void*,void* out) {
+    const int result=realDeviceList(service,out);
+    const auto* image=reinterpret_cast<const uint8_t*>(GetModuleHandleW(nullptr));
+    if(result!=0 || !out || _ReturnAddress()!=image+deviceListReturnRva) return result;
+    if(*reinterpret_cast<const volatile uint8_t*>(image+benchmarkFlagRva)!=1) return result;
+    auto** range=static_cast<InputDevice**>(out);
+    InputDevice* first=range[0];
+    if(!first || range[1]<first) return result;
+    const auto count=static_cast<size_t>(range[1]-first);
+    if(count<2 || count>maxListedDevices) return result;
+    std::vector<uint32_t> wanted;
+    for(const auto& name:deviceNames) wanted.push_back(Intern(image,name.c_str()));
+    const uint32_t keyboard=Intern(image,"keyboard");
+    const int index=PreferredDevice(first,count,wanted.data(),wanted.size(),keyboard);
+    if(index<=0) return result;
+    const auto chosen=first[index].family;
+    MoveToFront(first,static_cast<size_t>(index));
+    if(deviceReports.fetch_add(1)<4) {
+        const auto match=std::find(wanted.begin(),wanted.end(),chosen);
+        devicesLog("Direct practice device: %s (listed %u of %u) moved first, so DiRT 3 binds it to player 1",
+                   match!=wanted.end() ? deviceNames[static_cast<size_t>(match-wanted.begin())].c_str() : "the first non-keyboard device",
+                   static_cast<unsigned>(index+1),static_cast<unsigned>(count));
+    }
+    return result;
+}
+}
+
+bool DevicesRequested() {
+    std::vector<std::string> names;
+    return ReadDevices(names);
+}
+
+bool InstallDevices(void (*log)(const char*,...)) {
+    static std::once_flag once;
+    static std::atomic<bool> hooked{};
+    std::call_once(once,[log] {
+        if(!ReadDevices(deviceNames)) { log("Direct practice device refused: DIRT3VR_DIRECT_DEVICES is not a valid list"); return; }
+        auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+        if(!DeviceListMatches(image)) { log("Direct practice device refused: device list instructions differ; DiRT 3 binds its first device"); return; }
+        const auto init=MH_Initialize();
+        if(init!=MH_OK && init!=MH_ERROR_ALREADY_INITIALIZED) { log("Direct practice device refused: MinHook=%d",int(init)); return; }
+        devicesLog=log;
+        auto* target=image+deviceListRva;
+        if(MH_CreateHook(target,reinterpret_cast<void*>(&DeviceList),reinterpret_cast<void**>(&realDeviceList))!=MH_OK) { log("Direct practice device refused: hook not created"); return; }
+        if(MH_EnableHook(target)!=MH_OK) { MH_RemoveHook(target); log("Direct practice device refused: hook not enabled"); return; }
+        HMODULE pinned{};
+        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,reinterpret_cast<LPCWSTR>(&DeviceList),&pinned);
+        hooked.store(true,std::memory_order_release);
+        std::string requested;
+        for(const auto& name:deviceNames) requested+=(requested.empty() ? "" : ", ")+name;
+        log("Direct practice device: binds %s to player 1 in the direct start",requested.c_str());
     });
     return hooked.load(std::memory_order_acquire);
 }

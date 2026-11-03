@@ -45,7 +45,52 @@ bool InstalledGameMatches(const char* path) {
     std::vector<uint8_t> settings(dp::settingLookupRva+sizeof(dp::settingLookupEntry));
     file.seekg(static_cast<std::streamoff>(dp::settingLookupRva-0x1000+0x400));
     file.read(reinterpret_cast<char*>(settings.data()+dp::settingLookupRva),sizeof(dp::settingLookupEntry));
-    return file && dp::SettingLookupMatches(settings.data());
+    if(!file || !dp::SettingLookupMatches(settings.data())) return false;
+    std::vector<uint8_t> devices(dp::deviceListRva+sizeof(dp::deviceListEntry),0);
+    file.seekg(static_cast<std::streamoff>(dp::deviceListRva-0x1000+0x400));
+    file.read(reinterpret_cast<char*>(devices.data()+dp::deviceListRva),sizeof(dp::deviceListEntry));
+    file.seekg(static_cast<std::streamoff>(dp::deviceListReturnRva-5-0x1000+0x400));
+    file.read(reinterpret_cast<char*>(devices.data()+dp::deviceListReturnRva-5),5);
+    return file && dp::DeviceListMatches(devices.data());
+}
+
+void DrivingDevice() {
+    std::vector<std::string> names;
+    Require(dp::ParseDeviceNames("Logitech G HUB G920 Driving Force Racing Wheel USB|xinput_pad",names) && names.size()==2 &&
+            names[0]=="Logitech G HUB G920 Driving Force Racing Wheel USB" && names[1]=="xinput_pad","Device names not parsed in order");
+    Require(!dp::ParseDeviceNames("keyboard",names) && names.empty(),"The keyboard was accepted as a driving device");
+    Require(!dp::ParseDeviceNames("",names) && !dp::ParseDeviceNames("a||b",names) && !dp::ParseDeviceNames("a|",names) &&
+            !dp::ParseDeviceNames("a|a",names) && !dp::ParseDeviceNames("tab\tname",names) && !dp::ParseDeviceNames(nullptr,names),
+            "A malformed device list was accepted");
+    Require(!dp::ParseDeviceNames(std::string(dp::maxDeviceNameLength+1,'x').c_str(),names) &&
+            dp::ParseDeviceNames(std::string(dp::maxDeviceNameLength,'x').c_str(),names),"Name length limit is not 127");
+    Require(!dp::ParseDeviceNames("a|b|c|d|e|f|g|h|i",names) && dp::ParseDeviceNames("a|b|c|d|e|f|g|h",names),"More than 8 names accepted");
+
+    // As in run 20261103-104313: the keyboard listed first, then the pad.
+    const uint32_t keyboard=0x3cb8ca4,pad=0x3cc0cb4,wheel=0x4000010;
+    dp::InputDevice listed[]{{0x3cc0f74,keyboard,0},{0x3cc0eb4,pad,0},{0x4000020,wheel,0}};
+    const uint32_t wantWheel[]{wheel,pad},wantPad[]{pad},wantMissing[]{0x5000000};
+    Require(dp::PreferredDevice(listed,3,wantWheel,2,keyboard)==2,"The launcher's first device was not chosen");
+    Require(dp::PreferredDevice(listed,3,wantPad,1,keyboard)==1,"The pad was not chosen");
+    Require(dp::PreferredDevice(listed,3,wantMissing,1,keyboard)==1,"No match did not fall back to the first non-keyboard device");
+    const dp::InputDevice keyboardOnly[]{{0x3cc0f74,keyboard,0}};
+    Require(dp::PreferredDevice(keyboardOnly,1,wantPad,1,keyboard)==-1,"A keyboard-only list was given another device");
+    const dp::InputDevice padFirst[]{{0x3cc0eb4,pad,0},{0x3cc0f74,keyboard,0}};
+    Require(dp::PreferredDevice(padFirst,2,wantPad,1,keyboard)==0,"A device already first was not recognised");
+    const dp::InputDevice unusable[]{{0x3cc0f74,keyboard,0},{0,pad,0},{0x4000020,0,0}};
+    Require(dp::PreferredDevice(unusable,3,wantPad,1,keyboard)==-1,"An entry without a backend or family was chosen");
+    dp::MoveToFront(listed,2);
+    Require(listed[0].family==wheel && listed[1].family==keyboard && listed[2].family==pad,"The others' order changed");
+
+    std::vector<uint8_t> image(dp::deviceListRva+16,0xcc);
+    std::copy(std::begin(dp::deviceListEntry),std::end(dp::deviceListEntry),image.begin()+dp::deviceListRva);
+    const int32_t relative=static_cast<int32_t>(dp::deviceListRva-dp::deviceListReturnRva);
+    image[dp::deviceListReturnRva-5]=0xe8;
+    std::memcpy(image.data()+dp::deviceListReturnRva-4,&relative,sizeof(relative));
+    Require(dp::DeviceListMatches(image.data()),"Device list and its direct-start call not recognised");
+    const int32_t elsewhere=relative+16;
+    std::memcpy(image.data()+dp::deviceListReturnRva-4,&elsewhere,sizeof(elsewhere));
+    Require(!dp::DeviceListMatches(image.data()),"A call to another function was accepted");
 }
 
 std::vector<uint8_t> ExitImage(uintptr_t loadedBase) {
@@ -153,6 +198,8 @@ int main(int argc,char** argv) {
             image[dp::settingLookupRva+10]=0x78;
             Require(!dp::SettingLookupMatches(image.data()),"Settings lookup on another table accepted");
         }
+
+        DrivingDevice();
 
         uint8_t active=1,commandLine=1;
         Require(!dp::EndBenchmark(active,commandLine,1,0) && active==1,"Benchmark ended before the track was complete");

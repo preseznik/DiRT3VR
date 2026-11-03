@@ -297,6 +297,7 @@ void ObserveCreation(HRESULT result, ID3D11Device* device, IDXGISwapChain* chain
         if(state.supported && directpractice::ReturnRequested()) directpractice::InstallReturn(Log);
         if(state.supported && directpractice::RequestedDifficulty()>=0) directpractice::InstallDifficulty(Log);
         if(state.supported && directpractice::AssistsRequested()) directpractice::InstallAssists(Log);
+        if(state.supported && directpractice::Requested() && directpractice::DevicesRequested()) directpractice::InstallDevices(Log);
 #if defined(DIRT3VR_RESEARCH_PATCHES)
         if(state.supported && state.enabled) research::Apply(Log);
 #endif
