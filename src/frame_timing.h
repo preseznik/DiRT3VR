@@ -19,5 +19,7 @@ void Wait(LONGLONG started,LONGLONG periodNanoseconds);
 void Submitted(bool stereo);
 // After the native Present returns; started is Now() taken just before it.
 void Present(LONGLONG started);
+// The latest one-second GPU sample (the headset strip shares it), -1 if none.
+double GpuPercent();
 void Stop();
 }

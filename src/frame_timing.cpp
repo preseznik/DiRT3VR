@@ -145,6 +145,7 @@ void Present(LONGLONG started) {
     const auto tick=GetTickCount64();
     if (tick>=state->nextWrite) {Write(false);state->nextWrite=tick+writeInterval;}
 }
+double GpuPercent() { return Owner() ? state->gpu.Percent() : -1; }
 void Stop() {
     if (!Owner()) return;
     auto& slot=state->slots[state->current];

@@ -21,10 +21,10 @@ LUID adapterLuid{};
 std::vector<std::string> calls;
 std::vector<std::string> diagnosticMessages;
 std::deque<XrSessionState> events;
-std::array<ComPtr<ID3D11Texture2D>,4> textures;
-std::array<bool,4> acquired{},waited{};
-XrSwapchain seatChain{};
-XrCompositionLayerQuad lastSeat{XR_TYPE_COMPOSITION_LAYER_QUAD};
+std::array<ComPtr<ID3D11Texture2D>,5> textures;
+std::array<bool,5> acquired{},waited{};
+XrSwapchain seatChain{},perfChain{};
+XrCompositionLayerQuad lastSeat{XR_TYPE_COMPOSITION_LAYER_QUAD},lastPerf{XR_TYPE_COMPOSITION_LAYER_QUAD};
 bool shouldRender=true,validTracking=true,fullTracking=true,badLuid=false,badPose=false,timeoutForever=false;
 unsigned chainCount{},imageCount=2,timeoutCount{},layers{},endFrames{},sessions{},destroyedSessions{},destroyedInstances{},destroyedChains{};
 int failAcquire=-1,failChain=-1;
@@ -46,7 +46,7 @@ void Reset() {
     chainCount=timeoutCount=layers=endFrames=sessions=destroyedSessions=destroyedInstances=destroyedChains=imageIndex=0;
     imageCount=2; failAcquire=failChain=-1; headHeight=1.4f; headX=headZ=0;
     recommendedWidth=64; recommendedHeight=48;
-    headOrientation={0,0,0,1}; lastLayerType=XR_TYPE_UNKNOWN; lastQuad=lastSeat={XR_TYPE_COMPOSITION_LAYER_QUAD}; seatChain={};
+    headOrientation={0,0,0,1}; lastLayerType=XR_TYPE_UNKNOWN; lastQuad=lastSeat=lastPerf={XR_TYPE_COMPOSITION_LAYER_QUAD}; seatChain=perfChain={};
 }
 void CompletePair(XrRuntime::Frame& frame) {
     for(unsigned index=0;index<2;++index) {
@@ -103,8 +103,9 @@ XRAPI_ATTR XrResult XRAPI_CALL xrCreateReferenceSpace(XrSession,const XrReferenc
 XRAPI_ATTR XrResult XRAPI_CALL xrDestroySpace(XrSpace) { return XR_SUCCESS; }
 XRAPI_ATTR XrResult XRAPI_CALL xrCreateSwapchain(XrSession,const XrSwapchainCreateInfo* info,XrSwapchain* chain) {
     if(int(chainCount)==failChain) return XR_ERROR_RUNTIME_FAILURE;
-    Require(chainCount<4 && info->arraySize==1 && info->sampleCount==1,"Unexpected eye resource count or layout");
+    Require(chainCount<5 && info->arraySize==1 && info->sampleCount==1,"Unexpected eye resource count or layout");
     if(info->width==XrRuntime::SeatPanelWidth && info->height==XrRuntime::SeatPanelHeight) seatChain=XrSwapchain(10+chainCount);
+    if(info->width==XrRuntime::PerfPanelWidth && info->height==XrRuntime::PerfPanelHeight) perfChain=XrSwapchain(10+chainCount);
     D3D11_TEXTURE2D_DESC desc{}; desc.Width=info->width; desc.Height=info->height;
     desc.Format=DXGI_FORMAT(info->format); desc.MipLevels=desc.ArraySize=desc.SampleDesc.Count=1;
     desc.BindFlags=D3D11_BIND_RENDER_TARGET;
@@ -161,7 +162,7 @@ XRAPI_ATTR XrResult XRAPI_CALL xrEndFrame(XrSession,const XrFrameEndInfo* info) 
     lastLayerType=layers ? info->layers[0]->type : XR_TYPE_UNKNOWN;
     Require(info->displayTime==12345,"Frame ended with wrong display time");
     if(layers) {
-        Require(layers<=3 && std::none_of(acquired.begin(),acquired.end(),[](bool image) { return image; }),"Submitted layer retains an acquired image");
+        Require(layers<=4 && std::none_of(acquired.begin(),acquired.end(),[](bool image) { return image; }),"Submitted layer retains an acquired image");
         for(unsigned i=1;i<layers;++i) {
             Require(lastLayerType==XR_TYPE_COMPOSITION_LAYER_PROJECTION && info->layers[i]->type==XR_TYPE_COMPOSITION_LAYER_QUAD,"HUD and seat panel must follow the stereo world");
             const auto& quad=*reinterpret_cast<const XrCompositionLayerQuad*>(info->layers[i]);
@@ -170,6 +171,13 @@ XRAPI_ATTR XrResult XRAPI_CALL xrEndFrame(XrSession,const XrFrameEndInfo* info) 
                 Require(i==layers-1 && quad.space==XrSpace(3) && quad.eyeVisibility==XR_EYE_VISIBILITY_BOTH &&
                     quad.subImage.imageRect.extent.width==int32_t(XrRuntime::SeatPanelWidth) && quad.subImage.imageRect.extent.height==int32_t(XrRuntime::SeatPanelHeight) &&
                     quad.layerFlags==(XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT|XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT),"Seat panel not on top, or its image or transparency invalid");
+                continue;
+            }
+            if(perfChain && quad.subImage.swapchain==perfChain) {
+                lastPerf=quad;
+                Require(quad.space==XrSpace(3) && quad.layerFlags==0 && (i==layers-1 || reinterpret_cast<const XrCompositionLayerQuad*>(info->layers[i+1])->subImage.swapchain==seatChain) &&
+                    quad.subImage.imageRect.extent.width==int32_t(XrRuntime::PerfPanelWidth) && quad.subImage.imageRect.extent.height==int32_t(XrRuntime::PerfPanelHeight),
+                    "FPS strip not opaque, misplaced in the layer order, or its image invalid");
                 continue;
             }
             lastQuad=quad;
@@ -245,6 +253,25 @@ int main() {
             auto frame=runtime.BeginFrame(1); CompletePair(frame);
             { auto seat=frame.AcquireSeatPanel(); Require(!seat,"Seat panel acquired without the menu"); }
             frame.Abort();
+        }
+        Reset(); { // FPS / GPU strip: below the recentered HUD, or below the view when following; under the seat panel.
+            XrRuntime runtime; Require(runtime.Initialize(device.Get(),1.f,0,0,true,true,true) && chainCount==5 && perfChain==XrSwapchain(14),"FPS strip resources unavailable");
+            const auto strip=[&](XrRuntime::Frame& frame) { auto image=frame.AcquirePerfPanel(); Require(image && image.Width()==XrRuntime::PerfPanelWidth && image.Complete(),"FPS strip acquire/release failed"); };
+            { auto frame=runtime.BeginFrame(1); { auto image=frame.AcquirePerfPanel(); Require(!image,"FPS strip before the stereo pair"); } frame.Abort(); }
+            { auto frame=runtime.BeginFrame(2); CompletePair(frame); strip(frame);
+              Require(frame.ShowPerfPanel(false) && frame.Submit() && layers==2 && Near(lastPerf.pose.position.y,.8f) && Near(lastPerf.pose.position.z,-2.f) &&
+                      Near(lastPerf.size.width,.8f) && Near(lastPerf.size.height,.1f),"Fixed FPS strip not below the HUD position"); }
+            { auto frame=runtime.BeginFrame(3); CompletePair(frame);
+              { auto hud=frame.AcquireOverlay(); Require(hud.Complete(),"HUD release failed"); }
+              strip(frame);
+              { auto seat=frame.AcquireSeatPanel(); Require(seat.Complete(),"Seat panel release failed"); }
+              Require(frame.ShowPerfPanel(false) && frame.ShowSeatPanel({{0,0,0,1},{0,1.3f,-1}},.6f,.8f) && frame.SubmitOverlay(4.f/3.f) && layers==4,"HUD, FPS strip and seat panel did not submit together"); }
+            { auto frame=runtime.BeginFrame(4); CompletePair(frame); strip(frame); Require(!frame.Submit() && layers==0,"FPS strip without ShowPerfPanel submitted"); }
+            headOrientation={0,std::sin(.7853982f),0,std::cos(.7853982f)};
+            { auto frame=runtime.BeginFrame(5); CompletePair(frame); strip(frame);
+              Require(frame.ShowPerfPanel(true) && frame.Submit() && Near(lastPerf.pose.position.x,-1.5f) && Near(lastPerf.pose.position.y,.95f) && Near(lastPerf.pose.position.z,0) &&
+                      Near(lastPerf.size.width,.6f),"Following FPS strip not below the view"); }
+            { auto frame=runtime.BeginScreenFrame(6); { auto image=frame.AcquirePerfPanel(); Require(!image,"Screen frame acquired the FPS strip"); } frame.Abort(); }
         }
         Reset(); { // HUD placement: distance at the same angular size, fixed or following the view.
             XrRuntime runtime; Require(runtime.Initialize(device.Get(),1.f,0,0,true),"HUD init failed");

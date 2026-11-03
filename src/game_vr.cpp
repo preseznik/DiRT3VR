@@ -17,6 +17,7 @@
 #include "seat_input.h"
 #include "hud_placement.h"
 #include "frame_timing.h"
+#include "performance_display.h"
 #include <windows.h>
 #include <MinHook.h>
 #include <array>
@@ -78,6 +79,10 @@ struct PrototypeState {
     XrPosef seatPanelPose{{0,0,0,1},{0,0,-1}};
     unsigned seatOpenings{};
     bool seatActive{};
+    // FPS / GPU strip in the headset (#4896ffd3), when DIRT3VR_PERF_DISPLAY is "1".
+    PerformanceStrip perf;
+    TexturePresenter perfPresenter{RuntimeLog};
+    bool perfDisplay{},perfFollow{};
 };
 // Explicit render-thread teardown is necessary. A static XR destructor would
 // otherwise run under the DLL loader lock during process exit.
@@ -223,7 +228,7 @@ void Stop(PrototypeState& state,const char* reason) noexcept {
     state.pendingFrame.reset(); EndPresentationFrame(); ResetFrontendShadowResources();
     try { frametiming::Stop(); } catch(...) { } // Writes the final performance-summary.json.
     if(state.seat) state.seat->Inactive();
-    state.seatActive=false; state.seatPresenter.Reset();
+    state.seatActive=false; state.seatPresenter.Reset(); state.perfPresenter.Reset();
     state.hud.Reset(); state.hudPresenter.Reset(); state.presenter.Reset(); state.xr.Shutdown(); state.device.Reset();
     RuntimeLog("XR prototype shutdown complete");
 }
@@ -363,6 +368,20 @@ seat::Position UpdateSeat(PrototypeState& state,const XrRuntime::Frame& frame,bo
     }
     return state.seat->Offset();
 }
+// A launcher switch: "1" turns it on, anything else (or nothing) leaves it off.
+bool EnvironmentFlag(const char* variable) {
+    char text[4]{};
+    return GetEnvironmentVariableA(variable,text,sizeof(text))==1 && text[0]=='1';
+}
+// The FPS / GPU strip below the HUD, refreshed once per second. Only a drawn strip is acquired.
+void DrawPerfPanel(PrototypeState& state,XrRuntime::Frame& frame) {
+    if(!state.perfDisplay) return;
+    auto* strip=state.perf.Render(state.device.Get(),GetTickCount64(),frametiming::GpuPercent());
+    if(!strip) return;
+    auto image=frame.AcquirePerfPanel();
+    if(image && state.perfPresenter.Draw(strip,image.Target(),image.Width(),image.Height()) && image.Complete())
+        frame.ShowPerfPanel(state.perfFollow);
+}
 // The open seat menu's panel, on top of the HUD. Only an image that was drawn is acquired.
 void DrawSeatPanel(PrototypeState& state,XrRuntime::Frame& frame) {
     if(!state.seat || !state.seat->PanelOpen()) return;
@@ -389,10 +408,16 @@ bool Prepare(PrototypeState& state,ID3D11Texture2D* back) {
             Stop(state,"scene-resolution-mismatch"); return false;
         }
     }
-    if(InteractiveVrEnabled()) OpenSeatChannel(state,device.Get());
+    if(InteractiveVrEnabled()) {
+        OpenSeatChannel(state,device.Get());
+        state.perfDisplay=EnvironmentFlag("DIRT3VR_PERF_DISPLAY") && state.perfPresenter.Initialize(device.Get());
+        state.perfFollow=EnvironmentFlag("DIRT3VR_PERF_FOLLOW");
+        if(state.log) state.log("XR FPS display=%u follow=%u",unsigned(state.perfDisplay),unsigned(state.perfFollow));
+    }
     if(!state.presenter.Initialize(device.Get()) ||
        (state.resolution.width && !state.hudPresenter.Initialize(device.Get())) ||
-       !state.xr.Initialize(device.Get(),state.resolution.width ? 1.f : .5f,state.resolution.width,state.resolution.height,state.resolution.width!=0,state.seat.has_value())) {
+       !state.xr.Initialize(device.Get(),state.resolution.width ? 1.f : .5f,state.resolution.width,state.resolution.height,state.resolution.width!=0,
+                            state.seat.has_value(),state.perfDisplay)) {
         Stop(state,"initialization"); return false;
     }
     state.device=device;
@@ -534,7 +559,7 @@ void VrBeforePresent(IDXGISwapChain* chain) noexcept {
             const bool introScreen=IntroScreenActive(video);
             const auto transitions=TransitionDrawsSuppressed();
             auto& frame=*state->pendingFrame;
-            if(!introScreen) DrawSeatPanel(*state,frame);
+            if(!introScreen) { DrawPerfPanel(*state,frame); DrawSeatPanel(*state,frame); }
             auto* image=state->hud.Current(state->pendingScene);
             bool successful{};
             if(introScreen || image) {
@@ -553,6 +578,7 @@ void VrBeforePresent(IDXGISwapChain* chain) noexcept {
             }
             state->previousVideo=video; state->previousIntroScreen=introScreen; state->previousTransitions=transitions;
             if(successful) frametiming::Submitted(!introScreen);
+            if(successful && !introScreen) state->perf.Submitted(GetTickCount64());
             if(successful) {
                 if(introScreen) state->history.Reset();
                 else state->history.Completed(state->pendingPlugin,state->boundary.Sequence(),state->xr.ReferenceRevision());
