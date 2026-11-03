@@ -29,6 +29,8 @@ from diagnostic_files import (BLOOM_NAMES, DiagnosticFiles, FLOW_NAME, KEYBOARD_
 EXPECTED_EXE = "c502b495bb34a097440756769c80dcb36a79b618943f739e20d591d54171ff98"
 ROOT = Path(__file__).resolve().parents[1]
 REPLAY_PAIR_COUNT = 120
+# The game's own MSAA levels (docs/research/graphics-options.md); VR sessions write "off" today (#c8076a1e).
+MULTISAMPLING = ("off", "2xmsaa", "4xmsaa", "8xmsaa")
 REPLAY_SAMPLE_OFFSETS = (0, 60, 119)
 REPLAY_LINE = re.compile(
     r"Replay pair main=(\d+) ready=(\d+) restored=(\d+) calls=(\d+) sampled=(\d+) "
@@ -214,7 +216,7 @@ def diagnostic_environment(directory: Path, *, scene_observer: bool = False, rep
 
 
 def summarize_benchmark(path: Path, *, serial_render: bool = False, track: str = "aspen", route: str = "route_0",
-                        cars_expected: tuple[str, ...] = ("frx",)) -> dict:
+                        cars_expected: tuple[str, ...] = ("frx",), multisampling: str = "off") -> dict:
     """Check game-produced results instead of treating a filename as acceptance."""
     root = ET.parse(path).getroot()
     tracks = root.findall("track")
@@ -230,7 +232,7 @@ def summarize_benchmark(path: Path, *, serial_render: bool = False, track: str =
     expected = {"graphics_card/directx": {"forcedx9": "false"},
                 "graphics_card/stereo": {"enabled": "false"},
                 "graphics_card/resolution": {"width": "1280", "height": "720", "fullscreen": "false",
-                                             "vsync": "0", "multisampling": "off"}}
+                                             "vsync": "0", "multisampling": multisampling}}
     if serial_render:
         expected["cpu/threadStrategy"] = {"parallelUpdateRender": "false"}
     scheduling = hardware.find("cpu/threadStrategy") if hardware is not None else None
@@ -251,7 +253,7 @@ def summarize_benchmark(path: Path, *, serial_render: bool = False, track: str =
             "observedConfiguration": observed, "configurationMismatches": mismatches}
 
 
-def diagnostic_hardware(data: bytes, *, serial_render: bool = False) -> bytes:
+def diagnostic_hardware(data: bytes, *, serial_render: bool = False, multisampling: str = "off") -> bytes:
     """Build the unique diagnostic input without writing the user's settings file."""
     root = ET.fromstring(data)
     required = ["cpu/threadStrategy", "graphics_card/directx", "graphics_card/stereo", "graphics_card/resolution"]
@@ -261,7 +263,9 @@ def diagnostic_hardware(data: bytes, *, serial_render: bool = False) -> bytes:
         root.find("cpu/threadStrategy").set("parallelUpdateRender", "false")
     root.find("graphics_card/directx").set("forcedx9", "false")
     root.find("graphics_card/stereo").set("enabled", "false")
-    for key, value in {"width": "1280", "height": "720", "fullscreen": "false", "vsync": "0", "multisampling": "off"}.items():
+    if multisampling not in MULTISAMPLING:
+        raise ValueError(f"Unsupported multisampling {multisampling!r}; no files changed")
+    for key, value in {"width": "1280", "height": "720", "fullscreen": "false", "vsync": "0", "multisampling": multisampling}.items():
         root.find("graphics_card/resolution").set(key, value)
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
@@ -512,6 +516,8 @@ def main() -> int:
                         help="Research: zero the BloomFromDsX4 mixes of postprocess/effects.xml and tracks/generic/(night_)effects.xml (tools/bloom.py; journaled and restored)")
     parser.add_argument("--anisotropy", type=int, choices=(0, 1, 2, 4, 8, 16),
                         help="Anisotropic filtering level for the game's samplers (DIRT3VR_ANISOTROPY; 1 = trilinear); unset leaves them as the game made them")
+    parser.add_argument("--msaa", choices=MULTISAMPLING, default="off",
+                        help="The game's MSAA (graphics_card/resolution@multisampling) for this run; default off, as VR sessions write it")
     parser.add_argument("--research-patch", metavar="RVA:ORIGINAL:REPLACEMENT",
                         help="Research only: in-memory code change applied by the research proxy (build/native/bin/research/d3d11.dll, pass it with --proxy) after its original bytes match")
     parser.add_argument("--screenshots", metavar="SECONDS",
@@ -638,7 +644,7 @@ def main() -> int:
     proxy_bytes = args.proxy.read_bytes()
     hardware_source = hardware_dir / "hardware_settings_config.xml"
     no_links(hardware_source)
-    hardware_bytes = diagnostic_hardware(hardware_source.read_bytes(), serial_render=args.serial_render)
+    hardware_bytes = diagnostic_hardware(hardware_source.read_bytes(), serial_render=args.serial_render, multisampling=args.msaa)
     restrictions = preflight_serial_render(game) if args.serial_render else None
     xr_runtime = preflight_xr_manifest(args.xr_runtime) if args.xr_runtime else None
     spectator = preflight_replacement(game, SPECTATOR_NAME) if args.spectator_human_switch else None
@@ -662,7 +668,7 @@ def main() -> int:
                  "stereo": False, "sceneObserver": args.scene_observer,
                  "serialRender": args.serial_render, "replayPair": args.replay_pair,
                  "xrRuntime": xr_runtime, "backgroundPlay": args.background_play, "researchPatch": args.research_patch,
-                 "spectatorHumanSwitch": args.spectator_human_switch, "noBloom": args.no_bloom, "anisotropy": args.anisotropy,"directPractice": args.direct_practice,
+                 "spectatorHumanSwitch": args.spectator_human_switch, "noBloom": args.no_bloom, "anisotropy": args.anisotropy, "multisampling": args.msaa, "directPractice": args.direct_practice,
                  "playerHardwareSettings": args.player_hardware_settings, "directLaps": args.direct_laps, "directReturn": args.direct_return, "scene": scene,
                  "durationSeconds": args.seconds}
     if restrictions:
@@ -882,7 +888,7 @@ def main() -> int:
                 kept = run / result.name
                 kept.write_bytes(result.read_bytes())
                 summary = summarize_benchmark(kept, serial_render=args.serial_render, track=scene["track"],
-                                              route=scene["route"], cars_expected=tuple(scene["cars"]))
+                                              route=scene["route"], cars_expected=tuple(scene["cars"]), multisampling=args.msaa)
                 # The result is this run's own file (its run id is in the name); keep only the copy.
                 if kept.read_bytes() == result.read_bytes():
                     result.unlink()

@@ -62,6 +62,19 @@ class SerialRenderTransformTests(unittest.TestCase):
         self.assertEqual(serial.find("graphics_card/resolution").get("extra"), "keep")
         self.assertIn(b'parallelUpdateRender="true"', original)
 
+    def test_diagnostic_input_sets_only_the_requested_multisampling(self):
+        original = (b'<hardware_settings_config version="56"><cpu><threadStrategy parallelUpdateRender="true"/></cpu>'
+                    b'<graphics_card><directx forcedx9="true"/><stereo enabled="true"/><resolution width="1920" height="1080" multisampling="8xcsaa"/></graphics_card>'
+                    b'</hardware_settings_config>')
+        self.assertEqual(ET.fromstring(diagnostic_hardware(original)).find("graphics_card/resolution").get("multisampling"), "off")
+        for level in ("2xmsaa", "4xmsaa", "8xmsaa"):
+            with self.subTest(level=level):
+                resolution = ET.fromstring(diagnostic_hardware(original, multisampling=level)).find("graphics_card/resolution")
+                self.assertEqual((resolution.get("multisampling"), resolution.get("width"), resolution.get("fullscreen")), (level, "1280", "false"))
+        for unsupported in ("16xmsaa", "8xcsaa", "4", ""):
+            with self.subTest(unsupported=unsupported), self.assertRaises(ValueError):
+                diagnostic_hardware(original, multisampling=unsupported)
+
 
 class SerialRenderTransactionTests(unittest.TestCase):
     def setUp(self):
