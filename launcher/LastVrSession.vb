@@ -26,6 +26,8 @@ Public NotInheritable Class LastVrSession
     Public Property Performance As MeasuredPerformance
     ' The VR quality the session ran with (session.json, GraphicsRecommendation.VrQuality), or Nothing for older sessions.
     Public Property VrQuality As Dictionary(Of String, String)
+    ' The session's VR anti-aliasing (#c8076a1e); sessions before it always ran with it off. Nothing if not valid.
+    Public Property VrAntiAliasing As String = "off"
 
     Public Shared Function Parse(log As String, startedUtc As DateTime) As LastVrSession
         Dim scene = Requested.Match(log)
@@ -69,7 +71,7 @@ Public NotInheritable Class LastVrSession
                     text = New String(buffer, 0, reader.ReadBlock(buffer, 0, buffer.Length))
                 End Using
                 Dim result = Parse(text, Directory.GetCreationTimeUtc(folder))
-                If result IsNot Nothing Then result.Performance = MeasuredPerformance.Load(folder) : result.VrQuality = ReadVrQuality(folder)
+                If result IsNot Nothing Then result.Performance = MeasuredPerformance.Load(folder) : result.VrQuality = ReadVrQuality(folder) : result.VrAntiAliasing = ReadVrAntiAliasing(folder)
                 Return result
             Next
         Catch ex As Exception When TypeOf ex Is IOException OrElse TypeOf ex Is UnauthorizedAccessException
@@ -84,7 +86,20 @@ Public NotInheritable Class LastVrSession
 
     Private Class SessionQuality
         Public Property VrQuality As Dictionary(Of String, String)
+        Public Property VrAntiAliasing As String
     End Class
+
+    ' The VR anti-aliasing a session recorded: "off" for older sessions; Nothing when the value isn't valid.
+    Private Shared Function ReadVrAntiAliasing(folder As String) As String
+        Dim info = Path.Combine(folder, "session.json")
+        If Not File.Exists(info) Then Return "off"
+        Try
+            Dim recorded = SafeFiles.ReadJson(Of SessionQuality)(info)?.VrAntiAliasing
+            Return If(recorded Is Nothing, "off", If(LauncherSettings.VrAntiAliasingChoices.Contains(recorded), recorded, Nothing))
+        Catch ex As Exception When TypeOf ex Is System.Text.Json.JsonException OrElse TypeOf ex Is IOException OrElse TypeOf ex Is UnauthorizedAccessException
+            Return Nothing
+        End Try
+    End Function
 
     ' The VR quality a session recorded; Nothing when it didn't (older builds) or it isn't valid.
     Private Shared Function ReadVrQuality(folder As String) As Dictionary(Of String, String)

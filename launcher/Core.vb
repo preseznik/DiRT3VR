@@ -220,6 +220,11 @@ Public Class LauncherSettings
     Public Shared ReadOnly AnisotropyLevels As Integer() = {0, 1, 2, 4, 8, 16}
     Public Property DesktopAnisotropy As Integer
     Public Property VrAnisotropy As Integer
+    ' VR anti-aliasing (#c8076a1e): DiRT 3's own multisampling value for the VR session's graphics file. Lens's
+    ' runs showed the eye copy works unchanged at 2xmsaa and 4xmsaa (the backbuffer stays single-sample);
+    ' 8× isn't tested, so it isn't offered. Off by default, as every VR session ran before.
+    Public Shared ReadOnly VrAntiAliasingChoices As String() = {"off", "2xmsaa", "4xmsaa"}
+    Public Property VrAntiAliasing As String = "off"
     ' Seat positions on the monitor too (Launch, #b330cc4f): the same camera files, journaled for a desktop session.
     Public Property SeatOnDesktop As Boolean
     ' The in-game seat menu's key (#bd820b32, docs/seat-channel.md): opens it, and saves and closes it; 0 = none.
@@ -301,6 +306,7 @@ Public Class LauncherSettings
         If Not DirectPractice.GearboxChoices.Contains(DirectGearbox) Then Throw New IOException("Choose the gearbox for direct practice.")
         SeatAllCars = If(SeatAllCars, New SeatOffset) : SeatAllCars.ClearSessionFlags() : SeatAllCars.Validate()
         If HudDistance < 1D OrElse HudDistance > 5D OrElse HudDistance * 2D <> Decimal.Truncate(HudDistance * 2D) Then Throw New IOException("Choose a VR HUD distance from 1 to 5 m, in 0.5 m steps.")
+        If Not VrAntiAliasingChoices.Contains(VrAntiAliasing) Then Throw New IOException("Choose Off, 2× or 4× VR anti-aliasing.")
         If Not AnisotropyLevels.Contains(DesktopAnisotropy) OrElse Not AnisotropyLevels.Contains(VrAnisotropy) Then Throw New IOException("Choose Use game setting, Off, 2×, 4×, 8× or 16× anisotropic filtering.")
         If DesktopFov < -SeatOffset.FovNarrower OrElse DesktopFov > SeatOffset.FovWider Then Throw New IOException("Choose a cockpit field of view between " & SeatOffset.FovNarrower & "° narrower and " & SeatOffset.FovWider & "° wider.")
         Dim seats As New Dictionary(Of String, SeatOffset)(StringComparer.Ordinal)

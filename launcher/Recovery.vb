@@ -209,7 +209,7 @@ Public Class OwnedFileTransaction
         Select Case target
             Case "graphics"
                 Dim size = ExperimentalFiles.AppliedGraphicsSize(applied)
-                expected = ExperimentalFiles.Graphics(original, size.Width, size.Height, vrQuality)
+                expected = ExperimentalFiles.Graphics(original, size.Width, size.Height, vrQuality, ExperimentalFiles.AppliedMultisampling(applied))
             Case "restrictions" : expected = ExperimentalFiles.Restrictions(original)
             Case "startup" : expected = StartupMovies.Patch(original)
             Case "direct" : DirectPractice.Validate(applied) : expected = applied

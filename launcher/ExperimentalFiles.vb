@@ -6,7 +6,7 @@ Imports System.Xml.Linq
 ' Only verified graphics fields and bounded scene dimensions are changed.
 Public Module ExperimentalFiles
     Public Const RestrictionsHash As String = "45257db5fa64d833575d569ec6f3b03344b5f40be25830960a8d11783276470b"
-    Public Const ProfileDescription As String = "Experimental VR temporarily uses DirectX 11, serial rendering, headset-relative windowed rendering, VSync off and anti-aliasing off. Original graphics settings are restored after you quit."
+    Public Const ProfileDescription As String = "Experimental VR temporarily uses DirectX 11, serial rendering, headset-relative windowed rendering, VSync off and the VR anti-aliasing chosen below (off by default). Original graphics settings are restored after you quit."
 
     Private Function ReadXml(data As Byte()) As XDocument
         If data.Length > 10 * 1024 * 1024 Then Throw New IOException("Graphics XML is too large.")
@@ -21,15 +21,17 @@ Public Module ExperimentalFiles
     End Function
 
     ' vrQuality: VR-only graphics quality choices (GraphicsCatalog), part of this temporary transform.
-    Public Function Graphics(data As Byte(), Optional width As Integer = 1280, Optional height As Integer = 720, Optional vrQuality As IDictionary(Of String, String) = Nothing) As Byte()
+    ' multisampling: the VR anti-aliasing (LauncherSettings.VrAntiAliasingChoices, #c8076a1e), "off" by default.
+    Public Function Graphics(data As Byte(), Optional width As Integer = 1280, Optional height As Integer = 720, Optional vrQuality As IDictionary(Of String, String) = Nothing, Optional multisampling As String = "off") As Byte()
         HeadsetResolution.ValidateSceneSize(width, height)
+        If Not LauncherSettings.VrAntiAliasingChoices.Contains(multisampling) Then Throw New IOException("Unsupported VR anti-aliasing.")
         Dim document = ReadXml(data), root = document.Root
         If root Is Nothing OrElse root.Name <> "hardware_settings_config" Then Throw New IOException("Unexpected graphics XML root.")
         Dim changes As New Dictionary(Of String, Dictionary(Of String, String)) From {
             {"cpu/threadStrategy", New Dictionary(Of String, String) From {{"parallelUpdateRender", "false"}}},
             {"graphics_card/directx", New Dictionary(Of String, String) From {{"forcedx9", "false"}}},
             {"graphics_card/stereo", New Dictionary(Of String, String) From {{"enabled", "false"}}},
-            {"graphics_card/resolution", New Dictionary(Of String, String) From {{"width", width.ToString(Globalization.CultureInfo.InvariantCulture)}, {"height", height.ToString(Globalization.CultureInfo.InvariantCulture)}, {"fullscreen", "false"}, {"vsync", "0"}, {"multisampling", "off"}}}}
+            {"graphics_card/resolution", New Dictionary(Of String, String) From {{"width", width.ToString(Globalization.CultureInfo.InvariantCulture)}, {"height", height.ToString(Globalization.CultureInfo.InvariantCulture)}, {"fullscreen", "false"}, {"vsync", "0"}, {"multisampling", multisampling}}}}
         For Each change In changes
             Dim elements As IEnumerable(Of XElement) = {root}
             For Each name In change.Key.Split("/"c)
@@ -175,14 +177,21 @@ Public Module ExperimentalFiles
         Return New Drawing.Size(width, height)
     End Function
 
-    Public Function Changes(context As InstallContext, Optional width As Integer = 1280, Optional height As Integer = 720, Optional skipStartupMovies As Boolean = False, Optional vrQuality As IDictionary(Of String, String) = Nothing) As IReadOnlyDictionary(Of String, Byte())
+    ' The VR anti-aliasing a prepared graphics file holds, so recovery can recompute its exact transform.
+    Public Function AppliedMultisampling(data As Byte()) As String
+        Dim value = ReadXml(data).Root?.Element("graphics_card")?.Element("resolution")?.Attribute("multisampling")?.Value
+        If value Is Nothing OrElse Not LauncherSettings.VrAntiAliasingChoices.Contains(value) Then Throw New IOException("Invalid prepared anti-aliasing.")
+        Return value
+    End Function
+
+    Public Function Changes(context As InstallContext, Optional width As Integer = 1280, Optional height As Integer = 720, Optional skipStartupMovies As Boolean = False, Optional vrQuality As IDictionary(Of String, String) = Nothing, Optional multisampling As String = "off") As IReadOnlyDictionary(Of String, Byte())
         Dim payload = Path.Combine(context.PackageRoot, "payload", "d3d11.dll")
         For Each target In {context.GraphicsPath, Path.Combine(context.GameRoot, "system", "hardware_settings_restrictions.xml"), payload}
             SafeFiles.NoLinks(target)
             If Not File.Exists(target) Then Throw New IOException("Required experimental VR file is missing: " & target)
         Next
         Dim preparedFiles As New Dictionary(Of String, Byte()) From {
-            {"proxy", File.ReadAllBytes(payload)}, {"graphics", Graphics(File.ReadAllBytes(context.GraphicsPath), width, height, vrQuality)},
+            {"proxy", File.ReadAllBytes(payload)}, {"graphics", Graphics(File.ReadAllBytes(context.GraphicsPath), width, height, vrQuality, multisampling)},
             {"restrictions", Restrictions(File.ReadAllBytes(Path.Combine(context.GameRoot, "system", "hardware_settings_restrictions.xml")))}}
         If skipStartupMovies Then preparedFiles.Add("startup", StartupMovies.ReadPatch(context))
         Return preparedFiles

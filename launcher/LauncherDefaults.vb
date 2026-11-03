@@ -11,7 +11,7 @@ Public NotInheritable Class LauncherDefaults
         result.DesktopWidth = defaults.DesktopWidth : result.DesktopHeight = defaults.DesktopHeight
         result.DesktopDisplayMode = defaults.DesktopDisplayMode : result.DesktopVSync = defaults.DesktopVSync
         result.VrRenderScale = defaults.VrRenderScale
-        result.DesktopAnisotropy = defaults.DesktopAnisotropy : result.VrAnisotropy = defaults.VrAnisotropy
+        result.DesktopAnisotropy = defaults.DesktopAnisotropy : result.VrAnisotropy = defaults.VrAnisotropy : result.VrAntiAliasing = defaults.VrAntiAliasing
         result.GraphicsQuality = New Dictionary(Of String, String)
         result.VrGraphicsQuality = New Dictionary(Of String, String)
         Return result
