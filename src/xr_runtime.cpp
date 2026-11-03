@@ -1,6 +1,7 @@
 #include "xr_runtime.h"
 #include "vr_math.h"
 #include "headset_resolution.h"
+#include "xr_adapter.h"
 #include <dxgi.h>
 #include <algorithm>
 #include <cmath>
@@ -95,10 +96,11 @@ bool XrRuntime::InitializeResources(ID3D11Device* device,float scale,uint32_t ex
     if(!Check(requirementsFn(instance_,system_,&requirements),"graphics requirements")) return false;
     ComPtr<IDXGIDevice> dxgi; ComPtr<IDXGIAdapter> adapter; DXGI_ADAPTER_DESC desc{};
     if(FAILED(device->QueryInterface(IID_PPV_ARGS(&dxgi))) || FAILED(dxgi->GetAdapter(&adapter)) ||
-       FAILED(adapter->GetDesc(&desc)) || memcmp(&desc.AdapterLuid,&requirements.adapterLuid,sizeof(LUID)) ||
+       FAILED(adapter->GetDesc(&desc)) || !RequiredAdapter(requirements.adapterLuid,desc.AdapterLuid) ||
        device->GetFeatureLevel()<requirements.minFeatureLevel) {
         Report("XR rejected game D3D11 adapter or feature level"); return false;
     }
+    if(AnyAdapter(requirements.adapterLuid)) Report("XR runtime names no graphics adapter; using the game's");
     device_=device;
     XrGraphicsBindingD3D11KHR binding{XR_TYPE_GRAPHICS_BINDING_D3D11_KHR}; binding.device=device;
     XrSessionCreateInfo session{XR_TYPE_SESSION_CREATE_INFO}; session.next=&binding; session.systemId=system_;
