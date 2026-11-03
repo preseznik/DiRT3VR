@@ -51,7 +51,13 @@ bool InstalledGameMatches(const char* path) {
     file.read(reinterpret_cast<char*>(devices.data()+dp::deviceListRva),sizeof(dp::deviceListEntry));
     file.seekg(static_cast<std::streamoff>(dp::deviceListReturnRva-5-0x1000+0x400));
     file.read(reinterpret_cast<char*>(devices.data()+dp::deviceListReturnRva-5),5);
-    return file && dp::DeviceListMatches(devices.data());
+    if(!file || !dp::DeviceListMatches(devices.data())) return false;
+    std::vector<uint8_t> bind(dp::bindRva+sizeof(dp::bindEntry),0);
+    file.seekg(static_cast<std::streamoff>(dp::bindRva-0x1000+0x400));
+    file.read(reinterpret_cast<char*>(bind.data()+dp::bindRva),sizeof(dp::bindEntry));
+    file.seekg(static_cast<std::streamoff>(dp::bindPlayerOneReturnRva-5-0x1000+0x400));
+    file.read(reinterpret_cast<char*>(bind.data()+dp::bindPlayerOneReturnRva-5),5);
+    return file && dp::BindMatches(bind.data());
 }
 
 void DrivingDevice() {
@@ -79,8 +85,30 @@ void DrivingDevice() {
     Require(dp::PreferredDevice(padFirst,2,wantPad,1,keyboard)==0,"A device already first was not recognised");
     const dp::InputDevice unusable[]{{0x3cc0f74,keyboard,0},{0,pad,0},{0x4000020,0,0}};
     Require(dp::PreferredDevice(unusable,3,wantPad,1,keyboard)==-1,"An entry without a backend or family was chosen");
-    dp::MoveToFront(listed,2);
-    Require(listed[0].family==wheel && listed[1].family==keyboard && listed[2].family==pad,"The others' order changed");
+
+    // iztok's 18:13 logs: keyboard, pad, G920; the launcher binds the G920 (steering) and the pad.
+    auto extra=dp::ArrangeDevices(listed,3,2,wantWheel,2);
+    Require(listed[0].family==wheel && listed[1].family==keyboard && listed[2].family==pad,"The keyboard is not left for player 2");
+    Require(extra.size()==1 && extra[0].family==pad && extra[0].backend==0x3cc0eb4,"The pad is not bound to player 1 too");
+    // Only the launcher's device asked for: nothing else is bound.
+    dp::InputDevice single[]{{0x3cc0f74,keyboard,0},{0x3cc0eb4,pad,0}};
+    Require(dp::ArrangeDevices(single,2,1,wantPad,1).empty() && single[0].family==pad && single[1].family==keyboard,"A single device changed");
+    // Already first, with another launcher device listed before the keyboard: it moves behind it.
+    dp::InputDevice padFirstToo[]{{0x3cc0eb4,pad,0},{0x4000020,wheel,0},{0x3cc0f74,keyboard,0}};
+    extra=dp::ArrangeDevices(padFirstToo,3,0,wantWheel,2);
+    Require(padFirstToo[0].family==pad && padFirstToo[1].family==keyboard && padFirstToo[2].family==wheel &&
+            extra.size()==1 && extra[0].family==wheel,"A device already first did not bind the others");
+    // No keyboard: the second launcher device stays player 2's, not both players'.
+    dp::InputDevice noKeyboard[]{{0x3cc0eb4,pad,0},{0x4000020,wheel,0}};
+    Require(dp::ArrangeDevices(noKeyboard,2,1,wantWheel,2).empty() && noKeyboard[0].family==wheel && noKeyboard[1].family==pad,
+            "A device would be bound to both players");
+    // Two pads of the same family: both drive player 1.
+    dp::InputDevice twoPads[]{{0x3cc0f74,keyboard,0},{0x3cc0eb4,pad,0},{0x3cc0eb4,pad,1}};
+    extra=dp::ArrangeDevices(twoPads,3,1,wantPad,1);
+    Require(extra.size()==1 && extra[0].index==1 && twoPads[1].family==keyboard,"A second pad was not bound to player 1");
+    // Unusable entries are never bound.
+    dp::InputDevice broken[]{{0x3cc0f74,keyboard,0},{0x4000020,wheel,0},{0,pad,0}};
+    Require(dp::ArrangeDevices(broken,3,1,wantWheel,2).empty(),"An entry without a backend was bound");
 
     std::vector<uint8_t> image(dp::deviceListRva+16,0xcc);
     std::copy(std::begin(dp::deviceListEntry),std::end(dp::deviceListEntry),image.begin()+dp::deviceListRva);
@@ -91,6 +119,15 @@ void DrivingDevice() {
     const int32_t elsewhere=relative+16;
     std::memcpy(image.data()+dp::deviceListReturnRva-4,&elsewhere,sizeof(elsewhere));
     Require(!dp::DeviceListMatches(image.data()),"A call to another function was accepted");
+
+    std::vector<uint8_t> bind(dp::bindRva+16,0xcc);
+    std::copy(std::begin(dp::bindEntry),std::end(dp::bindEntry),bind.begin()+dp::bindRva);
+    const int32_t toBind=static_cast<int32_t>(dp::bindRva-dp::bindPlayerOneReturnRva);
+    bind[dp::bindPlayerOneReturnRva-5]=0xe8;
+    std::memcpy(bind.data()+dp::bindPlayerOneReturnRva-4,&toBind,sizeof(toBind));
+    Require(dp::BindMatches(bind.data()),"The bind and player 1's call to it not recognised");
+    bind[dp::bindRva+4]=0x00;
+    Require(!dp::BindMatches(bind.data()),"A different bind entry was accepted");
 }
 
 std::vector<uint8_t> ExitImage(uintptr_t loadedBase) {

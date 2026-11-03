@@ -216,10 +216,17 @@ bool ReadDevices(std::vector<std::string>& names) {
     return length && length<sizeof(text) && ParseDeviceNames(text,names);
 }
 using DeviceListFn=int (__thiscall*)(void*,void*);
+using BindFn=void* (__thiscall*)(void*,int,const InputDevice*);
 DeviceListFn realDeviceList{};
+BindFn realBind{};
 void (*devicesLog)(const char*,...){};
 std::vector<std::string> deviceNames;
 std::atomic<unsigned> deviceReports{};
+// The launcher's other listed devices, from the list call to player 1's bind (both run on the
+// game thread inside the direct start); kept alive for the game's own copy.
+std::mutex extraLock;
+std::vector<InputDevice> extraDevices;
+std::vector<std::string> extraNames;
 
 // The game's id for a name (0xccfe30 fills a 4-byte id object); its table exists once the
 // game lists devices, so this runs inside the hook.
@@ -244,16 +251,49 @@ int __fastcall DeviceList(void* service,void*,void* out) {
     for(const auto& name:deviceNames) wanted.push_back(Intern(image,name.c_str()));
     const uint32_t keyboard=Intern(image,"keyboard");
     const int index=PreferredDevice(first,count,wanted.data(),wanted.size(),keyboard);
-    if(index<=0) return result;
+    if(index<0) return result;
     const auto chosen=first[index].family;
-    MoveToFront(first,static_cast<size_t>(index));
-    if(deviceReports.fetch_add(1)<4) {
-        const auto match=std::find(wanted.begin(),wanted.end(),chosen);
-        devicesLog("Direct practice device: %s (listed %u of %u) moved first, so DiRT 3 binds it to player 1",
-                   match!=wanted.end() ? deviceNames[static_cast<size_t>(match-wanted.begin())].c_str() : "the first non-keyboard device",
-                   static_cast<unsigned>(index+1),static_cast<unsigned>(count));
+    const auto name=[&](uint32_t family) {
+        const auto match=std::find(wanted.begin(),wanted.end(),family);
+        return match!=wanted.end() ? deviceNames[static_cast<size_t>(match-wanted.begin())] : std::string("the first non-keyboard device");
+    };
+    auto extra=ArrangeDevices(first,count,static_cast<size_t>(index),wanted.data(),wanted.size());
+    if(!realBind) extra.clear();
+    {
+        std::lock_guard lock(extraLock);
+        extraNames.clear();
+        for(const auto& device:extra) extraNames.push_back(name(device.family));
+        extraDevices=std::move(extra);
     }
+    if(deviceReports.fetch_add(1)<4)
+        devicesLog("Direct practice device: %s (listed %u of %u) moved first, so DiRT 3 binds it to player 1",
+                   name(chosen).c_str(),static_cast<unsigned>(index+1),static_cast<unsigned>(count));
     return result;
+}
+
+// Player 1's bind in the direct start: the game's own device first, then the launcher's others.
+void* __fastcall Bind(void* service,void*,int map,const InputDevice* device) {
+    void* const result=realBind(service,map,device);
+    const auto* image=reinterpret_cast<const uint8_t*>(GetModuleHandleW(nullptr));
+    if(_ReturnAddress()!=image+bindPlayerOneReturnRva) return result;
+    std::lock_guard lock(extraLock);
+    for(size_t i=0;i<extraDevices.size();++i) {
+        realBind(service,map,&extraDevices[i]);
+        devicesLog("Direct practice device: %s also bound to player 1",extraNames[i].c_str());
+    }
+    extraNames.clear();
+    extraDevices.clear();
+    return result;
+}
+
+// Optional: without it only the first device drives, as before.
+void InstallBind(uint8_t* image,void (*log)(const char*,...)) {
+    auto* target=image+bindRva;
+    const char* problem{};
+    if(!BindMatches(image)) problem="bind instructions differ";
+    else if(MH_CreateHook(target,reinterpret_cast<void*>(&Bind),reinterpret_cast<void**>(&realBind))!=MH_OK) problem="bind hook not created";
+    else if(MH_EnableHook(target)!=MH_OK) { MH_RemoveHook(target); problem="bind hook not enabled"; }
+    if(problem) { realBind=nullptr; log("Direct practice device: %s; only the first device drives",problem); }
 }
 }
 
@@ -272,6 +312,7 @@ bool InstallDevices(void (*log)(const char*,...)) {
         const auto init=MH_Initialize();
         if(init!=MH_OK && init!=MH_ERROR_ALREADY_INITIALIZED) { log("Direct practice device refused: MinHook=%d",int(init)); return; }
         devicesLog=log;
+        if(deviceNames.size()>1) InstallBind(image,log);
         auto* target=image+deviceListRva;
         if(MH_CreateHook(target,reinterpret_cast<void*>(&DeviceList),reinterpret_cast<void**>(&realDeviceList))!=MH_OK) { log("Direct practice device refused: hook not created"); return; }
         if(MH_EnableHook(target)!=MH_OK) { MH_RemoveHook(target); log("Direct practice device refused: hook not enabled"); return; }
