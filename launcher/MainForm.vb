@@ -29,6 +29,15 @@ Public Class MainForm
     Private ReadOnly recenterKeepLevel As New CheckBox With {.Name = "RecenterKeepLevel", .Text = "Keep the horizon level when recentering", .AutoSize = True, .Checked = True}
     Private recenterDevice As RecenterDeviceBinding
     Private recenterWatcher As RecenterDeviceWatcher
+    ' Toggle VR (#288ceec1): its key and controller button, and the button's watcher during VR.
+    Private ReadOnly toggleKeyButton As New Button With {.Name = "ToggleVrKey", .AutoSize = True, .AccessibleName = "Toggle VR key"}
+    Private ReadOnly noToggleKey As New Button With {.Name = "ClearToggleVrKey", .Text = "No key", .AutoSize = True}
+    Private ReadOnly toggleDeviceButton As New Button With {.Name = "ToggleVrDevice", .AutoSize = True}
+    Private ReadOnly clearToggleDevice As New Button With {.Name = "ClearToggleVrDevice", .Text = "Clear", .AutoSize = True}
+    Private toggleKey As Integer = LauncherSettings.DefaultToggleVrKey, toggleModifiers As Integer
+    Private capturingToggle As Boolean
+    Private toggleDevice As RecenterDeviceBinding
+    Private toggleWatcher As RecenterDeviceWatcher
     ' The in-game seat menu's key and controller button (#c137c681), and its controller reader during VR.
     Private ReadOnly seatMenuKeyButton As New Button With {.Name = "SeatMenuKey", .AutoSize = True, .AccessibleName = "Seat menu key"}
     Private ReadOnly noSeatMenuKey As New Button With {.Name = "ClearSeatMenuKey", .Text = "No key", .AutoSize = True}
@@ -204,6 +213,7 @@ Public Class MainForm
                                                               Dim selected = CurrentSettings()
                                                               interactive = Await InteractiveSession.StartAsync(context, selected, AddressOf ConfirmLayerBypass)
                                                               StartRecenterWatcher(selected.RecenterDevice)
+                                                              StartToggleWatcher(selected.ToggleVrDevice)
                                                               StartSeatMenuReader(selected.SeatMenuButton)
                                                               UpdateLayerSummary()
                                                               settings = selected
@@ -550,6 +560,32 @@ Public Class MainForm
         Field(vrControls, "Controller / wheel button", deviceRow)
         vrControls.Controls.Add(Info("Optional: a controller, wheel or button-box button (or D-pad / hat direction) that also recenters while DiRT 3 is in front. The launcher reads the device without taking it over and sends nothing to the game."))
         vrControls.Controls.Add(recenterKeepLevel)
+        Dim toggleKeyRow As New FlowLayoutPanel With {.Name = "ToggleVrKeyRow", .AutoSize = True, .WrapContents = True, .Margin = New Padding(0)}
+        toggleKeyRow.Controls.AddRange({toggleKeyButton, noToggleKey})
+        Field(vrControls, "Toggle VR key", toggleKeyRow)
+        Dim toggleDeviceRow As New FlowLayoutPanel With {.Name = "ToggleVrDeviceRow", .AutoSize = True, .WrapContents = True, .Margin = New Padding(0)}
+        toggleDeviceRow.Controls.AddRange({toggleDeviceButton, clearToggleDevice})
+        Field(vrControls, "Toggle VR button", toggleDeviceRow)
+        vrControls.Controls.Add(Info("Switches the headset between VR and a flat screen in front of you while DiRT 3 is in front, for a view that looks wrong or uncomfortable; press again to go back. Every VR session starts in VR. F6 by default; the optional controller or wheel button works too. DiRT 3 also receives the key or button, so pick one the game doesn't use."))
+        AddHandler toggleKeyButton.Click, Sub()
+                                              capturingToggle = True
+                                              UpdateToggleLabels()
+                                              notice.Text = "Press the new Toggle VR key, with Ctrl, Alt or Shift if you like. Esc cancels."
+                                          End Sub
+        AddHandler toggleKeyButton.LostFocus, Sub()
+                                                  If Not capturingToggle Then Return
+                                                  capturingToggle = False : UpdateToggleLabels()
+                                              End Sub
+        AddHandler noToggleKey.Click, Sub() ClearToggleKey()
+        AddHandler toggleDeviceButton.Click, Sub()
+                                                 Using dialog As New RecenterDeviceForm(DrivingInput.LibraryPath(context), "Toggle VR button",
+                                                                                        "Press the button, or the D-pad / hat direction, on your controller, wheel or button box that should switch between VR and a flat screen.")
+                                                     If dialog.ShowDialog(Me) = DialogResult.OK AndAlso dialog.Binding IsNot Nothing Then SetToggleDevice(dialog.Binding)
+                                                 End Using
+                                             End Sub
+        AddHandler clearToggleDevice.Click, Sub() SetToggleDevice(Nothing)
+        tips.SetToolTip(toggleKeyButton, "Click, then press the key or key combination that switches between VR and a flat screen while DiRT 3 is in front.")
+        UpdateToggleLabels()
         vrControls.Controls.Add(Info("On (recommended): recentering turns the view to face forward and keeps the horizon level, however your head is tilted. Off: the key or button also resets pitch and roll, so the way you hold your head when you press it becomes level; useful if your headset sits tilted. The automatic centering at the start of VR always keeps the horizon level."))
         AddHandler recenterDeviceButton.Click, Sub()
                                                    Using dialog As New RecenterDeviceForm(DrivingInput.LibraryPath(context))
@@ -602,6 +638,47 @@ Public Class MainForm
         content.Controls.Add(TopicLink(HelpControls))
     End Sub
 
+    ' Public for the launcher tests: removes the Toggle VR key (the controller button, if any, still works).
+    Public Sub ClearToggleKey()
+        toggleKey = 0 : toggleModifiers = 0 : capturingToggle = False
+        UpdateToggleLabels()
+        notice.Text = If(toggleDevice Is Nothing, "Toggle VR key removed: nothing switches VR off during a session.", "Toggle VR key removed; the controller button still works.") & " Save settings or Launch to keep it."
+    End Sub
+
+    ' Public for the launcher tests; the dialog sets it after a button press.
+    Public Sub SetToggleDevice(value As RecenterDeviceBinding)
+        If value IsNot Nothing Then
+            value.Validate("Toggle VR")
+            Dim problem = If(value.SameInput(recenterDevice), value.Control() & " recenters the view.", If(value.SameInput(seatMenuDevice), value.Control() & " opens the seat menu.", ""))
+            If problem <> "" Then
+                notice.Text = problem & " Choose another button for Toggle VR."
+                Return
+            End If
+        End If
+        toggleDevice = value
+        UpdateToggleLabels()
+        notice.Text = If(value Is Nothing, "Toggle VR button cleared.", "Toggle VR button set to " & value.Describe() & ".") & " Save settings or Launch to keep it."
+    End Sub
+
+    Private Sub UpdateToggleLabels()
+        toggleKeyButton.Text = If(capturingToggle, "Press a key…", If(toggleKey = 0, "None", RecenterShortcut.Describe(toggleKey, toggleModifiers)))
+        noToggleKey.Enabled = toggleKey <> 0
+        toggleDeviceButton.Text = If(toggleDevice Is Nothing, "Bind a button…", toggleDevice.Describe())
+        clearToggleDevice.Enabled = toggleDevice IsNot Nothing
+    End Sub
+
+    ' Watches the bound Toggle VR button while this VR session runs, with the recenter button's handshake.
+    Private Sub StartToggleWatcher(binding As RecenterDeviceBinding)
+        toggleWatcher?.Dispose() : toggleWatcher = Nothing
+        If binding Is Nothing OrElse interactive Is Nothing Then Return
+        Try
+            toggleWatcher = RecenterDeviceWatcher.ForSession(DrivingInput.LibraryPath(context), Handle, binding, interactive.Game.Id, interactive.ToggleRequestPath, "toggle-vr-controller.json")
+            toggleWatcher.Start()
+        Catch ex As IOException
+            notice.Text &= " The Toggle VR button is unavailable: " & ex.Message
+        End Try
+    End Sub
+
     ' Public for the launcher tests: removes the seat menu key (the controller button, if any, still opens it).
     Public Sub ClearSeatMenuKey()
         seatMenuKey = 0 : seatMenuModifiers = 0 : capturingSeatMenu = False
@@ -615,6 +692,7 @@ Public Class MainForm
             value.Validate("seat menu")
             Dim problem = SeatMenuInput.Reserved(value)
             If problem = "" AndAlso value.SameInput(recenterDevice) Then problem = value.Control() & " recenters the view. Choose another button for the seat menu."
+            If problem = "" AndAlso value.SameInput(toggleDevice) Then problem = value.Control() & " toggles VR. Choose another button for the seat menu."
             If problem <> "" Then
                 notice.Text = problem
                 Return
@@ -652,6 +730,10 @@ Public Class MainForm
             notice.Text = value.Control() & " opens the seat menu. Choose another button for recentering."
             Return
         End If
+        If value IsNot Nothing AndAlso value.SameInput(toggleDevice) Then
+            notice.Text = value.Control() & " toggles VR. Choose another button for recentering."
+            Return
+        End If
         recenterDevice = value
         UpdateRecenterDeviceLabel()
         notice.Text = If(value Is Nothing, "Controller / wheel recenter cleared.", "Recenter button set to " & value.Describe() & ".") & " Save settings or Launch to keep it."
@@ -681,8 +763,29 @@ Public Class MainForm
     End Sub
 
     Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
-        If CaptureRecenterKey(keyData) OrElse CaptureSeatMenuKey(keyData) Then Return True
+        If CaptureRecenterKey(keyData) OrElse CaptureSeatMenuKey(keyData) OrElse CaptureToggleKey(keyData) Then Return True
         Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    ' Handles one key press while the Toggle VR key button waits for a key (public for the launcher tests).
+    Public Function CaptureToggleKey(keyData As Keys) As Boolean
+        If Not capturingToggle Then Return False
+        If RecenterShortcut.IsModifierOnly(keyData) Then Return True
+        If keyData = Keys.Escape Then
+            capturingToggle = False : UpdateToggleLabels()
+            notice.Text = "Toggle VR key unchanged."
+            Return True
+        End If
+        Dim key = CInt(keyData And Keys.KeyCode), modifiers = RecenterShortcut.Modifiers(keyData)
+        Dim problem = LauncherSettings.ToggleVrKeyProblem(key, modifiers, recenterKey, recenterModifiers, seatMenuKey, seatMenuModifiers)
+        If problem <> "" Then
+            notice.Text = RecenterShortcut.Describe(key, modifiers) & " can't be used. " & problem & " Esc cancels."
+            Return True
+        End If
+        toggleKey = key : toggleModifiers = modifiers : capturingToggle = False
+        UpdateToggleLabels()
+        notice.Text = "Toggle VR key set to " & RecenterShortcut.Describe(key, modifiers) & ". Save settings or Launch to keep it."
+        Return True
     End Function
 
     ' Handles one key press while the seat menu key button waits for a key (public for the launcher tests).
@@ -696,6 +799,7 @@ Public Class MainForm
         End If
         Dim key = CInt(keyData And Keys.KeyCode), modifiers = RecenterShortcut.Modifiers(keyData)
         Dim problem = LauncherSettings.SeatMenuKeyProblem(key, modifiers, recenterKey, recenterModifiers)
+        If problem = "" AndAlso toggleKey <> 0 AndAlso key = toggleKey AndAlso modifiers = toggleModifiers Then problem = "Toggle VR and the seat menu need different keys."
         If problem <> "" Then
             notice.Text = RecenterShortcut.Describe(key, modifiers) & " can't be used. " & problem & " Esc cancels."
             Return True
@@ -722,6 +826,10 @@ Public Class MainForm
         End If
         If seatMenuKey <> 0 AndAlso key = seatMenuKey AndAlso modifiers = seatMenuModifiers Then
             notice.Text = RecenterShortcut.Describe(key, modifiers) & " opens the seat menu. Choose another recenter key. Esc cancels."
+            Return True
+        End If
+        If toggleKey <> 0 AndAlso key = toggleKey AndAlso modifiers = toggleModifiers Then
+            notice.Text = RecenterShortcut.Describe(key, modifiers) & " toggles VR. Choose another recenter key. Esc cancels."
             Return True
         End If
         recenterKey = key : recenterModifiers = modifiers : capturingRecenter = False
@@ -824,6 +932,7 @@ Public Class MainForm
         recenterKey = settings.RecenterKey : recenterModifiers = settings.RecenterModifiers : capturingRecenter = False : UpdateRecenterLabel()
         recenterDevice = settings.RecenterDevice : UpdateRecenterDeviceLabel()
         seatMenuKey = settings.SeatMenuKey : seatMenuModifiers = settings.SeatMenuModifiers : seatMenuDevice = settings.SeatMenuButton : capturingSeatMenu = False : UpdateSeatMenuLabels()
+        toggleKey = settings.ToggleVrKey : toggleModifiers = settings.ToggleVrModifiers : toggleDevice = settings.ToggleVrDevice : capturingToggle = False : UpdateToggleLabels()
         recenterKeepLevel.Checked = settings.RecenterKeepLevel
         renderScale.Value = settings.VrRenderScale
         hudDistance.Value = CInt(settings.HudDistance * 2D) : hudFollow.Checked = settings.HudFollowView
@@ -856,6 +965,7 @@ Public Class MainForm
             .DesktopDisplayMode = {"game", "windowed", "fullscreen", "borderless"}(Math.Max(0, desktopMode.SelectedIndex)), .DesktopVSync = {"game", "off", "on"}(Math.Max(0, desktopVSync.SelectedIndex)), .SkipStartupMovies = skipStartupMovies.Checked,
             .RecenterKey = recenterKey, .RecenterModifiers = recenterModifiers, .RecenterDevice = recenterDevice, .RecenterKeepLevel = recenterKeepLevel.Checked,
             .SeatMenuKey = seatMenuKey, .SeatMenuModifiers = seatMenuModifiers, .SeatMenuButton = seatMenuDevice,
+            .ToggleVrKey = toggleKey, .ToggleVrModifiers = toggleModifiers, .ToggleVrDevice = toggleDevice,
             .GraphicsQuality = desktopQuality.Values, .VrGraphicsQuality = vrQuality.Values,
             .LaunchMode = directPicker.Mode, .DirectRoute = directPicker.RouteId, .DirectCar = directPicker.CarCode, .DirectLaps = directPicker.LapCount,
             .DirectOpponents = directPicker.OpponentCount, .DirectOpponentCars = directPicker.OpponentCars, .DirectDifficulty = directPicker.DifficultyLevel, .DirectAfterFinish = directPicker.AfterFinish,
@@ -982,6 +1092,7 @@ Public Class MainForm
             failed = True
         Finally
             recenterWatcher?.Dispose() : recenterWatcher = Nothing
+            toggleWatcher?.Dispose() : toggleWatcher = Nothing
             seatMenuReader?.Dispose() : seatMenuReader = Nothing
             launchProgress?.Dispose() : launchProgress = Nothing
             If Not IsDisposed AndAlso owned.FinalSeatCommit IsNot Nothing Then ShowSeatCommit(owned.FinalSeatCommit)
@@ -1251,6 +1362,7 @@ Public Class MainForm
                 "Live input and force feedback shows your wheel, pedals, shifter and controllers as Windows reports them and tests rumble or force feedback on each one. It reads devices without taking them over and changes no game or Windows setting. Close DiRT 3 before testing force feedback." & vbCrLf & vbCrLf &
                 recenter & " recenters the headset view while DiRT 3 is in front. To change it, click the key under VR and seat controls and press another key, optionally with Ctrl, Alt or Shift; Esc cancels. DiRT 3 still receives the key, so pick one the game doesn't use. Alt+Tab, Alt+F4 and Ctrl+Alt+Delete are reserved." & vbCrLf & vbCrLf &
                 "Bind a button… adds a controller, wheel or button-box button, or a D-pad / hat direction, as another way to recenter. During VR the launcher watches it only while DiRT 3 is in front, without taking the device over. Clear removes it." & vbCrLf & vbCrLf &
+                "Toggle VR key (F6 by default) switches the headset between VR and a flat screen in front of you while DiRT 3 is in front, for a view that looks wrong or uncomfortable; press it again to go back. Every VR session starts in VR. Toggle VR button adds a controller, wheel or button-box button for the same, watched like the recenter button. No key removes the key. DiRT 3 also receives the key or button, so pick one the game doesn't use (F9 is its Replay UI key)." & vbCrLf & vbCrLf &
                 "Keep the horizon level when recentering is on by default: recentering turns the view to face forward but leaves pitch and roll alone. Turn it off if your headset sits tilted; the key or button then also makes the way you hold your head level. The automatic centering at the start of VR always keeps the horizon level." & vbCrLf & vbCrLf &
                 "Seat moves your eye point in the cockpit, for each car, up to 50 cm in each direction: sideways (+ left), height and forward. Pick the car (cars with their own position say adjusted), move the sliders, and Reset this car to go back to DiRT 3's seat. Same position for all cars uses one position everywhere. Launch VR writes each adjusted car's camera file (cars\models\<car>\cameras.xml) for the session and restores it after exit, like DiRT3VR's other temporary changes; a car whose camera file isn't in the expected format keeps its own seat, and the launcher names it. Also when playing on the monitor (off by default) does the same for Launch, including direct practice on the monitor; without it desktop play keeps DiRT 3's seat. Seat positions stay with this PC: settings profiles and Restore launcher defaults keep them." & vbCrLf & vbCrLf &
                 "Seat menu key (F11 by default) opens a seat menu in the headset during Launch VR; press it again to save and close. In the menu the arrows move the seat (hold Shift to move sideways), Enter saves and Esc cancels; on an Xbox controller the D-pad, X, A and B do the same, and on a wheel or button box its first hat moves the seat. Seat menu button adds a controller, wheel or button-box button that opens the menu too; the launcher reads it only while DiRT 3 is in front, without taking the device over. What you save is kept under Seat. No key removes the key; without a key or button there is no menu. DiRT 3 also receives the key or button that opens the menu, so pick one the game doesn't use." & vbCrLf & vbCrLf &
@@ -1362,7 +1474,7 @@ Public Class MainForm
         If disposing AndAlso Not resourcesDisposed Then
             resourcesDisposed = True
             lifetime.Cancel() : lifetime.Dispose()
-            timer.Dispose() : tips.Dispose() : launchProgress?.Dispose() : recenterWatcher?.Dispose() : seatMenuReader?.Dispose()
+            timer.Dispose() : tips.Dispose() : launchProgress?.Dispose() : recenterWatcher?.Dispose() : seatMenuReader?.Dispose() : toggleWatcher?.Dispose()
             exitTimer.Dispose() : background.Dispose() : launchTips.Dispose()
         End If
         MyBase.Dispose(disposing)

@@ -217,6 +217,13 @@ Public Class LauncherSettings
     Public Property SeatMenuModifiers As Integer
     ' A controller or wheel button that also opens the seat menu (#c137c681); machine-specific like RecenterDevice.
     Public Property SeatMenuButton As RecenterDeviceBinding
+    ' Toggle VR (#288ceec1; Lens's renderer side): switches between stereo and a flat virtual screen while
+    ' playing. F6 by default (DiRT2VR's F9 is DiRT 3's Replay UI On Off); 0 = no key. Kept with the seat menu key.
+    Public Const DefaultToggleVrKey As Integer = 117
+    Public Property ToggleVrKey As Integer = DefaultToggleVrKey
+    Public Property ToggleVrModifiers As Integer
+    ' An optional controller or wheel button for it; machine-specific like RecenterDevice.
+    Public Property ToggleVrDevice As RecenterDeviceBinding
     ' Optional controller/wheel button; machine-specific, so never part of settings profiles.
     Public Property RecenterDevice As RecenterDeviceBinding
 
@@ -225,6 +232,15 @@ Public Class LauncherSettings
         If key = 0 Then Return ""
         If Not RecenterShortcut.Valid(key, modifiers) OrElse (key >= 37 AndAlso key <= 40) OrElse key = 13 Then Return "Choose another seat menu key. The arrows and Enter move and save in the menu, and Windows shortcuts are reserved."
         If key = recenterKey AndAlso modifiers = recenterModifiers Then Return "The seat menu and recentering need different keys."
+        Return ""
+    End Function
+
+    ' Why a key can't toggle VR, or "" when it can (0 = no key): never the recenter or seat menu key.
+    Public Shared Function ToggleVrKeyProblem(key As Integer, modifiers As Integer, recenterKey As Integer, recenterModifiers As Integer, seatMenuKey As Integer, seatMenuModifiers As Integer) As String
+        If key = 0 Then Return ""
+        If Not RecenterShortcut.Valid(key, modifiers) Then Return "Choose another Toggle VR key. Windows shortcuts such as Alt+Tab are reserved."
+        If key = recenterKey AndAlso modifiers = recenterModifiers Then Return "Toggle VR and recentering need different keys."
+        If key = seatMenuKey AndAlso modifiers = seatMenuModifiers Then Return "Toggle VR and the seat menu need different keys."
         Return ""
     End Function
 
@@ -239,12 +255,19 @@ Public Class LauncherSettings
         Dim seatKey = SeatMenuKeyProblem(SeatMenuKey, SeatMenuModifiers, RecenterKey, RecenterModifiers)
         If seatKey <> "" Then Throw New IOException(seatKey)
         If SeatMenuKey = 0 Then SeatMenuModifiers = 0
+        Dim toggleKey = ToggleVrKeyProblem(ToggleVrKey, ToggleVrModifiers, RecenterKey, RecenterModifiers, SeatMenuKey, SeatMenuModifiers)
+        If toggleKey <> "" Then Throw New IOException(toggleKey)
+        If ToggleVrKey = 0 Then ToggleVrModifiers = 0
         RecenterDevice?.Validate()
         If SeatMenuButton IsNot Nothing Then
             SeatMenuButton.Validate("seat menu")
             Dim reserved = SeatMenuInput.Reserved(SeatMenuButton)
             If reserved <> "" Then Throw New IOException(reserved)
             If SeatMenuButton.SameInput(RecenterDevice) Then Throw New IOException("The seat menu and recentering need different controller buttons.")
+        End If
+        If ToggleVrDevice IsNot Nothing Then
+            ToggleVrDevice.Validate("Toggle VR")
+            If ToggleVrDevice.SameInput(RecenterDevice) OrElse ToggleVrDevice.SameInput(SeatMenuButton) Then Throw New IOException("Toggle VR needs its own controller button, not the recenter or seat menu button.")
         End If
         DesktopGraphics.Validate(Me)
         GraphicsQuality = GraphicsCatalog.Current.Normalize(GraphicsQuality)
