@@ -229,6 +229,7 @@ bool XrRuntime::StartFrame(uint64_t sequence,FrameMode mode) noexcept {
     XrFrameBeginInfo begin{XR_TYPE_FRAME_BEGIN_INFO};
     if(!Check(xrBeginFrame(session_,&begin),"begin frame")) return false;
     frameOpen_=true; frameFailed_=frameRenderable_=seatShown_=false; frameMode_=mode; ++generation_; displayTime_=state.predictedDisplayTime;
+    if(state.predictedDisplayPeriod>0) displayPeriod_=state.predictedDisplayPeriod;
     for(auto& eye:eyes_) { eye.completed=false; eye.acquired=eye.waited=false; }
     if(!state.shouldRender) { EndFrame(generation_,false); return false; }
     if(spaceChangeTime_ && displayTime_>=spaceChangeTime_) {
@@ -374,7 +375,7 @@ void XrRuntime::Shutdown() noexcept {
     if(session_) xrDestroySession(session_);
     if(instance_) xrDestroyInstance(instance_);
     device_.Reset();
-    space_={}; session_={}; instance_={}; system_={}; format_=DXGI_FORMAT_UNKNOWN;
+    space_={}; session_={}; instance_={}; system_={}; format_=DXGI_FORMAT_UNKNOWN; displayPeriod_=0;
     running_=visible_=focused_=frameOpen_=frameRenderable_=canRecenter_=centered_=false;
     recenterPending_=true; recenterTilt_=false; haveGameSequence_=false; spaceChangeTime_=0;
     orientationModes_=0;
