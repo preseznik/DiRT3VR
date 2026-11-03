@@ -9,6 +9,7 @@
 #include "frame_timing.h"
 #include "desktop_seat.h"
 #include "anisotropic_filter.h"
+#include "cockpit_start.h"
 #if defined(DIRT3VR_RESEARCH_PATCHES)
 #include "research_patch.h"
 #endif
@@ -316,6 +317,7 @@ void ObserveCreation(HRESULT result, ID3D11Device* device, IDXGISwapChain* chain
                     static_cast<unsigned long long>(desc.DedicatedVideoMemory));
             ObserveFactory(device);
             if(state.supported) anisotropy::Install(device,Log);
+            if(state.supported) cockpitstart::Install(Log);
             if(state.supported && InteractiveVrEnabled()) InstallHudHooks(device,Log);
         }
         if(chain) Attach(chain);

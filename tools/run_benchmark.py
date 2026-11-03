@@ -200,7 +200,7 @@ def diagnostic_environment(directory: Path, *, scene_observer: bool = False, rep
                 "DIRT3VR_RESEARCH_STACKS", "DIRT3VR_RESEARCH_COUNT", "DIRT3VR_RESEARCH_PRESS_START_USER",
                 "DIRT3VR_RESEARCH_AUTO_SAVE_CHOICE", "DIRT3VR_RESEARCH_STORE_TRACE",
                 "DIRT3VR_RESEARCH_DATA_WATCH", "DIRT3VR_RESEARCH_GAME_LOG", "DIRT3VR_RESEARCH_VEHICLES", "DIRT3VR_RESEARCH_DEVICES", "DIRT3VR_RESEARCH_DEVICE_FIRST", "DIRT3VR_RESEARCH_LIVE_SEAT",
-                "DIRT3VR_ANISOTROPY"):
+                "DIRT3VR_ANISOTROPY", "DIRT3VR_START_IN_COCKPIT"):
         env.pop(flag, None)
     if background_play:
         env["DIRT3VR_BACKGROUND_PLAY"] = "1"
@@ -543,6 +543,9 @@ def main() -> int:
     parser.add_argument("--no-glare", action="store_true",
                         help="Research: zero the light streak and lens flare multipliers of postprocess/effects.xml (tools/glare.py; journaled and restored); "
                              "with --no-bloom the file gets both edits, and a --recover needs the same flags")
+    parser.add_argument("--start-in-cockpit", action="store_true",
+                        help="The renderer skips DiRT 3's race-start switch to the chase view (DIRT3VR_START_IN_COCKPIT); "
+                             "with --seat-test 0,0,0 --seat-cockpit first the race starts in the cockpit with every view kept")
     parser.add_argument("--anisotropy", type=int, choices=(0, 1, 2, 4, 8, 16),
                         help="Anisotropic filtering level for the game's samplers (DIRT3VR_ANISOTROPY; 1 = trilinear); unset leaves them as the game made them")
     parser.add_argument("--msaa", choices=MULTISAMPLING, default="off",
@@ -713,7 +716,7 @@ def main() -> int:
                  "stereo": False, "sceneObserver": args.scene_observer,
                  "serialRender": args.serial_render, "replayPair": args.replay_pair,
                  "xrRuntime": xr_runtime, "backgroundPlay": args.background_play, "researchPatch": args.research_patch,
-                 "spectatorHumanSwitch": args.spectator_human_switch, "noBloom": args.no_bloom, "noGlare": args.no_glare,"seatCockpit": args.seat_cockpit if args.seat_test is not None else None,"anisotropy": args.anisotropy, "multisampling": args.msaa, "size": list(args.size), "directPractice": args.direct_practice,
+                 "spectatorHumanSwitch": args.spectator_human_switch, "noBloom": args.no_bloom, "noGlare": args.no_glare, "startInCockpit": args.start_in_cockpit, "seatCockpit": args.seat_cockpit if args.seat_test is not None else None,"anisotropy": args.anisotropy, "multisampling": args.msaa, "size": list(args.size), "directPractice": args.direct_practice,
                  "playerHardwareSettings": args.player_hardware_settings, "directLaps": args.direct_laps, "directReturn": args.direct_return, "scene": scene,
                  "durationSeconds": args.seconds}
     if restrictions:
@@ -784,6 +787,8 @@ def main() -> int:
             env["DIRT3VR_RESEARCH_PATCH"] = args.research_patch
         if args.anisotropy is not None:
             env["DIRT3VR_ANISOTROPY"] = str(args.anisotropy)
+        if args.start_in_cockpit:
+            env["DIRT3VR_START_IN_COCKPIT"] = "1"
         if args.file_trace:
             env["DIRT3VR_RESEARCH_FILE_TRACE"] = "1"
         if args.game_log:
