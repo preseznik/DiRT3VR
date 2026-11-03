@@ -33,10 +33,33 @@ passed, and every protected file was restored unchanged.
 - No renderer change is needed for `off`, `2xmsaa` and `4xmsaa`. The launcher writes the chosen
   level instead of `off`.
 
+## Cost
+
+iztok: "measure it". DiRT 3's own Aspen benchmark on PC4080S (RTX 4080 SUPER), one view at
+3840×2160, no diagnostics: `run_benchmark.py --run --msaa <level> --size 3840x2160`. DiRT 3 runs
+only the sizes in `hardware_settings_info.xml`, so a headset's 3072×3264 can't be asked for
+directly (it falls back to 1280×720); 3840×2160 is 8.3 MP against 10.0 MP for that eye.
+
+| Level | Run | Average fps | Frame time | Minimum fps |
+| --- | --- | --- | --- | --- |
+| off | 20261103-202035-a128c1ec | 411.1 | 2.43 ms | 330.6 |
+| 2xmsaa | 20261103-201555-072922b5 | 384.5 | 2.60 ms (+0.17) | 333.4 |
+| 4xmsaa | 20261103-201757-679df5d4 | 363.8 | 2.75 ms (+0.32) | 313.9 |
+
+Every run's result confirms its level and size, and every protected file was restored. The first
+MSAA-off run (20261103-201351-cb8d24e1) had the window take focus for a moment and lose it, after
+which DiRT 3 throttles to about 19 fps; it was repeated with `--background-play`. The 2× and 4×
+runs never had focus and ran unthrottled.
+
+So 2× costs about 7% of the frame rate and 4× about 12%. At 400 fps the benchmark may be partly
+limited by the CPU, so the GPU cost can be somewhat higher than these differences. Scaled to a
+headset pair (two eyes of 10 MP, 2.4 times these pixels), that is roughly 0.4 ms per frame at 2×
+and 0.8 ms at 4×, out of 11.1 ms at 90 Hz. That's an estimate; a headset session's
+performance-summary.json would measure it.
+
 ## Not covered
 
 - `8xmsaa` was not run.
-- Headset sizes: the runs are 1280×720. At a VR size such as 3024×3360 the game's multisampled
-  targets grow with the sample count, so GPU memory and frame time need a headset session
-  (DiRT2VR warns at 4× and 8×).
+- GPU memory and frame time in a headset session at the headset's own size (DiRT2VR warns at 4×
+  and 8×).
 - Menus, transitions and the HUD in the headset.
