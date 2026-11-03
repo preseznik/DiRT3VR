@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.22 — in-game seat menu, wheels in direct practice and VR image options (Experimental)
+
 - The seat menu key is now **Tab** by default, as in DiRT2VR. A key you saved before (F11 was the default in 0.1.21) stays; change it under **Controls → Seat**.
 - DiRT 3's menus and HUD now fit the VR panel on every headset (#7d2ac4d9). At render sizes other than 3072 × 3264 (for example 3024 × 3360 in SteamVR) the renderer didn't recognise DiRT 3's menu camera, so menus and dialogs were cut off left and right and the black bars at the top and bottom stayed.
 - The FPS and GPU strip in the headset no longer flickers where it overlaps the HUD (#4896ffd3): it now sits just in front of the HUD panel instead of in the same plane, at the same size in your view.
