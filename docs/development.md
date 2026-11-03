@@ -16,6 +16,15 @@ them. Setup installs the portable layout into `<game>\DiRT3VR`, finds the game
 with `DiRT3VR.exe --discover`, and runs `--check-install` / `--check-uninstall`
 (supported executable, DiRT 3 closed, no pending recovery) before changing files.
 
+`DiRT3VR.exe --launch` (desktop) and `--launch --vr` start a session with this PC's
+saved launcher settings and no window, wait for DiRT 3 to close and its files to
+be restored, print progress to standard output and errors to standard error, and
+exit 0 (1 on an error). `--runtime vdxr|steamvr|other --manifest <path>`, or else
+`XR_RUNTIME_JSON` (as the other OpenXR runtime), picks the VR runtime for that
+launch only; the saved settings keep their own. Lens's `tools/fake_headset.py`
+uses it for VR runs on SteamVR's virtual headset. Controller and wheel buttons for
+recenter, Toggle VR and the seat menu need the launcher window; keys work.
+
 The badge artwork is `launcher/assets/DiRT3VR.png`. To replace it, run
 `python tools/prepare-launcher-art.py <artwork.png>` (cuts the badge out of a black
 background) and `tools/make-launcher-icon.ps1` (16–256 px `DiRT3VR.ico`). The icon
