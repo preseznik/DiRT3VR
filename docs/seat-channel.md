@@ -86,8 +86,8 @@ right (D-pad or hat), 11 save, 12 cancel, 13 open. Monitor sessions only: 14 FOV
 ## Monitor sessions (#c137c681 launcher, #35826889 renderer)
 
 With **Seat menu on the monitor too (Launch)** and a menu key or button, Launch installs DiRT3VR's renderer
-for the session (recovery journal schema 10 without direct practice) and passes `DIRT3VR_SEAT_CHANNEL`
-and `DIRT3VR_LOG_DIR`. The launcher writes 216 = 1 and 220 = the FOV offset the session's camera files
+for the session (recovery journal schema 10 without direct practice) and passes `DIRT3VR_SEAT_CHANNEL`,
+`DIRT3VR_LOG_DIR` and `DIRT3VR_DIAGNOSTICS=1` (the renderer runs the menu from its Present hook). The launcher writes 216 = 1 and 220 = the FOV offset the session's camera files
 hold (0 when the cockpit field of view on the monitor is DiRT 3's own); 224 and 228 start at that value.
 The renderer draws the panel over the game image and writes the selected head camera's eye point
 (+0x19d0) and FOV (+0x19e4) as the file's values plus (current − applied), following Wrench's research

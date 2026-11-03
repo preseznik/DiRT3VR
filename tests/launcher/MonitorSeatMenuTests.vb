@@ -121,8 +121,8 @@ Module MonitorSeatMenuTests
         ' The game's environment: the channel and the log folder; not direct practice.
         Dim logs = Path.Combine(ctx.UserRoot, "logs", "session-fixture")
         Dim start = DesktopStartupSession.StartInfo(ctx, Settings(), logs, Nothing, "Local\DiRT3VR.Seat.test")
-        check(start.Environment(SeatChannel.EnvironmentName) = "Local\DiRT3VR.Seat.test" AndAlso start.Environment("DIRT3VR_LOG_DIR") = logs AndAlso Not start.Environment.ContainsKey("DIRT3VR_DIRECT_PRACTICE") AndAlso start.ArgumentList.Count = 0,
-              "a normal Launch with the menu passes the channel and the log folder, and starts DiRT 3 as usual")
+        check(start.Environment(SeatChannel.EnvironmentName) = "Local\DiRT3VR.Seat.test" AndAlso start.Environment("DIRT3VR_LOG_DIR") = logs AndAlso start.Environment("DIRT3VR_DIAGNOSTICS") = "1" AndAlso Not start.Environment.ContainsKey("DIRT3VR_DIRECT_PRACTICE") AndAlso start.ArgumentList.Count = 0,
+              "a normal Launch with the menu passes the channel, the log folder and the Present hook's switch, and starts DiRT 3 as usual")
         Environment.SetEnvironmentVariable(SeatChannel.EnvironmentName, "stale")
         Try
             Dim none = DesktopStartupSession.StartInfo(ctx, Settings(False), logs)

@@ -78,9 +78,10 @@ Public NotInheritable Class DesktopStartupSession
         If settings.LaunchMode <> "direct" AndAlso seatChannelName Is Nothing Then Return start
         If Not Path.IsPathFullyQualified(logDirectory) Then Throw New IOException("The session log path must be absolute.")
         start.Environment("DIRT3VR_LOG_DIR") = logDirectory
+        ' The renderer runs the monitor menu, like direct practice's lap count, from its Present hook.
+        start.Environment("DIRT3VR_DIAGNOSTICS") = "1"
         If settings.LaunchMode <> "direct" Then Return start
         DirectPractice.AddStart(start, settings, directDevices)
-        start.Environment("DIRT3VR_DIAGNOSTICS") = "1"
         Return start
     End Function
 
