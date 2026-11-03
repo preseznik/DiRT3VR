@@ -40,6 +40,7 @@ static_assert(SeatPanelImage::Width==XrRuntime::SeatPanelWidth && SeatPanelImage
 
 void RuntimeLog(const char*) noexcept;
 std::wstring EnvironmentPath(const wchar_t* variable);
+bool GameInFront();
 struct PrototypeState {
     DWORD ownerThread=GetCurrentThreadId();
     DiagnosticLogger log{};
@@ -79,6 +80,8 @@ struct PrototypeState {
     XrPosef seatPanelPose{{0,0,0,1},{0,0,-1}};
     unsigned seatOpenings{};
     bool seatActive{};
+    uint64_t seatCarChecked{};
+    std::string seatCar;
     // FPS / GPU strip in the headset (#4896ffd3), when DIRT3VR_PERF_DISPLAY is "1".
     PerformanceStrip perf;
     TexturePresenter perfPresenter{RuntimeLog};
@@ -351,6 +354,19 @@ XrPosef SeatPanelPose(const std::array<XrView,2>& views) {
     const auto head=math::RecenterPose(math::CenterPose(views),{{0,0,0,1},{0,0,0}});
     return math::OffsetPose(head,{0,-.1f,-1.f});
 }
+// The player's car code (#88b7f778, docs/research/seat-adjustment.md): entry 0 of the race's
+// vehicle table, 16-byte "<code>_<livery> <tag>" names at 0xf9fc08 counted by
+// [[0xf9fbfc]+0xb234]. Checked for direct starts; races from the menus aren't yet. Read
+// through ReadProcessMemory, so a missing table only fails the read; empty then.
+std::string PlayerCarCode() {
+    const auto* image=reinterpret_cast<const unsigned char*>(GetModuleHandleW(nullptr));
+    const auto process=GetCurrentProcess();
+    uintptr_t owner{}; int count{}; char name[17]{}; SIZE_T read{};
+    if(!ReadProcessMemory(process,image+(0xf9fbfc-0x400000),&owner,sizeof(owner),&read) || !owner ||
+       !ReadProcessMemory(process,reinterpret_cast<const void*>(owner+0xb234),&count,sizeof(count),&read) || count<1 || count>64 ||
+       !ReadProcessMemory(process,image+(0xf9fc08-0x400000),name,16,&read)) return {};
+    return seat::CarCodeFromVehicleName(std::string_view(name,strnlen_s(name,16)));
+}
 // One stereo frame's seat menu step: cockpit frames run the menu, others close it once.
 seat::Position UpdateSeat(PrototypeState& state,const XrRuntime::Frame& frame,bool cockpit) {
     if(!state.seat) return {};
@@ -358,9 +374,18 @@ seat::Position UpdateSeat(PrototypeState& state,const XrRuntime::Frame& frame,bo
         if(state.seatActive) { state.seat->Inactive(); state.seatActive=false; }
         return {};
     }
-    DWORD process{};
-    GetWindowThreadProcessId(GetForegroundWindow(),&process);
-    state.seat->Update(GetTickCount64(),GetTickCount(),process==GetCurrentProcessId());
+    const auto now=GetTickCount64();
+    if(now-state.seatCarChecked>=1000) { // Once a second: a new race can change the car.
+        state.seatCarChecked=now;
+        auto code=PlayerCarCode();
+        if(code!=state.seatCar) {
+            const int index=state.seat->View().FindCar(code);
+            state.seat->Select(index);
+            if(state.log) state.log("Seat menu car=%s index=%d",code.empty() ? "unknown" : code.c_str(),index);
+            state.seatCar=std::move(code);
+        }
+    }
+    state.seat->Update(now,GetTickCount(),GameInFront());
     state.seatActive=true;
     if(state.seat->Openings()!=state.seatOpenings) {
         state.seatOpenings=state.seat->Openings();
