@@ -14,6 +14,8 @@ Tested with a **Quest 3 through Virtual Desktop (VDXR)**, an Xbox controller
 and a Logitech G920. SteamVR and other OpenXR runtimes are new and still being
 checked.
 
+This mod will remain free forever. If you'd like to support the work, you can [support me on Patreon](https://www.patreon.com/cw/bohloney).
+
 ## Requirements
 
 - Windows 10 or 11 (64-bit) and a PC that runs DiRT 3.
