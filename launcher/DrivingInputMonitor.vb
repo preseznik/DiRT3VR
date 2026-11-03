@@ -16,6 +16,8 @@ Public NotInheritable Class DrivingInputMonitor
     Private ReadOnly feedbackNote As New Label With {.Name = "LiveInputFeedback", .AutoSize = True, .MaximumSize = New Size(560, 0), .Margin = New Padding(12, 8, 0, 0), .UseMnemonic = False}
     Private input As DrivingInput
     Private playing As DrivingInput.Device
+    Private ReadOnly scroller As New Panel With {.Name = "LiveInputScroller", .Dock = DockStyle.Fill, .AutoScroll = True, .Margin = New Padding(0, 10, 0, 10)}
+    Private fitted As Boolean
 
     Public Sub New(libraryPath As String)
         Me.libraryPath = libraryPath
@@ -27,7 +29,6 @@ Public NotInheritable Class DrivingInputMonitor
         layout.RowStyles.Add(New RowStyle(SizeType.Percent, 100)) : layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
         layout.Controls.Add(New Label With {.Text = "Move your wheel, pedals, shifter or controller to see what Windows reports. Axis values are before calibration, so a released pedal may read −100% or +100%. Nothing here changes DiRT 3's controls. Refresh after connecting a device.", .AutoSize = True, .MaximumSize = New Size(820, 0), .Margin = New Padding(0, 0, 0, 10), .UseMnemonic = False}, 0, 0)
         layout.Controls.Add(status, 0, 1)
-        Dim scroller As New Panel With {.Dock = DockStyle.Fill, .AutoScroll = True, .Margin = New Padding(0, 10, 0, 10)}
         devicePanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100)) : scroller.Controls.Add(devicePanel) : layout.Controls.Add(scroller, 0, 2)
         Dim buttons As New FlowLayoutPanel With {.AutoSize = True, .Dock = DockStyle.Fill}
         Dim refresh As New Button With {.Name = "LiveInputRefresh", .Text = "Refresh devices", .AutoSize = True}
@@ -37,8 +38,38 @@ Public NotInheritable Class DrivingInputMonitor
         buttons.Controls.AddRange({refresh, closeButton, feedbackNote}) : layout.Controls.Add(buttons, 0, 3) : Controls.Add(layout)
         AddHandler pollTimer.Tick, Sub() Poll()
         AddHandler feedbackTimer.Tick, Sub() StopFeedback()
-        AddHandler Shown, Sub() RefreshDevices()
+        AddHandler Shown, Sub()
+                              RefreshDevices()
+                              FitToContent()
+                          End Sub
     End Sub
+
+    ' Opens tall enough to show every device without scrolling, within the screen's working area, at any
+    ' display scaling (#2a6e6f28: at 150% the fixed size cut off Test rumble). Only once, so a size the
+    ' player chooses afterwards stays.
+    ' again: fit once more (the tests, after showing their devices).
+    Public Sub FitToContent(Optional again As Boolean = False)
+        If fitted AndAlso Not again Then Return
+        fitted = True
+        PerformLayout()
+        Dim area = Screen.FromControl(Me).WorkingArea
+        Dim frameWidth = Width - ClientSize.Width, frameHeight = Height - ClientSize.Height
+        Dim others = ClientSize.Height - scroller.ClientSize.Height
+        Dim wanted = others + devicePanel.PreferredSize.Height + Px(Me, 8)
+        Dim fittedWidth = Math.Min(Math.Max(ClientSize.Width, Px(Me, 900)), area.Width - frameWidth)
+        Dim fittedHeight = Math.Min(Math.Max(wanted, Px(Me, 440)), area.Height - frameHeight)
+        ClientSize = New Size(fittedWidth, fittedHeight)
+        Left = Math.Clamp(Left, area.Left, Math.Max(area.Left, area.Right - Me.Width))
+        Top = Math.Clamp(Top, area.Top, Math.Max(area.Top, area.Bottom - Me.Height))
+    End Sub
+
+    ' Whether every device, down to its feedback test, is visible without scrolling (for the tests).
+    Public ReadOnly Property ShowsEverything As Boolean
+        Get
+            Return Not scroller.VerticalScroll.Visible AndAlso views.All(Function(view) view.Test.Bottom > 0 AndAlso
+                scroller.RectangleToClient(view.Test.RectangleToScreen(view.Test.ClientRectangle)).Bottom <= scroller.ClientSize.Height)
+        End Get
+    End Property
 
     Public ReadOnly Property DeviceCount As Integer
         Get
@@ -72,18 +103,37 @@ Public NotInheritable Class DrivingInputMonitor
             Loop
             devicePanel.RowStyles.Clear() : devicePanel.RowCount = 0
             input = New DrivingInput(libraryPath, Handle)
-            For Each device In input.Devices
-                Dim view As New DeviceView(device)
-                views.Add(view) : AddRow(view.Panel)
-                view.Test.Enabled = input.FeedbackAvailable
-                Dim target = view.Device
-                AddHandler view.Test.Click, Sub() TestFeedback(target)
-            Next
-            LauncherAppearance.Apply(devicePanel)
+            AddViews(input.Devices, input.FeedbackAvailable)
             Poll() : pollTimer.Start()
         Catch ex As Exception When TypeOf ex Is IOException OrElse TypeOf ex Is DllNotFoundException OrElse TypeOf ex Is BadImageFormatException OrElse TypeOf ex Is EntryPointNotFoundException
             input?.Dispose() : input = Nothing
             status.Text = ex.Message
+        Finally
+            devicePanel.ResumeLayout(True)
+        End Try
+    End Sub
+
+    Private Sub AddViews(devices As IEnumerable(Of DrivingInput.Device), feedback As Boolean)
+        For Each device In devices
+            Dim view As New DeviceView(device, DeviceDpi)
+            views.Add(view) : AddRow(view.Panel)
+            view.Test.Enabled = feedback
+            Dim target = view.Device
+            AddHandler view.Test.Click, Sub() TestFeedback(target)
+        Next
+        LauncherAppearance.Apply(devicePanel)
+    End Sub
+
+    ' The tests' devices, without the controller reader (none is connected under test).
+    Public Sub ShowDevices(devices As IEnumerable(Of DrivingInput.Device))
+        RefreshDevices()
+        pollTimer.Stop() : input?.Dispose() : input = Nothing
+        devicePanel.SuspendLayout()
+        Try
+            AddViews(devices, False)
+            For Each view In views
+                view.Update(DrivingInput.Sample.Empty())
+            Next
         Finally
             devicePanel.ResumeLayout(True)
         End Try
@@ -130,31 +180,36 @@ Public NotInheritable Class DrivingInputMonitor
         Public ReadOnly Property Panel As GroupBox
         Public ReadOnly Property Test As Button
         Private ReadOnly connection As New Label With {.AutoSize = True, .UseMnemonic = False}
-        Private ReadOnly buttonsLabel As New Label With {.AutoSize = True, .MaximumSize = New Size(560, 0)}
+        Private ReadOnly buttonsLabel As New Label With {.AutoSize = True}
         Private ReadOnly hatsLabel As New Label With {.AutoSize = True}
         Private ReadOnly values(7) As Label
         Private ReadOnly bars(7) As AxisMeter
 
-        Public Sub New(device As DrivingInput.Device)
+        ' dpi: the window's, so the rows built after it opens scale with the display like the text does.
+        Public Sub New(device As DrivingInput.Device, dpi As Integer)
             Me.Device = device
-            Panel = New GroupBox With {.Text = device.Name, .AutoSize = True, .AutoSizeMode = AutoSizeMode.GrowAndShrink, .Dock = DockStyle.Top, .Padding = New Padding(10, 22, 10, 10), .Margin = New Padding(0, 0, 0, 12)}
+            Dim px = Function(value As Integer) CInt(Math.Round(value * Math.Max(96, dpi) / 96.0))
+            buttonsLabel.MaximumSize = New Size(px(560), 0)
+            Panel = New GroupBox With {.Text = device.Name, .AutoSize = True, .AutoSizeMode = AutoSizeMode.GrowAndShrink, .Dock = DockStyle.Top, .Padding = New Padding(px(10), px(22), px(10), px(10)), .Margin = New Padding(0, 0, 0, px(12))}
             Dim grid As New TableLayoutPanel With {.AutoSize = True, .Dock = DockStyle.Top, .ColumnCount = 3}
-            grid.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 170)) : grid.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100)) : grid.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 100))
+            grid.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, px(170))) : grid.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100)) : grid.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, px(100)))
             connection.Text = device.Id : grid.Controls.Add(connection, 0, 0) : grid.SetColumnSpan(connection, 3)
             Dim names = If(device.Xbox, {"Left stick X", "Left stick Y", "Right stick X", "Right stick Y", "Left trigger", "Right trigger", "—", "—"},
                                         {"X axis", "Y axis", "Z axis", "X rotation", "Y rotation", "Z rotation", "Slider 0", "Slider 1"})
             For i = 0 To 7
-                grid.Controls.Add(New Label With {.Text = names(i), .AutoSize = True, .Anchor = AnchorStyles.Left}, 0, i + 1)
-                bars(i) = New AxisMeter(device.Xbox AndAlso i >= 4) With {.Dock = DockStyle.Fill, .Height = 18, .Margin = New Padding(3, 6, 3, 6)}
+                ' An Xbox pad has six axes; its last two rows would only ever show "—".
+                Dim shown = Not (device.Xbox AndAlso i >= 6)
+                grid.Controls.Add(New Label With {.Text = names(i), .AutoSize = True, .Anchor = AnchorStyles.Left, .Visible = shown}, 0, i + 1)
+                bars(i) = New AxisMeter(device.Xbox AndAlso i >= 4) With {.Dock = DockStyle.Fill, .Height = px(18), .Margin = New Padding(px(3), px(6), px(3), px(6)), .Visible = shown}
                 grid.Controls.Add(bars(i), 1, i + 1)
-                values(i) = New Label With {.Text = "—", .AutoSize = True, .Anchor = AnchorStyles.Right}
+                values(i) = New Label With {.Text = "—", .AutoSize = True, .Anchor = AnchorStyles.Right, .Visible = shown}
                 grid.Controls.Add(values(i), 2, i + 1)
             Next
             grid.Controls.Add(New Label With {.Text = If(device.Xbox, "Buttons", "Buttons (from 0)"), .AutoSize = True, .Anchor = AnchorStyles.Left}, 0, 9)
             grid.Controls.Add(buttonsLabel, 1, 9) : grid.SetColumnSpan(buttonsLabel, 2)
             grid.Controls.Add(New Label With {.Text = "Hats (from 0)", .AutoSize = True, .Anchor = AnchorStyles.Left}, 0, 10)
             grid.Controls.Add(hatsLabel, 1, 10) : grid.SetColumnSpan(hatsLabel, 2)
-            Test = New Button With {.Name = "LiveInputFeedbackTest", .Text = If(device.Xbox, "Test rumble", "Test force feedback"), .AutoSize = True, .Anchor = AnchorStyles.Left, .Margin = New Padding(3, 8, 3, 3)}
+            Test = New Button With {.Name = "LiveInputFeedbackTest", .Text = If(device.Xbox, "Test rumble", "Test force feedback"), .AutoSize = True, .Anchor = AnchorStyles.Left, .Margin = New Padding(px(3), px(8), px(3), px(3))}
             grid.Controls.Add(Test, 0, 11) : grid.SetColumnSpan(Test, 3)
             Panel.Controls.Add(grid)
         End Sub
