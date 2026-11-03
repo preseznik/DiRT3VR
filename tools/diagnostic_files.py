@@ -16,6 +16,7 @@ import uuid
 import xml.etree.ElementTree as ET
 
 import bloom
+import glare
 import seat_cameras
 
 RESTRICTIONS_NAME = "system/hardware_settings_restrictions.xml"
@@ -275,13 +276,22 @@ GENERIC_EFFECTS_SHA256 = "b8cc6d6f96a8a129da83555328912f62a7c6947ac80c38cc802622
 NIGHT_EFFECTS_NAME = "tracks/generic/night_effects.xml"
 NIGHT_EFFECTS_SHA256 = "2a59da28ef98ea179f781f196e8386bc9c3c8e69ba7b1d867515d858940929a4"
 BLOOM_NAMES = (EFFECTS_NAME, GENERIC_EFFECTS_NAME, NIGHT_EFFECTS_NAME)
+# Which edits postprocess/effects.xml gets: "bloom" (bloom.py) and/or "glare" (glare.py, light
+# streaks and lens flares; only that file has them). Set by --no-bloom / --no-glare; a --recover
+# needs the same flags.
+EFFECTS_EDITS: tuple[str, ...] = ("bloom",)
 
 
 def _bloom_off(pin: str):
     def transform(data: bytes) -> bytes:
         if hashlib.sha256(data).hexdigest() != globals()[pin]:
             raise ValueError("Unexpected post-processing effects file")
-        return bloom.disable_bloom(data)
+        if pin != "EFFECTS_SHA256":
+            return bloom.disable_bloom(data)
+        edits = {"bloom": bloom.disable_bloom, "glare": glare.disable_glare}
+        for name in EFFECTS_EDITS:
+            data = edits[name](data)
+        return data
     return transform
 
 
