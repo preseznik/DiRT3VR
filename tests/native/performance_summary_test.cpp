@@ -94,6 +94,10 @@ int main(int argc,char** argv) {
     if (json.find("\"limit\":\"gpu\"")==std::string::npos || json.find("Quoted \\\"GPU\\\"\\\\")==std::string::npos ||
         json.find("\"final\":true")==std::string::npos || json.find("\"targetFps\":90.00")==std::string::npos ||
         json.find("\"headset\":{\"width\":3072")==std::string::npos || json.find("\"gpuMs\":{\"frames\":0")==std::string::npos) return 9;
+    // Memory: null until sampled, then the peaks (an address-space dip doesn't lower them).
+    if (json.find("\"memory\":null")==std::string::npos) return 26;
+    gpu->Memory(1800,2900,4096);gpu->Memory(1700,2500,4096);
+    if (gpu->Json(true).find("\"memory\":{\"peakCommittedMb\":1800,\"peakAddressMb\":2900,\"addressLimitMb\":4096}")==std::string::npos) return 27;
 
     const auto module=LoadLibraryExW(L"d3d11.dll",nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32);
     const auto create=reinterpret_cast<decltype(&D3D11CreateDevice)>(GetProcAddress(module,"D3D11CreateDevice"));
@@ -121,6 +125,9 @@ int main(int argc,char** argv) {
         receipt.find("\"cpuViewMs\":{\"center\":{\"count\":60")==std::string::npos || std::filesystem::exists(path/L"performance-summary.json.tmp")) {
         std::fputs(receipt.c_str(),stderr);return 13;
     }
+    // The real process's memory: some commit, and address space in use below the limit.
+    if (Field(receipt,"\"peakCommittedMb\":")<=0 || Field(receipt,"\"peakAddressMb\":")<=0 ||
+        Field(receipt,"\"peakAddressMb\":")>=Field(receipt,"\"addressLimitMb\":")) {std::fputs(receipt.c_str(),stderr);return 14;}
     puts("VR performance summary: bounded statistics, limit estimate, receipt, owner thread and non-blocking GPU timestamps passed.");
     return 0;
 }

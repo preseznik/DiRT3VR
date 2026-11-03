@@ -73,6 +73,14 @@ public:
     }
     void Submitted(bool stereo) {if (stereo) frameStereo_=true;else frameScreen_=true;}
     bool FrameStereo() const {return frameStereo_;}
+    // Process memory (#2667690f). dirt3_game.exe is large-address aware, so on 64-bit Windows
+    // its 32-bit address space is 4 GB; running out of it is what crashes a 32-bit game. Keeps
+    // the peak commit charge and the peak address space in use, out of the limit.
+    void Memory(uint64_t peakCommittedMb,uint64_t addressUsedMb,uint64_t addressLimitMb) {
+        peakCommittedMb_=std::max(peakCommittedMb_,peakCommittedMb);
+        peakAddressMb_=std::max(peakAddressMb_,addressUsedMb);
+        addressLimitMb_=addressLimitMb;
+    }
     void CpuViews(double center,double left,double right) {
         cpuView_[0].Add(center);cpuView_[1].Add(left);cpuView_[2].Add(right);
     }
@@ -147,6 +155,10 @@ public:
         out+=",\"dedicatedMb\":"+std::to_string(identity.dedicatedMb)+"}";
         out+=",\"headset\":{\"width\":"+std::to_string(identity.headsetWidth)+",\"height\":"+std::to_string(identity.headsetHeight);
         out+=",\"scale\":"+std::to_string(identity.scale)+"}";
+        if (addressLimitMb_) {
+            out+=",\"memory\":{\"peakCommittedMb\":"+std::to_string(peakCommittedMb_)+",\"peakAddressMb\":"+std::to_string(peakAddressMb_);
+            out+=",\"addressLimitMb\":"+std::to_string(addressLimitMb_)+"}";
+        } else out+=",\"memory\":null";
         out+=",\"displayPeriodMs\":"+Number(periodMs_)+",\"targetFps\":"+Number(TargetFps());
         out+=",\"stereoFrames\":"+std::to_string(stereoFrames_)+",\"screenFrames\":"+std::to_string(screenFrames_);
         out+=",\"fps\":{\"windows\":"+std::to_string(fps_.Count())+",\"p5\":"+Number(fps_.Percentile(.05));
@@ -218,6 +230,7 @@ private:
     FramesPerSecond fps_;
     Percent gpu_;
     uint64_t stereoFrames_{},screenFrames_{},gpuFrames_{},gpuDropped_{},gpuDisjoint_{},windowFrames_{},windowIntervals_{};
+    uint64_t peakCommittedMb_{},peakAddressMb_{},addressLimitMb_{};
     std::array<uint64_t,5> slow_{}; // indexed by Limit
     std::array<Bucket,TimelineCapacity> timeline_{};
     unsigned buckets_{};
