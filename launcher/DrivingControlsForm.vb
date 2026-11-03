@@ -306,7 +306,9 @@ Public NotInheritable Class DrivingCalibrationForm
         layout.Controls.Add(New Label With {.Text = "Axis direction", .AutoSize = True, .Anchor = AnchorStyles.Left}, 0, 0) : layout.Controls.Add(direction, 1, 0)
         layout.Controls.Add(New Label With {.Text = "Dead zone (%)", .AutoSize = True, .Anchor = AnchorStyles.Left}, 0, 1) : layout.Controls.Add(Slider(dead, "DeadZone"), 1, 1)
         layout.Controls.Add(New Label With {.Text = "Saturation (%)", .AutoSize = True, .Anchor = AnchorStyles.Left}, 0, 2) : layout.Controls.Add(Slider(saturationBox, "Saturation"), 1, 2)
-        Dim help As New Label With {.Text = "Dead zone ignores input near rest. Saturation is the travel needed for full output: 100% uses all of it; lower makes the control more sensitive. Defaults are 0% and 100%; the dead zone must stay below saturation." & Environment.NewLine & Environment.NewLine &
+        Dim initial = DrivingControls.DefaultCalibration(binding.Action)
+        Dim defaults = If(binding.Action = "Clutch", "The clutch starts at 10% and 80%, as in DiRT 3's own wheel presets, so it counts as fully in before the pedal's end; other axes start at 0% and 100%.", "Defaults are 0% and 100%.")
+        Dim help As New Label With {.Text = "Dead zone ignores input near rest. Saturation is the travel needed for full output: 100% uses all of it; lower makes the control more sensitive. " & defaults & " The dead zone must stay below saturation." & Environment.NewLine & Environment.NewLine &
             "A centered axis (steering, sticks) uses half its travel per action; a pedal or lever uses its full travel.", .AutoSize = True, .MaximumSize = New Size(600, 0), .Margin = New Padding(3, 10, 3, 12)}
         layout.Controls.Add(help, 0, 3) : layout.SetColumnSpan(help, 2)
         Dim ok As New Button With {.Name = "CalibrationApply", .Text = "Apply", .AutoSize = True}
@@ -322,9 +324,9 @@ Public NotInheritable Class DrivingCalibrationForm
                                  If found.Count > 0 Then MessageBox.Show(Me, String.Join(Environment.NewLine, found)) : Return
                                  DialogResult = DialogResult.OK : Close()
                              End Sub
-        Dim reset As New Button With {.Name = "CalibrationReset", .Text = "Reset to 0% / 100%", .AutoSize = True}
+        Dim reset As New Button With {.Name = "CalibrationReset", .Text = "Reset to " & Percent(initial.DeadZone) & " / " & Percent(initial.Saturation), .AutoSize = True}
         AddHandler reset.Click, Sub()
-                                    dead.Value = 0 : saturationBox.Value = 100
+                                    dead.Value = initial.DeadZone * 100D : saturationBox.Value = initial.Saturation * 100D
                                 End Sub
         Dim cancel As New Button With {.Text = "Cancel", .AutoSize = True, .DialogResult = DialogResult.Cancel}
         CancelButton = cancel
@@ -340,6 +342,10 @@ Public NotInheritable Class DrivingCalibrationForm
             Return result
         End Get
     End Property
+
+    Private Shared Function Percent(value As Decimal) As String
+        Return (value * 100D).ToString("0.##", Globalization.CultureInfo.CurrentCulture) & "%"
+    End Function
 
     Private Shared Function Slider(number As NumericUpDown, name As String) As Control
         Dim track As New TrackBar With {.Name = name & "Slider", .AccessibleName = number.AccessibleName, .Minimum = CInt(number.Minimum), .Maximum = CInt(number.Maximum),

@@ -81,6 +81,16 @@ Public NotInheritable Class DrivingControls
         New DrivingWizardBatch("Look and horn", "look left/right/up/down and horn", {"Look Left", "Look Right", "Look Up", "Look Down", "Horn"})}
 
     Public Shared ReadOnly Calibrations As String() = {"uniDirectionalPositive", "uniDirectionalNegative", "biDirectionalLower", "biDirectionalUpper"}
+
+    ' DiRT 3's own wheel presets (lg_g25, lg_g27 and their JPN twins) give the clutch a 10% dead zone and
+    ' full output at 80% travel; at 0% / 100% a G920's clutch didn't shift in H-pattern with clutch
+    ' (#16fa2aa3). Other axes start at 0% / 100% (#e7547282).
+    Public Const ClutchDeadZone As Decimal = 0.1D, ClutchSaturation As Decimal = 0.8D
+
+    ' The dead zone and saturation an axis bound to the action starts with.
+    Public Shared Function DefaultCalibration(action As String) As (DeadZone As Decimal, Saturation As Decimal)
+        Return If(action = "Clutch", (ClutchDeadZone, ClutchSaturation), (0D, 1D))
+    End Function
     Public Shared ReadOnly XboxAxes As String() = {"xinput_left_stick_x", "xinput_left_stick_y", "xinput_right_stick_x", "xinput_right_stick_y", "xinput_left_trigger", "xinput_right_trigger"}
     Public Shared ReadOnly DirectAxes As String() = {"di_x_axis", "di_y_axis", "di_z_axis", "di_x_axis_rotation", "di_y_axis_rotation", "di_z_axis_rotation", "di_slider_0", "di_slider_1"}
     ' XInput wButtons bit order (DrivingInput.XboxButtonNames); bits 10 and 11 are unused.
@@ -118,6 +128,12 @@ Public NotInheritable Class DrivingControls
         End Try
         If value Is Nothing Then Throw New IOException("The driving controls file is invalid.")
         value.Validate()
+        ' Earlier launchers bound a clutch axis at 0% / 100%; it takes the clutch's own default.
+        For Each binding In value.Bindings
+            If binding.Action = "Clutch" AndAlso DrivingCapture.IsAxis(binding) AndAlso binding.DeadZone = 0D AndAlso binding.Saturation = 1D Then
+                binding.DeadZone = ClutchDeadZone : binding.Saturation = ClutchSaturation
+            End If
+        Next
         Return value
     End Function
 
