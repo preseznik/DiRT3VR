@@ -54,6 +54,34 @@ class SeatCameraTests(unittest.TestCase):
         hidden = {document.attributes_of(v)["ident"]: document.attributes_of(v)["hidden"] for v in seat_cameras.views(document)}
         self.assertEqual(hidden, {"chase_close": "true", "head-cam": "false"})
 
+    def test_cockpit_first_moves_head_cam_and_hides_nothing(self):
+        data = sample()
+        moved = seat_cameras.cockpit_first(data)
+        document, original = seat_cameras.decode(moved), seat_cameras.decode(data)
+        views = seat_cameras.views(document)
+        self.assertEqual([document.attributes_of(v) for v in views],
+                         [original.attributes_of(3), original.attributes_of(2)])  # head-cam, then chase_close
+        self.assertEqual(document.strings, original.strings)
+        self.assertEqual(document.attributes, original.attributes)
+        self.assertEqual(document.elements[2], original.elements[3])
+        self.assertEqual(document.elements[3], original.elements[2])
+        self.assertEqual(seat_cameras.head_position(document)[1], (0.346, 1.068, -0.317))
+        self.assertEqual(seat_cameras.cockpit_first(moved), moved)
+        root = decode_xml(moved)
+        self.assertEqual([v.get("ident") for v in root.findall("ViewManager/View")], ["head-cam", "chase_close"])
+        self.assertEqual(root.find("ViewManager/View[@ident='head-cam']/Parameter").get("y"), "1.0680")
+
+    def test_research_seat_test_modes(self):
+        import hashlib
+        from unittest.mock import patch
+        import diagnostic_files
+        data = sample()
+        with patch.object(diagnostic_files, "SEAT_SHA256", hashlib.sha256(data).hexdigest()), \
+                patch.object(diagnostic_files, "SEAT_TEST_OFFSET", (0.0, 0.1, 0.0)):
+            for mode, expected in (("hide", seat_cameras.start_in_cockpit(data)), ("first", seat_cameras.cockpit_first(data))):
+                with patch.object(diagnostic_files, "SEAT_TEST_COCKPIT", mode):
+                    self.assertEqual(diagnostic_files.seat_test(data), seat_cameras.offset_seat(expected, 0.0, 0.1, 0.0))
+
     def test_refusals(self):
         data = sample()
         for bad in (0.51, -0.6, float("nan"), float("inf"), True):
@@ -75,6 +103,13 @@ class SeatCameraTests(unittest.TestCase):
                 after = seat_cameras.head_position(seat_cameras.decode(seat_cameras.offset_seat(data, 0.1, -0.2, 0.3)))[1]
                 self.assertEqual([round(b - a, 4) for a, b in zip(before, after)], [0.1, -0.2, 0.3])
                 self.assertIsNotNone(decode_xml(seat_cameras.offset_seat(data, 0.1, -0.2, 0.3)))
+                original = decode_xml(data)
+                first = decode_xml(seat_cameras.cockpit_first(seat_cameras.offset_seat(data, 0.1, -0.2, 0.3)))
+                idents = [v.get("ident") for v in original.findall("ViewManager/View")]
+                self.assertEqual([v.get("ident") for v in first.findall("ViewManager/View")],
+                                 ["head-cam"] + [i for i in idents if i != "head-cam"])
+                self.assertEqual([v.get("hidden") for v in first.findall("ViewManager/View")][1:],
+                                 [v.get("hidden") for v in original.findall("ViewManager/View") if v.get("ident") != "head-cam"])
 
 
 if __name__ == "__main__":

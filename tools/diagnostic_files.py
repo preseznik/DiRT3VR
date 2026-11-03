@@ -113,13 +113,17 @@ SEAT_SHA256 = "c8c989e557dd6729345a6baf564907e3e2fe4e2b07e9428d756fafbf4a981c58"
 # Research seat test (metres sideways, up, forward); set by run_benchmark.py --seat-test.
 # A --recover of such a run needs the same value to recognise the applied file.
 SEAT_TEST_OFFSET = (0.0, 0.0, 0.0)
+# How the seat test starts in the cockpit: "hide" the views before head-cam, or move head-cam
+# "first" (seat_cameras.cockpit_first); set by --seat-cockpit, needed again by a --recover.
+SEAT_TEST_COCKPIT = "hide"
 
 
 def seat_test(data: bytes) -> bytes:
     """Research: start the frx in its cockpit view, with the eye point moved by SEAT_TEST_OFFSET."""
     if hashlib.sha256(data).hexdigest() != SEAT_SHA256:
         raise ValueError("Unexpected frx camera definitions")
-    return seat_cameras.offset_seat(seat_cameras.start_in_cockpit(data), *SEAT_TEST_OFFSET)
+    cockpit = {"hide": seat_cameras.start_in_cockpit, "first": seat_cameras.cockpit_first}[SEAT_TEST_COCKPIT]
+    return seat_cameras.offset_seat(cockpit(data), *SEAT_TEST_OFFSET)
 
 
 # Research bisection of the profile load: "signin" (d3s only), "dataset" (through d3d) or "full".
