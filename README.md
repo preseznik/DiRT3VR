@@ -77,6 +77,9 @@ from that session's frame rate.
 
 ## If something goes wrong
 
+- If Setup says your `dirt3_game.exe` is not supported, it's an older build of
+  the game. In Steam, open DiRT 3 Complete Edition → **Properties → Installed
+  Files → Verify integrity of game files**, then run Setup again.
 - After a crash or a Windows restart during play, click
   **Restore original files** before launching again.
 - If an add-on such as ReShade or the OBS mirror stops VR from starting,

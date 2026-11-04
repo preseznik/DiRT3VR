@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- When Setup or the launcher rejects `dirt3_game.exe`, the message now says why and how to fix it: DiRT3VR needs the current Steam version (the 2019 update), and **Verify integrity of game files** in Steam brings it. An older 2015 build has the same version number, 1.2.0.0, but isn't supported.
 - **Bloom** and **Light streaks and lens flares** under **Graphics → Desktop** and **Graphics → VR rendering** (#3c6d6ffa, as DiRT2VR's bloom option; Wrench's research): both are on as in DiRT 3. Turn one off and DiRT3VR edits DiRT 3's effect files for that session and puts them back afterwards. The glare around the sun (the blue streak and the flares, drawn by each eye on its own in VR) is the streaks and flares; bloom is the glow around bright areas, which adds little in daytime driving.
 
 ## 0.1.23 — first Stable release, with the flat screen for chosen VR views

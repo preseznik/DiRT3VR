@@ -120,12 +120,16 @@ Public Class InstallContext
         End Get
     End Property
 
+    Public Const UnsupportedGame As String = "This dirt3_game.exe is not supported: DiRT3VR works only with the current Steam version of DiRT 3 Complete Edition (the 2019 update). If you have it on Steam, open DiRT 3 Complete Edition → Properties → Installed Files → Verify integrity of game files, then try again. No game files were changed."
+
     Public Sub ValidateGame()
         SafeFiles.NoLinks(GameRoot)
         Dim executable = Path.Combine(GameRoot, "dirt3_game.exe")
         SafeFiles.NoLinks(executable)
         If Not File.Exists(executable) Then Throw New IOException("dirt3_game.exe was not found. Select the DiRT 3 Complete Edition game folder.")
-        If SafeFiles.Hash(executable) <> SupportedHash Then Throw New IOException("This DiRT 3 executable is not supported by this build. No game files were changed.")
+        ' An older DiRT 3 build (the 2015 one, still version 1.2.0.0) has the same name but other code addresses, so the
+        ' message says how to get the supported 2019 Steam build (iztok, 2026-11-04).
+        If SafeFiles.Hash(executable) <> SupportedHash Then Throw New IOException(UnsupportedGame)
     End Sub
 
     Public Sub RequireClosed()
