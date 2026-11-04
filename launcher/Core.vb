@@ -214,6 +214,22 @@ Public Class LauncherSettings
     ' FPS and GPU usage in the headset (#4896ffd3; Lens's renderer side), and whether that display follows the view.
     Public Property PerfDisplay As Boolean
     Public Property PerfFollowView As Boolean
+    ' Views on the flat screen in VR (#48208327; Lens's renderer side, iztok picked all three groups). Every 3D view
+    ' is in stereo by default; a group turned on shows on the flat virtual screen instead, as Toggle VR does. The
+    ' cockpit view always stays 3D.
+    Public Property FlatCarViews As Boolean
+    Public Property FlatCinematic As Boolean
+    Public Property FlatMenus As Boolean
+
+    ' DIRT3VR_FLAT_VIEWS (Lens's contract): the groups on the flat screen, comma-separated in the order car,
+    ' cinematic, menus; "" when every view stays 3D.
+    Public Function FlatViews() As String
+        Dim groups As New List(Of String)
+        If FlatCarViews Then groups.Add("car")
+        If FlatCinematic Then groups.Add("cinematic")
+        If FlatMenus Then groups.Add("menus")
+        Return String.Join(",", groups)
+    End Function
     ' Anisotropic filtering (#15714dd2; Wrench's renderer side): 0 = DiRT 3's own, 1 = off (trilinear), else 2/4/8/16×.
     ' DiRT 3 has no setting for it, so another choice goes to the renderer as DIRT3VR_ANISOTROPY; on the monitor
     ' that installs DiRT3VR's renderer for the Launch session.
