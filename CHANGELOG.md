@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Flat screen in VR** under **Graphics** (#48208327, as DiRT2VR offers; Lens's renderer side): show car views outside the cockpit, cinematic cameras (race intros and replay cameras) or 3D menu backgrounds on the flat screen instead of in stereo, each on its own. All are off by default, and the cockpit always stays 3D.
 - The **Enable experimental VR** checkbox and the launcher's help no longer say VR works only with VDXR: SteamVR and other OpenXR runtimes work too.
 - The README is now a short quickstart, like DiRT2VR's (iztok). The launcher's **?** instructions cover every option.
 - The GitHub repository now holds only what builds the installer (iztok): development notes, tests and research tools stay with the developers. A fresh clone still builds the installer; `tools/build.ps1` skips the tests that aren't there.

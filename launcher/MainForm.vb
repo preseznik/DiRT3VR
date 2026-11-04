@@ -70,6 +70,10 @@ Public Class MainForm
     ' FPS and GPU usage in the headset (#4896ffd3).
     Private ReadOnly perfDisplay As New CheckBox With {.Name = "PerfDisplay", .Text = "Show FPS and GPU usage in the headset", .AutoSize = True}
     Private ReadOnly perfFollow As New CheckBox With {.Name = "PerfFollowView", .Text = "Performance display follows view", .AutoSize = True, .Enabled = False}
+    ' Views on the flat screen in VR (#48208327), off by default: every 3D view in stereo.
+    Private ReadOnly flatCarViews As New CheckBox With {.Name = "FlatCarViews", .Text = "Car views outside the cockpit (chase, bonnet, bumper)", .AutoSize = True}
+    Private ReadOnly flatCinematic As New CheckBox With {.Name = "FlatCinematic", .Text = "Cinematic cameras (race intros and replay cameras)", .AutoSize = True}
+    Private ReadOnly flatMenus As New CheckBox With {.Name = "FlatMenus", .Text = "3D menu backgrounds", .AutoSize = True}
     Private ReadOnly desktopResolution As New ComboBox With {.Name = "DesktopResolution", .DropDownStyle = ComboBoxStyle.DropDownList}
     Private ReadOnly desktopMode As New ComboBox With {.Name = "DesktopDisplayMode", .DropDownStyle = ComboBoxStyle.DropDownList}
     Private ReadOnly desktopVSync As New ComboBox With {.Name = "DesktopVSync", .DropDownStyle = ComboBoxStyle.DropDownList}
@@ -433,6 +437,9 @@ Public Class MainForm
         hud.Controls.Add(perfFollow)
         hud.Controls.Add(Info("A small display with frames per second and GPU usage, below straight ahead (or in front of you with follows view). Every VR session also measures its FPS for the Last VR session line under VR rendering, with or without the display."))
         AddHandler perfDisplay.CheckedChanged, Sub() perfFollow.Enabled = perfDisplay.Checked
+        Dim flat = Section(columns.Second, "Flat screen in VR")
+        flat.Controls.Add(Info("Every 3D view is in stereo. Tick a group to show it on the flat screen in front of you instead, as Toggle VR does; the cockpit view always stays 3D. Applies on the next VR launch."))
+        flat.Controls.AddRange({flatCarViews, flatCinematic, flatMenus})
         BuildQuality(content)
         Field(content, "Game graphics file", graphicsPath)
         content.Controls.Add(graphicsDefaultsButton)
@@ -1028,6 +1035,7 @@ Public Class MainForm
         renderScale.Value = settings.VrRenderScale
         hudDistance.Value = CInt(settings.HudDistance * 2D) : hudFollow.Checked = settings.HudFollowView
         perfDisplay.Checked = settings.PerfDisplay : perfFollow.Checked = settings.PerfFollowView : perfFollow.Enabled = perfDisplay.Checked
+        flatCarViews.Checked = settings.FlatCarViews : flatCinematic.Checked = settings.FlatCinematic : flatMenus.Checked = settings.FlatMenus
         applyingPreset = True
         desktopQuality.Values = settings.GraphicsQuality : vrQuality.Values = settings.VrGraphicsQuality
         seatPicker.Apply(settings.SeatOffsets, settings.SeatSameForAll, settings.SeatAllCars, settings.DirectCar, settings.StartInCockpit, settings.SeatOnDesktop)
@@ -1057,7 +1065,7 @@ Public Class MainForm
 
     Public Function CurrentSettings() As LauncherSettings
         Dim resolution = TryCast(desktopResolution.SelectedItem, DesktopResolutionChoice)
-        Return New LauncherSettings With {.ModernInterface = modern.Checked, .RuntimeMode = VrRuntime.Modes(Math.Max(0, runtime.SelectedIndex)), .SteamRuntimeManifest = manifest.Text, .VdxrRuntimeManifest = vdxrManifest.Text, .OtherRuntimeManifest = otherManifest.Text, .DiagnosticLogging = logging.Checked, .ExperimentalVrEnabled = experimental.Checked, .VrRenderScale = renderScale.Value, .HudDistance = hudDistance.Value / 2D, .HudFollowView = hudFollow.Checked, .PerfDisplay = perfDisplay.Checked, .PerfFollowView = perfFollow.Checked,
+        Return New LauncherSettings With {.ModernInterface = modern.Checked, .RuntimeMode = VrRuntime.Modes(Math.Max(0, runtime.SelectedIndex)), .SteamRuntimeManifest = manifest.Text, .VdxrRuntimeManifest = vdxrManifest.Text, .OtherRuntimeManifest = otherManifest.Text, .DiagnosticLogging = logging.Checked, .ExperimentalVrEnabled = experimental.Checked, .VrRenderScale = renderScale.Value, .HudDistance = hudDistance.Value / 2D, .HudFollowView = hudFollow.Checked, .PerfDisplay = perfDisplay.Checked, .PerfFollowView = perfFollow.Checked, .FlatCarViews = flatCarViews.Checked, .FlatCinematic = flatCinematic.Checked, .FlatMenus = flatMenus.Checked,
             .DesktopAnisotropy = LauncherSettings.AnisotropyLevels(Math.Max(0, desktopAnisotropy.SelectedIndex)), .VrAnisotropy = LauncherSettings.AnisotropyLevels(Math.Max(0, vrAnisotropy.SelectedIndex)), .VrAntiAliasing = LauncherSettings.VrAntiAliasingChoices(Math.Max(0, vrAntiAliasing.SelectedIndex)), .VrFieldOfView = vrFieldOfView.Value, .VrHelmetView = vrHelmetView.Checked,
             .DesktopWidth = If(resolution Is Nothing, 0, resolution.Size.Width), .DesktopHeight = If(resolution Is Nothing, 0, resolution.Size.Height),
             .DesktopDisplayMode = {"game", "windowed", "fullscreen", "borderless"}(Math.Max(0, desktopMode.SelectedIndex)), .DesktopVSync = {"game", "off", "on"}(Math.Max(0, desktopVSync.SelectedIndex)), .SkipStartupMovies = skipStartupMovies.Checked,
@@ -1442,6 +1450,7 @@ Public Class MainForm
                 "Advanced → Enable experimental VR turns on the VR session when this package supports it. Choose VDXR (through Virtual Desktop), SteamVR or another OpenXR runtime under Settings → VR runtime. " & RuntimeCapabilities.SteamVrNote & " Close other VR games first." & vbCrLf & vbCrLf &
                 "All rendered 3D camera views use stereo and headset tracking, including cockpit, bonnet, bumper, chase and replay. Loading screens, movies and frames without a 3D scene use a virtual screen, and recognized HUD and menu draws use a transparent panel 2 metres away. Camera transitions are still experimental." & vbCrLf & vbCrLf &
                 "Show FPS and GPU usage in the headset (Graphics → VR HUD, off by default) adds a small display below straight ahead, or in front of you when it follows the view. Each VR session also measures its frame rate; Graphics → VR rendering shows the last one (median and low FPS, GPU usage, and whether the GPU or CPU held it back)." & vbCrLf & vbCrLf &
+                "Flat screen in VR (Graphics, all off by default) shows chosen views on the flat screen in front of you instead of in stereo, as Toggle VR does: car views outside the cockpit (chase, bonnet, bumper), cinematic cameras (race intros and replay cameras), and 3D menu backgrounds. The cockpit view always stays 3D. A replay's chase view counts as a car view." & vbCrLf & vbCrLf &
                 "Recommend for this PC (Graphics → Quality) reads the last VR session's measured frame rate. If that session ran the same VR quality on the same headset, it lowers the VR render scale when the GPU held the frame rate back, raises it by 10% when the GPU had plenty to spare, keeps it when the CPU was the limit (lowering it wouldn't help), or picks VR Balanced or Potato / Low-End when Ultra or the lowest scale was still too heavy. It changes only the controls; Undo preset brings them back, and nothing is kept until Save settings or Launch. Without a measured session it asks you to drive one first." & vbCrLf & vbCrLf &
                 "Graphics → VR HUD moves that panel from 1 to 5 metres away; it keeps the same size in your view, so only how far away it seems changes. Follow view keeps it in front of you as you turn your head; off (the default), it stays where you last recentered." & vbCrLf & vbCrLf &
                 "DiRT 3's motion blur is switched off for VR sessions: in the headset every head movement counts as camera movement, so it smeared the nearest ground and objects. DiRT3VR writes the game's postprocess\effects.xml with the blur lengths at zero for the session and restores it after exit; desktop play keeps the game's motion blur." & vbCrLf & vbCrLf &
