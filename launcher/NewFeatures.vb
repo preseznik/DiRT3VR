@@ -14,7 +14,8 @@ Public NotInheritable Class NewFeatures
 
     ' Control or section names, and the version that first ships them. Empty right after a release: add each
     ' launcher setting, section, option or button added since, with NextVersion.
-    Private Shared ReadOnly Since As New Dictionary(Of String, String)(StringComparer.Ordinal)
+    Private Shared ReadOnly Since As New Dictionary(Of String, String)(StringComparer.Ordinal) From {
+        {"DesktopBloom", NextVersion}, {"DesktopGlare", NextVersion}, {"VrBloom", NextVersion}, {"VrGlare", NextVersion}}
     Private Shared ReadOnly marked As New ConditionalWeakTable(Of Control, Object)
     ' Whether the running build is an experimental one (BuildInfo.Experimental); tests may set it.
     Public Shared Property ExperimentalBuild As Boolean = BuildInfo.Experimental

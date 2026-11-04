@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Bloom** and **Light streaks and lens flares** under **Graphics → Desktop** and **Graphics → VR rendering** (#3c6d6ffa, as DiRT2VR's bloom option; Wrench's research): both are on as in DiRT 3. Turn one off and DiRT3VR edits DiRT 3's effect files for that session and puts them back afterwards. The glare around the sun (the blue streak and the flares, drawn by each eye on its own in VR) is the streaks and flares; bloom is the glow around bright areas, which adds little in daytime driving.
+
 ## 0.1.23 — first Stable release, with the flat screen for chosen VR views
 
 - **Flat screen in VR** under **Graphics** (#48208327, as DiRT2VR offers; Lens's renderer side): show car views outside the cockpit, cinematic cameras (race intros and replay cameras) or 3D menu backgrounds on the flat screen instead of in stereo, each on its own. All are off by default, and the cockpit always stays 3D.

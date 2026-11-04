@@ -236,6 +236,12 @@ Public Class LauncherSettings
     Public Shared ReadOnly AnisotropyLevels As Integer() = {0, 1, 2, 4, 8, 16}
     Public Property DesktopAnisotropy As Integer
     Public Property VrAnisotropy As Integer
+    ' Bloom and light streaks + lens flares (#3c6d6ffa; Wrench's research, as DiRT2VR's bloom option): on (DiRT 3's
+    ' own) by default, separately for the monitor and VR. Off edits DiRT 3's effect files for that session (PostEffects).
+    Public Property DesktopBloom As Boolean = True
+    Public Property VrBloom As Boolean = True
+    Public Property DesktopGlare As Boolean = True
+    Public Property VrGlare As Boolean = True
     ' VR anti-aliasing (#c8076a1e): DiRT 3's own multisampling value for the VR session's graphics file. Lens's
     ' runs showed the eye copy works unchanged at 2xmsaa and 4xmsaa (the backbuffer stays single-sample);
     ' 8× isn't tested, so it isn't offered. Off by default, as every VR session ran before.

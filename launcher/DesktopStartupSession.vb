@@ -1,7 +1,8 @@
 ' Desktop launches with temporary game-folder changes need a process-lifetime owner: startup logo
 ' skipping, seat positions on the monitor, direct practice, which installs DiRT3VR's renderer (as a
 ' plain pass-through, no VR) for its player-control fix, the in-game seat menu on the monitor, which
-' installs it for the menu (#c137c681), and anisotropic filtering other than the game's (#15714dd2).
+' installs it for the menu (#c137c681), anisotropic filtering other than the game's (#15714dd2), and bloom or
+' light streaks + lens flares turned off (#3c6d6ffa), which edit DiRT 3's effect files for the session.
 ' Ordinary desktop launching remains unchanged and never installs the renderer.
 Public NotInheritable Class DesktopStartupSession
     Private ReadOnly context As InstallContext
@@ -9,6 +10,8 @@ Public NotInheritable Class DesktopStartupSession
     Public ReadOnly Game As Process
     ' Devices whose launcher driving bindings couldn't go into the session's action maps, or "".
     Public Property DrivingNote As String = ""
+    ' Bloom or light streaks + lens flares that stay on because an effect file is missing or unexpected, or "".
+    Public Property EffectsNote As String = ""
     ' Cars whose seat position couldn't be applied (camera file missing or not the expected format).
     Public Property SeatsSkipped As New List(Of String)
     ' The in-game seat menu's shared memory for this session (monitor menu), or Nothing.
@@ -30,7 +33,8 @@ Public NotInheritable Class DesktopStartupSession
     Public Const RendererMode As String = "desktop-renderer"
 
     Public Shared Function NeedsSession(settings As LauncherSettings) As Boolean
-        Return settings.SkipStartupMovies OrElse settings.LaunchMode = "direct" OrElse SeatPositions.OnDesktop(settings) OrElse NeedsRenderer(settings)
+        Return settings.SkipStartupMovies OrElse settings.LaunchMode = "direct" OrElse SeatPositions.OnDesktop(settings) OrElse NeedsRenderer(settings) OrElse
+               Not settings.DesktopBloom OrElse Not settings.DesktopGlare
     End Function
 
     ' Whether the session installs DiRT3VR's renderer: direct practice, the seat menu on the monitor, or
@@ -107,6 +111,12 @@ Public NotInheritable Class DesktopStartupSession
             Dim actionMaps = If(settings.LaunchMode = "direct", SessionActionMaps.Changes(context, DrivingControls.Load(context)), New SessionActionMaps.SessionChanges())
             Dim seats = SeatPositions.Changes(context, settings, vr:=False)
             Dim changes = DesktopStartupSession.Changes(context, settings, actionMaps, seats.Files)
+            ' Bloom and light streaks + lens flares off (#3c6d6ffa): the effect files, for this session only.
+            Dim effectsNote As String = ""
+            Dim post = PostEffects.SessionChanges(context, motionBlurOff:=False, glareOff:=Not settings.DesktopGlare, bloomOff:=Not settings.DesktopBloom, note:=effectsNote)
+            For Each pair In post.Files
+                changes.Add(pair.Key, pair.Value)
+            Next
             Dim logs = Path.Combine(context.UserRoot, "logs", "session-" & Guid.NewGuid().ToString("N"))
             If settings.LaunchMode <> "direct" AndAlso NeedsRenderer(settings) Then
                 SafeFiles.NoLinks(logs) : Directory.CreateDirectory(logs)
@@ -121,9 +131,9 @@ Public NotInheritable Class DesktopStartupSession
             settings.Save(context)
             DesktopGraphics.Apply(context, settings, monitor)
             preparing = True
-            ' Seat positions alone may come to nothing (every adjusted car's camera file unusable).
+            ' Seat positions or effects alone may come to nothing (every file unusable or already as wanted).
             If changes.Count > 0 Then
-                transaction.Prepare(changes, apply:=False, seats:=If(seats.Offsets.Count > 0, seats.Offsets, Nothing), monitorRenderer:=NeedsRenderer(settings))
+                transaction.Prepare(changes, apply:=False, seats:=If(seats.Offsets.Count > 0, seats.Offsets, Nothing), monitorRenderer:=NeedsRenderer(settings), effects:=post.Edits)
                 Await RecoveryWorker.ApplyAsync(context)
             End If
             context.RequireClosed()
@@ -134,7 +144,7 @@ Public NotInheritable Class DesktopStartupSession
             game = Process.Start(StartInfo(context, settings, logs, actionMaps.PreferredDevices, seatMenu?.Name))
             If game Is Nothing Then Throw New IOException("DiRT 3 could not start.")
             Session.WriteLaunchStatus(context, "starting", "Waiting for the game window. DiRT3VR's temporary files are removed after exit.", game.Id, DateTime.UtcNow, mode:=If(settings.LaunchMode = "direct", "direct-practice", "desktop"))
-            Return New DesktopStartupSession(context, game, lease) With {.DrivingNote = actionMaps.Note, .SeatsSkipped = seats.Skipped, .SeatMenu = seatMenu, .LogDirectory = If(NeedsRenderer(settings), logs, "")}
+            Return New DesktopStartupSession(context, game, lease) With {.DrivingNote = actionMaps.Note, .EffectsNote = effectsNote, .SeatsSkipped = seats.Skipped, .SeatMenu = seatMenu, .LogDirectory = If(NeedsRenderer(settings), logs, "")}
         Catch ex As Exception
             failure = ex
         End Try
