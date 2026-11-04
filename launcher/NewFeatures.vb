@@ -8,14 +8,13 @@ Imports System.Windows.Forms
 ' stable releases never show marks, and the next version drops them.
 Public NotInheritable Class NewFeatures
     Public Const Mark As String = "*new*"
-    ' The release after 0.1.22. After each release, set the next version and remove the released entries
+    ' The release after 0.1.23. After each release, set the next version and remove the released entries
     ' (NewFeaturesTests fails while this build is past NextVersion).
-    Public Const NextVersion As String = "0.1.23"
+    Public Const NextVersion As String = "0.1.24"
 
     ' Control or section names, and the version that first ships them. Empty right after a release: add each
     ' launcher setting, section, option or button added since, with NextVersion.
-    Private Shared ReadOnly Since As New Dictionary(Of String, String)(StringComparer.Ordinal) From {
-        {"SectionFlatscreeninVR", NextVersion}}
+    Private Shared ReadOnly Since As New Dictionary(Of String, String)(StringComparer.Ordinal)
     Private Shared ReadOnly marked As New ConditionalWeakTable(Of Control, Object)
     ' Whether the running build is an experimental one (BuildInfo.Experimental); tests may set it.
     Public Shared Property ExperimentalBuild As Boolean = BuildInfo.Experimental

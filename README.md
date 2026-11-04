@@ -1,18 +1,19 @@
 # DiRT3VR
 
-[**Download**](https://github.com/preseznik/DiRT3VR/releases) · [Changelog](https://github.com/preseznik/DiRT3VR/blob/main/CHANGELOG.md)
+[**Stable download**](https://github.com/preseznik/DiRT3VR/releases/latest) · [**All releases, including Experimental**](https://github.com/preseznik/DiRT3VR/releases) · [Changelog](https://github.com/preseznik/DiRT3VR/blob/main/CHANGELOG.md)
 
-Open the newest release, then **Assets**, and choose the Setup EXE (or the
-ZIP). All releases so far are **Experimental** pre-releases.
+Open **Assets** on the release page and choose the Setup EXE (or the ZIP).
+Releases marked **Pre-release** are Experimental builds with the newest
+features.
 
 A launcher for **DiRT 3 Complete Edition** (Steam) with experimental
 stereoscopic VR and head tracking, and direct practice, driving controls and
 seat positions on the monitor and in VR. In VR, menus, loading screens and
 movies use a virtual screen.
 
-Tested with a **Quest 3 through Virtual Desktop (VDXR)**, an Xbox controller
-and a Logitech G920. SteamVR and other OpenXR runtimes are new and still being
-checked.
+Tested with a **Quest 3 through Virtual Desktop (VDXR) and SteamVR**, an Xbox
+controller and a Logitech G920. Other headsets and OpenXR runtimes need more
+testing.
 
 This mod will remain free forever. If you'd like to support the work, you can [support me on Patreon](https://www.patreon.com/cw/bohloney).
 
@@ -35,8 +36,9 @@ This mod will remain free forever. If you'd like to support the work, you can [s
 3. Open **DiRT3VR**. Windows may ask for permission when DiRT3VR needs to write
    to the Steam folder.
 
-To get updates, turn on **? → Include experimental releases**. DiRT3VR checks
-at startup and shows **Update available** next to **?**.
+DiRT3VR checks for updates at startup and shows **Update available** next to
+**?**. Turn on **? → Include experimental releases** to also get Experimental
+builds; **Return to stable…** goes back.
 
 ## Play on the monitor
 
