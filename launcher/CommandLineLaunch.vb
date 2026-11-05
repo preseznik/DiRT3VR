@@ -23,6 +23,7 @@ Public Module CommandLineLaunch
                 Select Case mode
                     Case "steamvr" : settings.SteamRuntimeManifest = manifest
                     Case "other" : settings.OtherRuntimeManifest = manifest
+                    Case "system" ' The PC's active runtime: no manifest to give.
                     Case Else : settings.VdxrRuntimeManifest = manifest
                 End Select
             End If

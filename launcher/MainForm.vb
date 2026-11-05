@@ -969,7 +969,7 @@ Public Class MainForm
                                                     End Using
                                                 End Sub)
         Dim runtimes = Section(content, "VR runtime")
-        runtime.Items.AddRange({"VDXR", "SteamVR", VrRuntime.OtherName})
+        runtime.Items.AddRange({"VDXR", "SteamVR", VrRuntime.OtherName, VrRuntime.SystemName})
         StyleChoice(runtime, Me)
         Field(runtimes, "Runtime", runtime)
         Field(runtimes, "VDXR x86 manifest", vdxrManifest)
@@ -977,6 +977,8 @@ Public Class MainForm
         Field(runtimes, "Other OpenXR x86 manifest", otherManifest)
         Dim browseRuntime As New Button With {.Name = "BrowseRuntime", .Text = "Browse selected runtime…", .AutoSize = True}
         runtimes.Controls.Add(browseRuntime)
+        ' The system default has no file to choose.
+        AddHandler runtime.SelectedIndexChanged, Sub() browseRuntime.Enabled = runtime.SelectedIndex <> 3
         AddHandler browseRuntime.Click, Sub()
                                             Dim filename = If(runtime.SelectedIndex = 1, "steamxr_win32.json", If(runtime.SelectedIndex = 2, "*.json", "virtualdesktop-openxr-32.json"))
                                             Using picker As New OpenFileDialog With {.Filter = If(runtime.SelectedIndex = 2, "OpenXR runtime manifest|*.json", "32-bit runtime|" & filename), .FileName = If(runtime.SelectedIndex = 2, "", filename)}
@@ -989,7 +991,7 @@ Public Class MainForm
                                                 End If
                                             End Using
                                         End Sub
-        runtimes.Controls.Add(Info("For VDXR, connect through Virtual Desktop; for SteamVR, start SteamVR with your headset connected. The selected 32-bit runtime is used only by the launched process; your system OpenXR default stays unchanged."))
+        runtimes.Controls.Add(Info("For VDXR, connect through Virtual Desktop; for SteamVR, start SteamVR with your headset connected. OpenXR (system default) uses whichever 32-bit OpenXR runtime your PC has set active, as DiRT2VR does: Virtual Desktop, SteamVR or your headset's own software. The selected runtime is used only by the launched process; DiRT3VR never changes your system OpenXR default."))
         runtimes.Controls.Add(Info("Other OpenXR runtime: for a headset with its own OpenXR runtime, browse to that runtime's .json file. DiRT 3 is a 32-bit game, so the runtime must include a 32-bit part; Check runtime and headset tells whether it works. Only VDXR and SteamVR have been tried with DiRT3VR so far."))
         runtimes.Controls.Add(probe) : runtimes.Controls.Add(probeStatus)
         Dim addOns As New Button With {.Name = "VrCompatibility", .Text = "OpenXR add-ons…", .AutoSize = True}
@@ -1501,7 +1503,7 @@ Public Class MainForm
                 "Start races in the cockpit view (off by default): DiRT 3 starts a race in the first view of each car's camera list (chase close). For the VR session DiRT3VR moves the cockpit view to the front of every car's camera file and its renderer keeps the race in it, so races start in the cockpit and Change View still reaches the chase, bumper and bonnet views. Nothing is hidden. The camera files are restored after exit with the seat changes."),
             New HelpTopic(HelpRuntime,
                 "Settings → Check runtime and headset runs a small 32-bit OpenXR check without starting the game. A successful check does not mean VR driving is ready." & vbCrLf & vbCrLf &
-                "Choose VDXR, SteamVR or another OpenXR runtime explicitly. The selected runtime is used only by DiRT3VR's own processes; your system OpenXR default stays unchanged. Each runtime needs its own check. Browse to the selected runtime file if it is installed elsewhere." & vbCrLf & vbCrLf &
+                "Choose VDXR, SteamVR or another OpenXR runtime explicitly, or OpenXR (system default) to use whichever 32-bit OpenXR runtime your headset software has set active on this PC (VDXR when Virtual Desktop is active, SteamVR when SteamVR is), as DiRT2VR does. The selected runtime is used only by DiRT3VR's own processes; DiRT3VR never changes your system OpenXR default. Each runtime needs its own check. Browse to the selected runtime file if it is installed elsewhere." & vbCrLf & vbCrLf &
                 "Other OpenXR runtime is for headsets with their own OpenXR runtime instead of Virtual Desktop or SteamVR. Browse to that runtime's .json manifest. DiRT 3 is a 32-bit game, so the runtime must include a 32-bit part; the launcher refuses a 64-bit-only runtime. Check runtime and headset shows whether the headset answers. Only VDXR and SteamVR have been tried with DiRT3VR so far, so please report how another runtime works." & vbCrLf & vbCrLf &
                 "OpenXR add-ons… lists the add-ons turned off for DiRT 3 and turns them back on."),
             New HelpTopic(HelpSettings,

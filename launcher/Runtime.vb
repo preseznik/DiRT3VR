@@ -57,16 +57,46 @@ End Class
 
 Public Module VrRuntime
     ' VDXR, SteamVR, and any other 32-bit OpenXR runtime the player browses to (#982a5c40).
-    Public ReadOnly Modes As String() = {"vdxr", "steamvr", "other"}
+    Public ReadOnly Modes As String() = {"vdxr", "steamvr", "other", "system"}
     Public Const OtherName As String = "Other OpenXR runtime"
+    Public Const SystemName As String = "OpenXR (system default)"
 
     Public Function Label(mode As String) As String
-        Return If(mode = "steamvr", "SteamVR", If(mode = "other", "the other OpenXR runtime", "VDXR"))
+        Return If(mode = "steamvr", "SteamVR", If(mode = "other", "the other OpenXR runtime", If(mode = "system", "the PC's default OpenXR runtime", "VDXR")))
+    End Function
+
+    ' "OpenXR (system default)", as DiRT2VR's (#07626461: a Steam Frame player on VDXR, while DiRT2VR followed whichever
+    ' headset software was active): the PC's active 32-bit OpenXR runtime, from HKLM\SOFTWARE\Khronos\OpenXR\1
+    ' ActiveRuntime in the 32-bit registry view (the launcher is 64-bit; DiRT 3 is 32-bit). Tests may replace the reader.
+    Public Property SystemManifestReader As Func(Of String) = AddressOf ReadSystemManifest
+
+    Private Function ReadSystemManifest() As String
+        Try
+            Using root = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry32),
+                  key = root.OpenSubKey("SOFTWARE\Khronos\OpenXR\1")
+                Return TryCast(key?.GetValue("ActiveRuntime"), String)
+            End Using
+        Catch ex As Exception When TypeOf ex Is Security.SecurityException OrElse TypeOf ex Is UnauthorizedAccessException OrElse TypeOf ex Is IOException
+            Throw New IOException("This PC's 32-bit OpenXR runtime can't be read. Choose VDXR or SteamVR under Settings → VR runtime.", ex)
+        End Try
+    End Function
+
+    ' The system default resolves to the runtime it names, so SteamVR's and VDXR's own handling (the desktop theater,
+    ' the headset check's runtime name) applies to it; any other manifest is an other runtime.
+    Private Function ResolveSystem() As RuntimeInfo
+        Dim active = SystemManifestReader.Invoke()
+        If String.IsNullOrWhiteSpace(active) Then Throw New IOException("No 32-bit OpenXR runtime is set as this PC's default. Make your headset software the active OpenXR runtime (VDXR in Virtual Desktop Streamer, or SteamVR's OpenXR setting), or choose VDXR or SteamVR under Settings → VR runtime.")
+        Dim path = Environment.ExpandEnvironmentVariables(active.Trim())
+        If Not IO.Path.IsPathFullyQualified(path) OrElse Not File.Exists(path) Then Throw New IOException("This PC's default OpenXR runtime was not found: " & path)
+        Dim manifestName = IO.Path.GetFileName(path)
+        Dim mode = If(String.Equals(manifestName, "steamxr_win32.json", StringComparison.OrdinalIgnoreCase), "steamvr", If(String.Equals(manifestName, "virtualdesktop-openxr-32.json", StringComparison.OrdinalIgnoreCase), "vdxr", "other"))
+        Return ReadManifest(mode, path)
     End Function
 
     Public Function Resolve(mode As String, steamManifest As String, Optional vdxrManifest As String = "", Optional otherManifest As String = "") As RuntimeInfo
         If mode = "openxr" Then mode = "vdxr" ' Compatibility with initial settings and command lines.
         If Not Modes.Contains(mode) Then Throw New IOException("Choose VDXR, SteamVR or another OpenXR runtime.")
+        If mode = "system" Then Return ResolveSystem()
         If mode = "other" Then
             ' Any runtime manifest, as long as its library is 32-bit (ReadManifest); the runtime check shows the rest.
             If String.IsNullOrWhiteSpace(otherManifest) Then Throw New IOException("Select the OpenXR runtime's .json file in Settings → VR runtime, then check the runtime and headset.")
@@ -185,6 +215,7 @@ Public Module VrRuntime
     Public Function NoHeadsetHint(mode As String) As String
         Select Case mode
             Case "steamvr" : Return "SteamVR reports no headset. Start SteamVR with your headset connected and try again. If you connect through Virtual Desktop, choose VDXR under Settings → VR runtime."
+            Case "system" : Return "This PC's default OpenXR runtime reports no headset. Start your headset software with the headset connected and make it the active OpenXR runtime, or choose VDXR or SteamVR under Settings → VR runtime."
             Case "other" : Return "The other OpenXR runtime reports no headset. Start its software with your headset connected and try again, or choose VDXR or SteamVR under Settings → VR runtime."
             Case Else : Return "No headset is connected through Virtual Desktop (VDXR). Connect your headset in Virtual Desktop and try again. If your headset uses SteamVR (Steam Frame, Valve Index, HTC Vive, or Pico through SteamVR), choose SteamVR under Settings → VR runtime."
         End Select

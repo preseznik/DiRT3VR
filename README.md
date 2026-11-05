@@ -56,8 +56,9 @@ builds; **Return to stable…** goes back.
 1. Start your headset software and connect the headset. In Virtual Desktop,
    choose **VDXR** as the OpenXR runtime.
 2. In DiRT3VR, turn on **Advanced → Enable experimental VR** and choose
-   **VDXR**, **SteamVR** or **Other OpenXR runtime** under
-   **Settings → VR runtime**. Close other VR games.
+   **VDXR**, **SteamVR**, **Other OpenXR runtime** or
+   **OpenXR (system default)** (whichever runtime your headset software has
+   set active) under **Settings → VR runtime**. Close other VR games.
 3. Click **Launch VR**, sit facing forward, and keep DiRT 3 in front. The view
    centres itself when VR starts.
 4. While driving, with DiRT 3 in front:
