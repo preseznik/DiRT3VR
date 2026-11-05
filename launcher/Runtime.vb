@@ -142,7 +142,7 @@ Public Module VrRuntime
                 If timedOut Then Throw New IOException("The runtime check timed out after 45 seconds. No game was started.")
                 Dim report As JsonElement
                 Try
-                    report = ValidateProbeOutput(output, child.ExitCode, errorOutput)
+                    report = ValidateProbeOutput(output, child.ExitCode, errorOutput, runtime.Mode)
                 Catch ex As IOException
                     SafeFiles.SaveJson(context.DiagnosticsPath, New With {.schema = 1, .kind = "runtime-probe", .updatedUtc = DateTime.UtcNow, .runtime = runtime.Mode, .disabledApiLayers = disabledLayers, .report = New With {.success = False, .error = ex.Message, .exitCode = child.ExitCode, .stereo = False}})
                     ' Keep the full output: it names an OpenXR add-on that failed to load.
@@ -178,7 +178,20 @@ Public Module VrRuntime
         Return If(report, trimmed).Trim()
     End Function
 
-    Public Function ValidateProbeOutput(output As String, exitCode As Integer, errors As String) As JsonElement
+    ' XR_ERROR_FORM_FACTOR_UNAVAILABLE: the runtime is installed but has no headset (#07626461: a Steam Frame player
+    ' still on VDXR, the default). Says what to do for the chosen runtime instead of the raw OpenXR code.
+    Public Const NoHeadsetResult As Integer = -35
+
+    Public Function NoHeadsetHint(mode As String) As String
+        Select Case mode
+            Case "steamvr" : Return "SteamVR reports no headset. Start SteamVR with your headset connected and try again. If you connect through Virtual Desktop, choose VDXR under Settings → VR runtime."
+            Case "other" : Return "The other OpenXR runtime reports no headset. Start its software with your headset connected and try again, or choose VDXR or SteamVR under Settings → VR runtime."
+            Case Else : Return "No headset is connected through Virtual Desktop (VDXR). Connect your headset in Virtual Desktop and try again. If your headset uses SteamVR (Steam Frame, Valve Index, HTC Vive, or Pico through SteamVR), choose SteamVR under Settings → VR runtime."
+        End Select
+    End Function
+
+    ' mode: the runtime that was checked, for a clearer message when it has no headset.
+    Public Function ValidateProbeOutput(output As String, exitCode As Integer, errors As String, Optional mode As String = Nothing) As JsonElement
         If output.Length > 1024 * 1024 Then Throw New IOException("Runtime probe returned too much output.")
         Try
             Using document = JsonDocument.Parse(ProbeJson(output))
@@ -188,6 +201,10 @@ Public Module VrRuntime
                 If exitCode <> 0 OrElse Not success.GetBoolean() Then
                     Dim detail As JsonElement
                     Dim explanation = If(root.TryGetProperty("error", detail) AndAlso detail.ValueKind = JsonValueKind.String, detail.GetString(), errors.Trim())
+                    Dim result As JsonElement, code As Integer
+                    Dim noHeadset = If(explanation, "").Contains("XR_ERROR_FORM_FACTOR_UNAVAILABLE", StringComparison.Ordinal) OrElse
+                                    (root.TryGetProperty("xrResult", result) AndAlso result.ValueKind = JsonValueKind.Number AndAlso result.TryGetInt32(code) AndAlso code = NoHeadsetResult)
+                    If noHeadset Then Throw New IOException("Runtime check failed. " & NoHeadsetHint(mode) & " (XR_ERROR_FORM_FACTOR_UNAVAILABLE)")
                     Throw New IOException("Runtime check failed. " & If(String.IsNullOrWhiteSpace(explanation), "Check that your selected runtime and headset are ready.", explanation))
                 End If
                 If Not root.TryGetProperty("stereo", stereo) OrElse stereo.ValueKind <> JsonValueKind.False Then Throw New IOException("The runtime probe returned an unexpected stereo capability. Game VR remains unavailable.")
