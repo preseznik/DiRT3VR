@@ -94,6 +94,10 @@ public:
     bool CropFieldOfView(float width,float height) noexcept;
     // includeTilt also resets pitch and roll (the player's choice); automatic centering never does.
     void RequestRecenter(bool includeTilt=false) noexcept { recenterPending_=true; recenterTilt_=includeTilt; }
+    // Centering waits for a focused pose the runtime reports as tracked. Some runtimes never set the
+    // tracked bits although the pose is valid (a Pico Neo 3 over SteamVR showed only black, #e7d536b4):
+    // after this long focused with valid, untracked poses, the valid pose centres the view instead.
+    static constexpr XrDuration UntrackedGrace=3'000'000'000; // nanoseconds of display time
     bool Initialized() const noexcept { return session_!=XR_NULL_HANDLE && !failed_; }
     bool Running() const noexcept { return running_ && !failed_; }
     bool Exiting() const noexcept { return failed_ || exiting_; }
@@ -134,6 +138,7 @@ private:
     void Report(const char*,...) noexcept;
     void ReportRefreshRate(bool enabled) noexcept;
     void ReportOrientation(const char* reason) noexcept;
+    void ReportWait(bool shouldRender,XrViewStateFlags flags) noexcept;
     Logger logger_{};
     DWORD ownerThread_{};
     XrInstance instance_{};
@@ -151,6 +156,9 @@ private:
     XrTime displayTime_{};
     XrDuration displayPeriod_{};
     XrTime spaceChangeTime_{};
+    XrTime untrackedSince_{}; // display time of the first focused, valid, untracked pose in a row
+    bool untracked_{};
+    uint64_t lastWait_=~0ull; unsigned waitReports_{};
     DXGI_FORMAT format_=DXGI_FORMAT_UNKNOWN;
     uint64_t generation_{},lastGameSequence_{},submitted_{},screenSubmitted_{},referenceRevision_{};
     unsigned orientationReports_{},orientationModes_{};

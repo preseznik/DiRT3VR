@@ -42,6 +42,20 @@ void XrRuntime::ReportOrientation(const char* reason) noexcept {
             f.angleLeft,f.angleRight,f.angleUp,f.angleDown,centerUp.y,relativeUp.y);
     } catch(...) { } // Diagnostics never change frame eligibility.
 }
+// Why no frame renders yet (focus, shouldRender, tracking), once per change and at most 24 times.
+void XrRuntime::ReportWait(bool shouldRender,XrViewStateFlags flags) noexcept {
+    const uint64_t state=(uint64_t(flags)<<2)|(shouldRender ? 2u : 0u)|(focused_ ? 1u : 0u);
+    if(state==lastWait_ || waitReports_>=24) return;
+    lastWait_=state; ++waitReports_;
+    const auto describe=[&](XrViewStateFlags validBit,XrViewStateFlags trackedBit) {
+        if(!shouldRender) return "unknown";
+        if(!(flags&validBit)) return "invalid";
+        return (flags&trackedBit) ? "tracked" : "valid-untracked";
+    };
+    Report("XR waiting for a centred frame: focused=%d should_render=%d orientation=%s position=%s view_flags=0x%llx",
+           int(focused_),int(shouldRender),describe(XR_VIEW_STATE_ORIENTATION_VALID_BIT,XR_VIEW_STATE_ORIENTATION_TRACKED_BIT),
+           describe(XR_VIEW_STATE_POSITION_VALID_BIT,XR_VIEW_STATE_POSITION_TRACKED_BIT),static_cast<unsigned long long>(flags));
+}
 // Diagnostics only: a missing extension or a failed query never affects the session.
 void XrRuntime::ReportRefreshRate(bool enabled) noexcept {
     if(!enabled) { Report("XR display refresh rate unavailable: runtime lacks %s",XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME); return; }
@@ -237,7 +251,7 @@ bool XrRuntime::StartFrame(uint64_t sequence,FrameMode mode) noexcept {
     frameOpen_=true; frameFailed_=frameRenderable_=seatShown_=perfShown_=false; frameMode_=mode; ++generation_; displayTime_=state.predictedDisplayTime;
     if(state.predictedDisplayPeriod>0) displayPeriod_=state.predictedDisplayPeriod;
     for(auto& eye:eyes_) { eye.completed=false; eye.acquired=eye.waited=false; }
-    if(!state.shouldRender) { EndFrame(generation_,false); return false; }
+    if(!state.shouldRender) { ReportWait(false,0); EndFrame(generation_,false); return false; }
     if(spaceChangeTime_ && displayTime_>=spaceChangeTime_) {
         spaceChangeTime_=0; centered_=false; recenterPending_=true; recenterTilt_=false;
     }
@@ -247,7 +261,7 @@ bool XrRuntime::StartFrame(uint64_t sequence,FrameMode mode) noexcept {
     constexpr auto valid=XR_VIEW_STATE_ORIENTATION_VALID_BIT|XR_VIEW_STATE_POSITION_VALID_BIT;
     constexpr auto tracked=XR_VIEW_STATE_ORIENTATION_TRACKED_BIT|XR_VIEW_STATE_POSITION_TRACKED_BIT;
     if(!Check(xrLocateViews(session_,&locate,&tracking,2,&count,views_.data()),"locate views") || count!=2 || (tracking.viewStateFlags&valid)!=valid) {
-        EndFrame(generation_,false); return false;
+        ReportWait(true,tracking.viewStateFlags); EndFrame(generation_,false); return false;
     }
     try {
         for(auto& view:views_) {
@@ -256,21 +270,30 @@ bool XrRuntime::StartFrame(uint64_t sequence,FrameMode mode) noexcept {
         }
         if(frameMode_==FrameMode::Stereo && (fovWidth_<1.f || fovHeight_<1.f))
             for(auto& view:views_) view.fov=math::CropFov(view.fov,fovWidth_,fovHeight_);
-        canRecenter_=focused_ && (tracking.viewStateFlags&tracked)==tracked;
+        // A pose the runtime reports as tracked centres at once; a valid but untracked one only after
+        // UntrackedGrace in focus without tracking, for runtimes that never report it (#e7d536b4).
+        const bool fullyTracked=(tracking.viewStateFlags&tracked)==tracked;
+        if(!focused_ || fullyTracked) untracked_=false;
+        else if(!untracked_) { untracked_=true; untrackedSince_=displayTime_; }
+        const bool graceElapsed=untracked_ && displayTime_-untrackedSince_>=UntrackedGrace;
+        canRecenter_=focused_ && (fullyTracked || graceElapsed);
         bool recentered=false;
         if(recenterPending_ && canRecenter_) {
             const auto center=math::CenterPose(views_);
             reference_=recenterTilt_ ? math::RecenterPoseWithTilt(center) : math::RecenterPose(center,reference_);
             ++referenceRevision_;
-            Report(recenterTilt_ ? "XR recentered from focused tracked pose including tilt" : "XR recentered from focused tracked pose");
+            if(fullyTracked) Report(recenterTilt_ ? "XR recentered from focused tracked pose including tilt" : "XR recentered from focused tracked pose");
+            else Report("XR recentered from focused valid pose%s; the runtime hasn't reported it as tracked for %.1f s (view_flags=0x%llx)",
+                        recenterTilt_ ? " including tilt" : "",double(displayTime_-untrackedSince_)/1e9,static_cast<unsigned long long>(tracking.viewStateFlags));
             recenterPending_=recenterTilt_=false; centered_=true;
             recentered=true;
         }
-        if(!centered_) { EndFrame(generation_,false); return false; }
+        if(!centered_) { ReportWait(true,tracking.viewStateFlags); EndFrame(generation_,false); return false; }
         const unsigned modeBit=frameMode_==FrameMode::Screen ? 2u : 1u;
         if(recentered || !(orientationModes_&modeBit)) ReportOrientation(recentered ? "recenter" : "first-renderable");
         orientationModes_|=modeBit;
     } catch(const std::exception& error) { Report("XR pose rejected: %s",error.what()); EndFrame(generation_,false); return false; }
+    lastWait_=~0ull; // A later wait is reported again.
     frameRenderable_=true; return true;
 }
 bool XrRuntime::Acquire(uint64_t generation,unsigned index) noexcept {
@@ -413,6 +436,7 @@ void XrRuntime::Shutdown() noexcept {
     space_={}; session_={}; instance_={}; system_={}; format_=DXGI_FORMAT_UNKNOWN; displayPeriod_=0;
     running_=visible_=focused_=frameOpen_=frameRenderable_=canRecenter_=centered_=false;
     recenterPending_=true; recenterTilt_=false; haveGameSequence_=false; spaceChangeTime_=0;
+    untracked_=false; untrackedSince_=0; lastWait_=~0ull; waitReports_=0;
     orientationModes_=0;
     referenceRevision_=0;
     overlayEnabled_=seatPanelEnabled_=seatShown_=perfPanelEnabled_=perfShown_=perfFollow_=false;
