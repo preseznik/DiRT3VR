@@ -4,7 +4,7 @@ Imports System.Text.Json.Serialization
 ' Portable choices only: never carry machine paths, game saves or detected XR data.
 Public Class ProfileValues
     Public Property ModernInterface As Boolean = True
-    Public Property RuntimeMode As String = "vdxr"
+    Public Property RuntimeMode As String = "system"
     Public Property DiagnosticLogging As Boolean
     Public Property ExperimentalVrEnabled As Boolean
     Public Property VrRenderScale As Integer = 100

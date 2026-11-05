@@ -151,7 +151,7 @@ End Class
 Public Class LauncherSettings
     Public Property Version As Integer = 1
     Public Property ModernInterface As Boolean = True
-    Public Property RuntimeMode As String = "vdxr"
+    Public Property RuntimeMode As String = "system" ' New installs and Restore launcher defaults follow the PC's active OpenXR runtime (#07626461, iztok); saved choices stay.
     Public Property SteamRuntimeManifest As String = ""
     Public Property VdxrRuntimeManifest As String = ""
     ' "Other OpenXR runtime" (#982a5c40): a 32-bit OpenXR runtime manifest the player browsed to, for headsets with

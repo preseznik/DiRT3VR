@@ -209,7 +209,7 @@ Public Module VrRuntime
     End Function
 
     ' XR_ERROR_FORM_FACTOR_UNAVAILABLE: the runtime is installed but has no headset (#07626461: a Steam Frame player
-    ' still on VDXR, the default). Says what to do for the chosen runtime instead of the raw OpenXR code.
+    ' still on VDXR, then the default). Says what to do for the chosen runtime instead of the raw OpenXR code.
     Public Const NoHeadsetResult As Integer = -35
 
     Public Function NoHeadsetHint(mode As String) As String
