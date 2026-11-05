@@ -5,7 +5,8 @@ Imports System.Drawing
 ' progress to standard output and errors to standard error, and returns 0, or 1 on an error. For automated VR runs on
 ' SteamVR's virtual headset (Lens's tools/fake_headset.py, #0ea87e54): with XR_RUNTIME_JSON set and no --runtime, that
 ' manifest is used as the other OpenXR runtime for this launch only. The saved settings keep their own runtime.
-' Controller and wheel buttons for recenter, Toggle VR and the seat menu need the launcher window; keys work.
+' Controller and wheel buttons for recenter, Toggle VR and the seat menu need the launcher window; keys work, the seat
+' menu's too (KeepSeatMenu keeps it alive while DiRT 3 runs).
 Public Module CommandLineLaunch
     Public Const RuntimeVariable As String = "XR_RUNTIME_JSON"
 
@@ -34,6 +35,27 @@ Public Module CommandLineLaunch
         Return (settings, overridden)
     End Function
 
+    ' The in-game seat menu while DiRT 3 runs (#4f96de7b). The renderer takes a heartbeat older than 1 s as the launcher
+    ' gone and closes the menu on every frame; the window keeps it fresh from its timers, so a session without the window
+    ' refreshes it here every 250 ms and saves each position the menu commits, as the window does every 1.5 s, until
+    ' exited says DiRT 3 has closed. wait sleeps up to the given milliseconds (Process.WaitForExit for a session); the
+    ' session's own restore then reads a last commit and closes the channel.
+    Public Sub KeepSeatMenu(context As InstallContext, channel As SeatChannel, exited As Func(Of Boolean), wait As Action(Of Integer), Optional output As TextWriter = Nothing)
+        Dim polls = 0
+        Do Until exited()
+            channel.Heartbeat()
+            polls += 1
+            If polls Mod 6 = 0 Then
+                Try
+                    If SeatChannel.SaveCommit(context, channel) IsNot Nothing Then output?.WriteLine("Seat position saved from the in-game menu.")
+                Catch ex As IOException
+                    output?.WriteLine("The seat position from the in-game menu couldn't be saved: " & ex.Message)
+                End Try
+            End If
+            wait(250)
+        Loop
+    End Sub
+
     Public Function Run(context As InstallContext, arguments As String(), output As TextWriter, errors As TextWriter) As Integer
         Dim saved As Byte() = Nothing, restored = False
         ' Starting a session saves its settings; a runtime given only for this launch must not stay in them.
@@ -55,6 +77,7 @@ Public Module CommandLineLaunch
                 End Try
                 output.WriteLine("DiRT 3 started in VR (process " & vrSession.Game.Id.ToString(Globalization.CultureInfo.InvariantCulture) & "). Session logs: " & vrSession.LogDirectory)
                 output.Flush()
+                If vrSession.SeatMenu IsNot Nothing Then KeepSeatMenu(context, vrSession.SeatMenu, Function() vrSession.Game.HasExited, Sub(milliseconds) vrSession.Game.WaitForExit(milliseconds), output)
                 output.WriteLine(vrSession.WaitAndRestoreAsync().GetAwaiter().GetResult())
             Else
                 Dim monitor = If(settings.DesktopDisplayMode = "borderless", DesktopDisplay.MainBounds().Size, Size.Empty)
@@ -67,6 +90,7 @@ Public Module CommandLineLaunch
                     End Try
                     output.WriteLine("DiRT 3 started (process " & desktopSession.Game.Id.ToString(Globalization.CultureInfo.InvariantCulture) & ")." & If(desktopSession.LogDirectory = "", "", " Session logs: " & desktopSession.LogDirectory))
                     output.Flush()
+                    If desktopSession.SeatMenu IsNot Nothing Then KeepSeatMenu(context, desktopSession.SeatMenu, Function() desktopSession.Game.HasExited, Sub(milliseconds) desktopSession.Game.WaitForExit(milliseconds), output)
                     output.WriteLine(desktopSession.WaitAndRestoreAsync().GetAwaiter().GetResult())
                 Else
                     Dim game As Process
