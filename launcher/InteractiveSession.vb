@@ -300,6 +300,8 @@ Public Class InteractiveSession
             Dim restored As Boolean
             DirectPractice.RemoveResults(context)
             Try
+                ' Another DiRT 3 process still closing gets up to 30 s; after that the restore names it and refuses.
+                Await InstallContext.WaitUntilClosedAsync(InstallContext.CloseGrace)
                 restored = Await RecoveryWorker.RecoverAsync(context)
             Catch ex As Exception
                 Session.WriteLaunchStatus(context, "recovery-pending", "DiRT 3 closed; recovery is pending: " & ex.Message, Game.Id, StartedUtc, exitCode, mode:="experimental-interactive")

@@ -132,19 +132,44 @@ Public Class InstallContext
         If SafeFiles.Hash(executable) <> SupportedHash Then Throw New IOException(UnsupportedGame)
     End Sub
 
+    ' The refusal names the processes it found (2026-11-06: a --launch restore refused once, about 9 s after the
+    ' session's DiRT 3 was killed, and nothing showed which process it saw).
     Public Sub RequireClosed()
-        If GameRunning() Then Throw New IOException("Close DiRT 3 before launching again or restoring files.")
+        Dim running = GameProcessIds.Invoke()
+        If running.Length > 0 Then Throw New IOException("Close DiRT 3 before launching again or restoring files. Still running: " & String.Join(", ", running.Select(Function(id) "dirt3_game.exe (process " & id.ToString(Globalization.CultureInfo.InvariantCulture) & ")")) & ".")
     End Sub
 
     Public Shared Function GameRunning() As Boolean
+        Return GameProcessIds.Invoke().Length > 0
+    End Function
+
+    ' The IDs of the running DiRT 3 processes; tests may replace it.
+    Public Shared Property GameProcessIds As Func(Of Integer()) = AddressOf ListGameProcesses
+
+    Private Shared Function ListGameProcesses() As Integer()
         Dim games = Process.GetProcessesByName("dirt3_game")
         Try
-            Return games.Length <> 0
+            Return games.Select(Function(game) game.Id).ToArray()
         Finally
             For Each game In games
                 game.Dispose()
             Next
         End Try
+    End Function
+
+    ' How long the restore after a session waits for other DiRT 3 processes to close.
+    Public Shared ReadOnly CloseGrace As TimeSpan = TimeSpan.FromSeconds(30)
+
+    ' After the session's DiRT 3 has exited, before its files are restored: waits up to timeout for every DiRT 3
+    ' process to be gone, so one still closing doesn't make the restore refuse. Returns whether none is left; if one
+    ' is, the restore refuses as before and names it.
+    Public Shared Async Function WaitUntilClosedAsync(timeout As TimeSpan, Optional interval As TimeSpan? = Nothing) As Task(Of Boolean)
+        Dim waited = Stopwatch.StartNew()
+        While GameRunning()
+            If waited.Elapsed >= timeout Then Return False
+            Await Task.Delay(If(interval, TimeSpan.FromMilliseconds(500)))
+        End While
+        Return True
     End Function
 End Class
 

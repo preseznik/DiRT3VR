@@ -183,6 +183,8 @@ Public NotInheritable Class DesktopStartupSession
             End Try
             SeatMenu?.Dispose() : SeatMenu = Nothing
             DirectPractice.RemoveResults(context)
+            ' Another DiRT 3 process still closing gets up to 30 s; after that the restore names it and refuses.
+            Await InstallContext.WaitUntilClosedAsync(InstallContext.CloseGrace)
             Await RecoveryWorker.RecoverAsync(context)
             Return "DiRT 3 closed (exit code 0x" & exitCode.ToString("X8") & "). DiRT3VR's temporary files were removed."
         Finally
