@@ -3,6 +3,7 @@
 ## Unreleased
 
 - With **Anisotropic filtering** on under **Graphics → VR rendering**, the ground no longer turns green or teal, and the **Colour filter** works in VR (#24f76866). DiRT 3 grades each frame through a small colour table, and anisotropic filtering smeared it; DiRT3VR now reads that table with DiRT 3's own filtering, while the road and other surfaces keep anisotropic filtering. Checked on the virtual headset at 16×: the same views as with **Use game setting**, colour for colour.
+
 ## 0.1.24 — colour, bloom and light streak switches, a 50% helmet view and OpenXR (system default) (Experimental)
 
 - VR no longer stays black (or flat on the monitor) on headsets whose runtime never reports the head as tracked (#e7d536b4, a Pico Neo 3 over SteamVR; possibly the Steam Frame too). DiRT3VR centres the view from the first focused pose the runtime reports as tracked. If the session stays focused for 3 seconds with valid poses that are never reported as tracked, it now centres from the valid pose instead, and the session log says so. While it waits, the log says why (focus, whether the runtime asks for frames, and the tracking state). Headsets that report tracking behave as before.
