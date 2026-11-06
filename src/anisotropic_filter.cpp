@@ -23,22 +23,38 @@ uintptr_t imageBegin{},imageEnd{};
 void (*logLine)(const char*,...){};
 std::atomic<unsigned> reports{},paletteReports{},contextReports{},traceReports{};
 
-// The colour lookup (IsPalette): each raised sampler with the game's own one behind it, and per device context
-// its palette slots. D3D11 uses a context from one thread at a time, so a context's state needs no lock; the
-// shared tables take one to change and to look up a sampler.
+// The colour lookup (IsPalette, IsColourTable): each raised sampler with the game's own one behind it, and per
+// device context its colour-lookup slots. D3D11 uses a context from one thread at a time, so a context's state needs
+// no lock; the sampler tables take one to change and to look up a sampler.
 constexpr unsigned SamplerSlots=D3D11_COMMONSHADER_SAMPLER_SLOT_COUNT;
 std::mutex lock;
 std::unordered_map<ID3D11SamplerState*,ID3D11SamplerState*> ownOf,raisedOf; // both directions; every sampler held
-struct ContextState {
-    std::atomic<ID3D11DeviceContext*> context{};
+
+// A context's state, kept on the context as COM private data: it lives exactly as long as the context, however many
+// contexts there are (other immediate contexts appear every ~120 ms at startup; a fixed table of 16 ran out).
+class ContextState final : public IUnknown {
+public:
     PaletteSlots slots;
     bool bound{};
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID id,void** out) override {
+        if(!out) return E_POINTER;
+        if(id==__uuidof(IUnknown)) { *out=static_cast<IUnknown*>(this); AddRef(); return S_OK; }
+        *out=nullptr;
+        return E_NOINTERFACE;
+    }
+    ULONG STDMETHODCALLTYPE AddRef() override { return ++references_; }
+    ULONG STDMETHODCALLTYPE Release() override {
+        const auto left=--references_;
+        if(!left) delete this;
+        return left;
+    }
+private:
+    std::atomic<ULONG> references_{1};
 };
-constexpr unsigned MaxContexts=16;
-std::array<ContextState,MaxContexts> contexts{};
+constexpr GUID StateTag={0x3f1c9a54,0x7d24,0x4e8b,{0x91,0x0e,0x5a,0x6b,0x2c,0x47,0xd8,0x13}};
 
-// Whether a view shows a palette, decided from its texture the first time it's bound and kept on the view as
-// private data (so a released view's address can't be mistaken for it).
+// Whether a view shows a colour lookup (a palette or the colour table), decided from its texture the first time it's
+// bound and kept on the view as private data (so a released view's address can't be mistaken for it).
 constexpr GUID PaletteTag={0x3f1c9a52,0x7d24,0x4e8b,{0x91,0x0e,0x5a,0x6b,0x2c,0x47,0xd8,0x13}};
 constexpr GUID TracedTag={0x3f1c9a53,0x7d24,0x4e8b,{0x91,0x0e,0x5a,0x6b,0x2c,0x47,0xd8,0x13}};
 bool IsPaletteView(ID3D11ShaderResourceView* view) {
@@ -53,10 +69,15 @@ bool IsPaletteView(ID3D11ShaderResourceView* view) {
         D3D11_TEXTURE2D_DESC desc{};
         static_cast<ID3D11Texture2D*>(resource.Get())->GetDesc(&desc);
         palette=IsPalette(desc);
+    } else if(dimension==D3D11_RESOURCE_DIMENSION_TEXTURE3D) {
+        D3D11_TEXTURE3D_DESC desc{};
+        static_cast<ID3D11Texture3D*>(resource.Get())->GetDesc(&desc);
+        palette=IsColourTable(desc);
     }
     cached=palette ? 1 : 0;
     view->SetPrivateData(PaletteTag,sizeof(cached),&cached);
-    if(palette && logLine && paletteReports.fetch_add(1)<16) logLine("Anisotropic filtering: a colour palette is bound to a pixel shader");
+    if(palette && logLine && paletteReports.fetch_add(1)<16)
+        logLine("Anisotropic filtering: a colour %s is bound to a pixel shader",dimension==D3D11_RESOURCE_DIMENSION_TEXTURE3D ? "table (3D)" : "palette");
     return palette;
 }
 
@@ -64,17 +85,21 @@ const char* Kind(ID3D11DeviceContext* context) {
     return context->GetType()==D3D11_DEVICE_CONTEXT_IMMEDIATE ? "immediate" : "deferred";
 }
 
+// The context's state, made the first time the context is seen. The context holds the only lasting reference, so the
+// pointer stays valid while the hook runs on it (D3D11 requires the caller to keep the context alive).
 ContextState* StateFor(ID3D11DeviceContext* context) {
-    for(auto& state:contexts) if(state.context.load(std::memory_order_acquire)==context) return &state;
-    std::lock_guard guard(lock);
-    for(auto& state:contexts) if(state.context.load(std::memory_order_relaxed)==context) return &state;
-    for(auto& state:contexts) {
-        if(state.context.load(std::memory_order_relaxed)) continue;
-        state.context.store(context,std::memory_order_release);
-        if(logLine && contextReports.fetch_add(1)<MaxContexts) logLine("Anisotropic filtering: pixel shader bindings on a %s context",Kind(context));
-        return &state;
+    IUnknown* held{};
+    UINT size=sizeof(held);
+    if(SUCCEEDED(context->GetPrivateData(StateTag,&size,&held)) && size==sizeof(held) && held) {
+        held->Release(); // GetPrivateData added a reference; the context keeps its own.
+        return static_cast<ContextState*>(held);
     }
-    return nullptr;
+    auto* state=new ContextState();
+    const auto hr=context->SetPrivateDataInterface(StateTag,state);
+    state->Release();
+    if(FAILED(hr)) return nullptr;
+    if(logLine && contextReports.fetch_add(1)<32) logLine("Anisotropic filtering: pixel shader bindings on a %s context",Kind(context));
+    return state;
 }
 
 // DIRT3VR_ANISOTROPY_TRACE=1: each distinct texture the pixel shader gets, once, so a run shows what the colour

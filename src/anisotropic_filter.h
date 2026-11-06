@@ -75,9 +75,17 @@ inline bool InScope(const D3D11_SAMPLER_DESC& game,Scope scope) {
 // several samples along the screen-space gradient of the lookup coordinate, which jumps at every colour edge, so it
 // averages unrelated table entries: green and teal patches on the ground in VR (iztok, 2026-11-06). So while a
 // palette is bound to a pixel-shader slot, the device gets the game's own samplers. (VR runs at 16x showed the game
-// creating its 11 palettes but not binding them directly, so the trace looks for what the grading reads instead.)
+// creating its 11 palettes but no guard engaging: the guard kept the state of only 16 device contexts, and other
+// immediate contexts used them up within seconds of startup. The state now lives on each context itself.)
 inline bool IsPalette(const D3D11_TEXTURE2D_DESC& desc) {
     return desc.Width==32 && desc.Height==256 && desc.MipLevels==1 && desc.ArraySize==1;
+}
+
+// The 3D colour table DiRT 3 builds from the palette each frame and grades the scene through (Rowan's traced VR run,
+// 2026-11-06: 32x16x16, R10G10B10A2, one mip, read beside the 1280x1280 scene). Any small single-mip volume counts:
+// the passes reading it sample the scene 1:1, so the game's own samplers lose nothing there.
+inline bool IsColourTable(const D3D11_TEXTURE3D_DESC& desc) {
+    return desc.MipLevels==1 && desc.Width>=2 && desc.Height>=2 && desc.Depth>=2 && desc.Width<=64 && desc.Height<=64 && desc.Depth<=64;
 }
 
 // Which pixel-shader resource slots of one device context hold a palette.
