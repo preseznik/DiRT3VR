@@ -12,13 +12,13 @@ Public NotInheritable Class NewFeatures
     Public Const LastStable As String = "0.1.23"
     ' The next release. After every release, set the version after it; entries added since use it
     ' (NewFeaturesTests fails while this build is past NextVersion).
-    Public Const NextVersion As String = "0.1.24"
+    Public Const NextVersion As String = "0.1.25"
 
     ' Control or section names, and the version that first ships them: each launcher setting, section, option or
     ' button added since LastStable, with NextVersion at the time it was added. Empty right after a Stable release.
     Private Shared ReadOnly Since As New Dictionary(Of String, String)(StringComparer.Ordinal) From {
-        {"DesktopBloom", NextVersion}, {"DesktopGlare", NextVersion}, {"VrBloom", NextVersion}, {"VrGlare", NextVersion},
-        {"DesktopColourFilter", NextVersion}, {"VrColourFilter", NextVersion}}
+        {"DesktopBloom", "0.1.24"}, {"DesktopGlare", "0.1.24"}, {"VrBloom", "0.1.24"}, {"VrGlare", "0.1.24"},
+        {"DesktopColourFilter", "0.1.24"}, {"VrColourFilter", "0.1.24"}}
     Private Shared ReadOnly marked As New ConditionalWeakTable(Of Control, Object)
 
     Private Sub New()
