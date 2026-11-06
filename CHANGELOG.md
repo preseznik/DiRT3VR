@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Colour filter** off now also turns off the tint colour each track mixes into the picture (#24f76866): Finland, for example, mixes in 27% of an orange and London 50%. A user-submitted remake mod does the same besides its own palettes (Rowan compared it with the Steam files); DiRT3VR makes the change itself in `postprocess\effects.xml` for that session and puts the file back afterwards, as with the palettes. Saturation, contrast and tone mapping stay as in DiRT 3.
+- **Colour filter** off now also turns off the tint colour each track mixes into the picture and brings its colours back to full saturation (#24f76866): Finland, for example, mixes in 27% of an orange and turns saturation down to 71%. A user-submitted remake mod does the same besides its own palettes (Rowan compared it with the Steam files); DiRT3VR makes the change itself in `postprocess\effects.xml` for that session and puts the file back afterwards, as with the palettes. Contrast and tone mapping stay as in DiRT 3. In Rowan's Finland run on the virtual headset with the tint off, the yellow-green cast was gone: the sky was blue and the cockpit neutral grey.
 - With **Anisotropic filtering** on under **Graphics → VR rendering**, the ground no longer turns green or teal, and the **Colour filter** works in VR (#24f76866). DiRT 3 grades each frame through a small colour table, and anisotropic filtering smeared it; DiRT3VR now reads that table with DiRT 3's own filtering, while the road and other surfaces keep anisotropic filtering. Checked on the virtual headset at 16×: no green or teal shift compared with **Use game setting** in the same views.
 
 ## 0.1.24 — colour, bloom and light streak switches, a 50% helmet view and OpenXR (system default) (Experimental)

@@ -16,28 +16,32 @@ Imports System.Text.RegularExpressions
 ' and lens flares, then bloom), and recovery accepts only that exact result of the recorded original.
 ' - Colour filter (#24f76866; Wrench's tools/colour_filter.py, docs/research/colour-filter.md): the green/cyan tint of
 '   each track's colour palette, in postprocess\palettes.pssg (ColourFilter), and with it each track effect's
-'   ColourBalance tintAmount set to 0 in postprocess\effects.xml (tools/colour_tint.py; a user's remake mod does both,
-'   Rowan's comparison). Saturation, contrast, tone mapping and the non-track effects stay.
+'   ColourBalance tintAmount set to 0 and its colour (saturation) to 1.0 in postprocess\effects.xml
+'   (tools/colour_tint.py; a user's remake mod does all three, Rowan's comparison; saturation iztok's choice). Contrast,
+'   tone mapping and the non-track effects stay.
 Public NotInheritable Class PostEffects
     Public Const MotionBlurEdit As String = "motionblur"
     Public Const GlareEdit As String = "glare"
     Public Const BloomEdit As String = "bloom"
     Public Const ColourEdit As String = "colour"
-    ' The colour filter's tint in the effects file. The Colour filter switch always chooses it with ColourEdit (the
-    ' palettes); a 0.1.24 journal has ColourEdit alone, from before the tint was part of it.
+    ' The colour filter's tint and saturation in the effects file. The Colour filter switch always chooses both with
+    ' ColourEdit (the palettes); a 0.1.24 journal has ColourEdit alone, one from 6afe405 ColourEdit and TintEdit.
     Public Const TintEdit As String = "tint"
+    Public Const SaturationEdit As String = "saturation"
     ' The edits in the order a session applies them; ColourEdit is the only one outside the effects file.
-    Public Shared ReadOnly Order As String() = {MotionBlurEdit, GlareEdit, BloomEdit, ColourEdit, TintEdit}
+    Public Shared ReadOnly Order As String() = {MotionBlurEdit, GlareEdit, BloomEdit, ColourEdit, TintEdit, SaturationEdit}
     ' Bloom's two generic track files (journal targets; postprocess\effects.xml is MotionBlur.Target).
     Public Const TrackTarget As String = "bloom-track"
     Public Const NightTarget As String = "bloom-night"
     ' The colour filter's palettes (postprocess\palettes.pssg).
     Public Const PaletteTarget As String = "colour-palettes"
     Private Const Zero As String = "0.000000"
+    Private Const One As String = "1.000000"
     Private Const BloomGroup As String = "BloomFromDsX4"
     ' Track effects are named t~<country>~<track>[~<variant>]; the others are screens, menus, damage and cameras.
     Private Const TrackEffect As String = "t~"
     Private Shared ReadOnly TintParams As New Dictionary(Of String, String())(StringComparer.Ordinal) From {{"ColourBalance", {"tintAmount"}}}
+    Private Shared ReadOnly SaturationParams As New Dictionary(Of String, String())(StringComparer.Ordinal) From {{"ColourBalance", {"colour"}}}
     Private Shared ReadOnly BloomMixes As String() = {"mixMedium", "mixLarge", "mixHuge", "mixStreak"}
     Private Shared ReadOnly GlareParams As New Dictionary(Of String, String())(StringComparer.Ordinal) From {
         {"Streaks", {"multiplier_0", "multiplier_1", "multiplier_2"}}, {"LensFlares", {"multiplier"}}}
@@ -66,12 +70,13 @@ Public NotInheritable Class PostEffects
         Return target = MotionBlur.Target OrElse IsBloomTarget(target) OrElse target = PaletteTarget
     End Function
 
-    ' Whether a list of edits is a valid, non-empty selection in the session's order (the tint only with the palettes).
+    ' Whether a list of edits is a valid, non-empty selection in the session's order (the tint only with the palettes,
+    ' the saturation only with both).
     Public Shared Function ValidEdits(edits As IReadOnlyList(Of String)) As Boolean
         If edits Is Nothing OrElse edits.Count = 0 Then Return False
         Dim positions = edits.Select(Function(edit) Array.IndexOf(Order, edit)).ToArray()
         Return positions.All(Function(position) position >= 0) AndAlso positions.Zip(positions.Skip(1), Function(a, b) a < b).All(Function(ordered) ordered) AndAlso
-               (Not edits.Contains(TintEdit) OrElse edits.Contains(ColourEdit))
+               (Not edits.Contains(TintEdit) OrElse edits.Contains(ColourEdit)) AndAlso (Not edits.Contains(SaturationEdit) OrElse edits.Contains(TintEdit))
     End Function
 
     ' The chosen edits of postprocess\effects.xml, applied in the session's order (the colour filter isn't in it).
@@ -85,6 +90,7 @@ Public NotInheritable Class PostEffects
                 Case BloomEdit : result = DisableBloom(result)
                 Case ColourEdit ' postprocess\palettes.pssg (ColourFilter)
                 Case TintEdit : result = RemoveTint(result)
+                Case SaturationEdit : result = NeutralSaturation(result)
             End Select
         Next
         Return result
@@ -92,26 +98,32 @@ Public NotInheritable Class PostEffects
 
     ' Every Streaks and LensFlares multiplier set to zero (postprocess\effects.xml, binary).
     Public Shared Function DisableGlare(data As Byte()) As Byte()
-        Return ZeroBinary(data, GlareParams, "No light streak or lens flare multipliers in this effects file.")
+        Return SetBinary(data, GlareParams, Zero, "No light streak or lens flare multipliers in this effects file.")
     End Function
 
     ' Every BloomFromDsX4 mix set to zero, in a binary or a text effects file.
     Public Shared Function DisableBloom(data As Byte()) As Byte()
-        If IsBinary(data) Then Return ZeroBinary(data, New Dictionary(Of String, String())(StringComparer.Ordinal) From {{BloomGroup, BloomMixes}}, "No bloom mixes in this effects file.")
+        If IsBinary(data) Then Return SetBinary(data, New Dictionary(Of String, String())(StringComparer.Ordinal) From {{BloomGroup, BloomMixes}}, Zero, "No bloom mixes in this effects file.")
         Return DisableTextBloom(data)
     End Function
 
     ' Every track effect's ColourBalance tintAmount set to zero (postprocess\effects.xml, binary). A file without track
     ' tints comes back unchanged: the palettes still do most of the colour filter's work.
     Public Shared Function RemoveTint(data As Byte()) As Byte()
-        Return ZeroBinary(data, TintParams, "", tracksOnly:=True)
+        Return SetBinary(data, TintParams, Zero, "", tracksOnly:=True)
     End Function
 
-    ' The values the edits would zero, in file order (for tests and diagnostics): group/parameter and value.
+    ' Every track effect's ColourBalance colour (saturation) set to 1.0, as RemoveTint. With the tint gone DiRT 3's
+    ' own values (about 0.5 to 0.75) look flat (Rowan's Finland run); the remake mod raises them to about 1.0 too.
+    Public Shared Function NeutralSaturation(data As Byte()) As Byte()
+        Return SetBinary(data, SaturationParams, One, "", tracksOnly:=True)
+    End Function
+
+    ' The values the edits would set, in file order (for tests and diagnostics): group/parameter and value.
     Public Shared Function Read(data As Byte(), edit As String) As IReadOnlyList(Of (Name As String, Value As Double))
-        If edit = TintEdit Then
+        If edit = TintEdit OrElse edit = SaturationEdit Then
             Dim effects = SeatCameras.Decode(data)
-            Return ParamElements(effects, TintParams, "", tracksOnly:=True).Select(Function(item) (item.Name, Number(Value.Match(ElementText(effects, item.Element)).Groups(2).Value))).ToArray()
+            Return ParamElements(effects, If(edit = TintEdit, TintParams, SaturationParams), "", tracksOnly:=True).Select(Function(item) (item.Name, Number(Value.Match(ElementText(effects, item.Element)).Groups(2).Value))).ToArray()
         End If
         Dim groups = If(edit = GlareEdit, GlareParams, New Dictionary(Of String, String())(StringComparer.Ordinal) From {{BloomGroup, BloomMixes}})
         If Not IsBinary(data) Then
@@ -170,13 +182,15 @@ Public NotInheritable Class PostEffects
         Return result
     End Function
 
-    Private Shared Function ZeroBinary(data As Byte(), groups As IReadOnlyDictionary(Of String, String()), missing As String, Optional tracksOnly As Boolean = False) As Byte()
+    ' Every Param named in groups set to wanted (Zero or One), keeping its whitespace; ones already there keep their bytes.
+    Private Shared Function SetBinary(data As Byte(), groups As IReadOnlyDictionary(Of String, String()), wanted As String, missing As String, Optional tracksOnly As Boolean = False) As Byte()
         Dim document = SeatCameras.Decode(data)
+        Dim target = Number(wanted)
         For Each item In ParamElements(document, groups, missing, tracksOnly)
             Dim match = Value.Match(ElementText(document, item.Element))
             If Not match.Success Then Throw New IOException("Unexpected post-processing value.")
-            If Number(match.Groups(2).Value) = 0 Then Continue For
-            Dim replacement = match.Groups(1).Value & Zero & match.Groups(3).Value
+            If Number(match.Groups(2).Value) = target Then Continue For
+            Dim replacement = match.Groups(1).Value & wanted & match.Groups(3).Value
             ' Strings are shared between elements, so a new value never edits an existing string.
             Dim index = document.Strings.IndexOf(replacement)
             If index < 0 Then
@@ -210,13 +224,13 @@ Public NotInheritable Class PostEffects
     End Function
 
     ' A session's post-processing changes: postprocess\effects.xml with the chosen edits (MotionBlur.Target), with
-    ' bloom off the generic track files, and with the colour filter off its palettes and the track tints in the effects
-    ' file. A file that is missing, unusable or already as wanted is left out; note says what stays on. Edits: the
-    ' chosen edits (the journal records them).
+    ' bloom off the generic track files, and with the colour filter off its palettes and the track tints and saturation
+    ' in the effects file. A file that is missing, unusable or already as wanted is left out; note says what stays on.
+    ' Edits: the chosen edits (the journal records them).
     Public Shared Function SessionChanges(context As InstallContext, motionBlurOff As Boolean, glareOff As Boolean, bloomOff As Boolean, ByRef note As String, Optional colourOff As Boolean = False) As (Files As Dictionary(Of String, Byte()), Edits As String())
         note = ""
         Dim files As New Dictionary(Of String, Byte())
-        Dim chosen = Order.Where(Function(edit) (edit = MotionBlurEdit AndAlso motionBlurOff) OrElse (edit = GlareEdit AndAlso glareOff) OrElse (edit = BloomEdit AndAlso bloomOff) OrElse ((edit = ColourEdit OrElse edit = TintEdit) AndAlso colourOff)).ToArray()
+        Dim chosen = Order.Where(Function(edit) (edit = MotionBlurEdit AndAlso motionBlurOff) OrElse (edit = GlareEdit AndAlso glareOff) OrElse (edit = BloomEdit AndAlso bloomOff) OrElse ((edit = ColourEdit OrElse edit = TintEdit OrElse edit = SaturationEdit) AndAlso colourOff)).ToArray()
         If chosen.Length = 0 Then Return (files, chosen)
         Dim kept As New List(Of String)
         Dim effectEdits = chosen.Where(Function(edit) edit <> ColourEdit).ToArray()
@@ -225,7 +239,7 @@ Public NotInheritable Class PostEffects
             If effects.Usable Then
                 If effects.Data IsNot Nothing Then files.Add(MotionBlur.Target, effects.Data)
             Else
-                kept.Add(String.Join(", ", effectEdits.Select(AddressOf Describe)) & " (postprocess\effects.xml)")
+                kept.Add(String.Join(", ", effectEdits.Where(Function(edit) edit <> SaturationEdit).Select(AddressOf Describe)) & " (postprocess\effects.xml)")
             End If
         End If
         If bloomOff Then
@@ -251,7 +265,7 @@ Public NotInheritable Class PostEffects
     End Function
 
     Private Shared Function Describe(edit As String) As String
-        Return If(edit = MotionBlurEdit, "motion blur", If(edit = GlareEdit, "light streaks and lens flares", If(edit = ColourEdit, "the colour filter", If(edit = TintEdit, "the colour filter's tint", "bloom"))))
+        Return If(edit = MotionBlurEdit, "motion blur", If(edit = GlareEdit, "light streaks and lens flares", If(edit = ColourEdit, "the colour filter", If(edit = TintEdit, "the colour filter's tint and saturation", "bloom"))))
     End Function
 
     ' The changed bytes of one file (Nothing when nothing changes), or not usable when it is missing or unexpected.
