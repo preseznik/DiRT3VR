@@ -62,6 +62,21 @@ Public Class ValueSlider
             track.Value = value
         End Set
     End Property
+    ' A value below the new minimum moves up to it (and raises ValueChanged).
+    <System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)>
+    Public Property Minimum As Integer
+        Get
+            Return track.Minimum
+        End Get
+        Set(value As Integer)
+            If labels IsNot Nothing OrElse value > track.Maximum Then Throw New ArgumentOutOfRangeException(NameOf(value))
+            ' TrackBar moves its value up without its own ValueChanged.
+            Dim before = track.Value
+            track.Minimum = value
+            RefreshValue() : FitValueWidth()
+            If track.Value <> before Then RaiseEvent ValueChanged(Me, EventArgs.Empty)
+        End Set
+    End Property
     <System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)>
     Public Property Maximum As Integer
         Get

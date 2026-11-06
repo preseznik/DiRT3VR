@@ -100,7 +100,7 @@ Public NotInheritable Class LastVrSession
         Try
             Dim recorded = SafeFiles.ReadJson(Of SessionQuality)(info)
             Dim w = If(recorded?.VrFovWidth, 100), h = If(recorded?.VrFovHeight, 100)
-            If w < LauncherSettings.MinimumVrFieldOfView OrElse w > 100 OrElse h < LauncherSettings.MinimumVrFieldOfView OrElse h > 100 Then Return ""
+            If w < LauncherSettings.MinimumVrFieldOfView OrElse w > 100 OrElse h < LauncherSettings.MinimumHelmetFieldOfView OrElse h > 100 Then Return ""
             Return FovKey(w, h)
         Catch ex As Exception When TypeOf ex Is System.Text.Json.JsonException OrElse TypeOf ex Is IOException OrElse TypeOf ex Is UnauthorizedAccessException
             Return ""

@@ -31,7 +31,10 @@ Public Class HeadsetResolution
     ' The scene size with the VR field of view cropped (#16a86c75, Lens's contract): each axis times its kept share,
     ' after the render scale, in whole pixels.
     Public Function CroppedSceneSize(scale As Integer, widthPercent As Integer, heightPercent As Integer) As Size
-        If widthPercent < LauncherSettings.MinimumVrFieldOfView OrElse widthPercent > 100 OrElse heightPercent < LauncherSettings.MinimumVrFieldOfView OrElse heightPercent > 100 Then Throw New IOException("Choose a VR field of view from 70% to 100%.")
+        ' The renderer's bounds (#47d16d40): width 70-100%, height down to 50% for a helmet view.
+        If widthPercent < LauncherSettings.MinimumVrFieldOfView OrElse widthPercent > 100 OrElse heightPercent < LauncherSettings.MinimumHelmetFieldOfView OrElse heightPercent > 100 Then
+            Throw New IOException("Choose a VR field of view from 70% to 100%, or down to 50% with Helmet view.")
+        End If
         Dim size = SceneSize(scale)
         Dim cropped As New Size(size.Width * widthPercent \ 100, size.Height * heightPercent \ 100)
         ValidateSceneSize(cropped.Width, cropped.Height)

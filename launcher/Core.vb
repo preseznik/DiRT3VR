@@ -259,8 +259,16 @@ Public Class LauncherSettings
     ' side): the share of each eye's field of view kept, which crops the scene size the same way; helmet view
     ' crops only the top and bottom. Passed as DIRT3VR_VR_FOV_WIDTH / DIRT3VR_VR_FOV_HEIGHT when under 100.
     Public Const MinimumVrFieldOfView As Integer = 70
+    ' Helmet view goes down to 50% (#47d16d40: a real helmet cuts the vertical view to 50-60%); the renderer accepts a
+    ' height crop of 50-100% and a width crop of 70-100%.
+    Public Const MinimumHelmetFieldOfView As Integer = 50
     Public Property VrFieldOfView As Integer = 100
     Public Property VrHelmetView As Boolean
+
+    ' The lowest VR field of view: 50% with Helmet view (height only), 70% otherwise.
+    Public Shared Function MinimumFieldOfView(helmetView As Boolean) As Integer
+        Return If(helmetView, MinimumHelmetFieldOfView, MinimumVrFieldOfView)
+    End Function
 
     ' The kept width and height of each eye's field of view, in percent.
     Public Function VrFovWidth() As Integer
@@ -351,7 +359,10 @@ Public Class LauncherSettings
         If Not DirectPractice.GearboxChoices.Contains(DirectGearbox) Then Throw New IOException("Choose the gearbox for direct practice.")
         SeatAllCars = If(SeatAllCars, New SeatOffset) : SeatAllCars.ClearSessionFlags() : SeatAllCars.Validate()
         If HudDistance < 1D OrElse HudDistance > 5D OrElse HudDistance * 2D <> Decimal.Truncate(HudDistance * 2D) Then Throw New IOException("Choose a VR HUD distance from 1 to 5 m, in 0.5 m steps.")
-        If VrFieldOfView < MinimumVrFieldOfView OrElse VrFieldOfView > 100 Then Throw New IOException("Choose a VR field of view from " & MinimumVrFieldOfView & "% to 100%.")
+        If VrFieldOfView < MinimumFieldOfView(VrHelmetView) OrElse VrFieldOfView > 100 Then
+            Throw New IOException(If(VrHelmetView, "Choose a VR field of view from " & MinimumHelmetFieldOfView & "% to 100% for Helmet view.",
+                                     "Choose a VR field of view from " & MinimumVrFieldOfView & "% to 100%, or tick Helmet view to go down to " & MinimumHelmetFieldOfView & "%."))
+        End If
         If Not VrAntiAliasingChoices.Contains(VrAntiAliasing) Then Throw New IOException("Choose Off, 2× or 4× VR anti-aliasing.")
         If Not AnisotropyLevels.Contains(DesktopAnisotropy) OrElse Not AnisotropyLevels.Contains(VrAnisotropy) Then Throw New IOException("Choose Use game setting, Off, 2×, 4×, 8× or 16× anisotropic filtering.")
         If DesktopFov < -SeatOffset.FovNarrower OrElse DesktopFov > SeatOffset.FovWider Then Throw New IOException("Choose a cockpit field of view between " & SeatOffset.FovNarrower & "° narrower and " & SeatOffset.FovWider & "° wider.")

@@ -432,12 +432,16 @@ Public Class MainForm
         StyleChoice(vrAntiAliasing, vrSettings)
         Field(vrSettings, "Field of view", vrFieldOfView)
         vrSettings.Controls.Add(vrHelmetView)
-        vrSettings.Controls.Add(Info("Below 100% the edges of each eye's view are cut off and that many fewer pixels are rendered, without stretching the picture, to save GPU time. Helmet view cuts only the top and bottom, like looking out of a helmet."))
+        vrSettings.Controls.Add(Info("Below 100% the edges of each eye's view are cut off and that many fewer pixels are rendered, without stretching the picture, to save GPU time. Helmet view cuts only the top and bottom, like looking out of a helmet, and goes down to 50%; without it the field of view stops at 70%."))
         AddHandler vrFieldOfView.ValueChanged, Sub()
                                                    vrHelmetView.Enabled = vrFieldOfView.Value < 100
                                                    UpdateResolutionLabels()
                                                End Sub
-        AddHandler vrHelmetView.CheckedChanged, Sub() UpdateResolutionLabels()
+        ' Helmet view goes down to 50% (#47d16d40); unticking it moves a lower value back up to 70%.
+        AddHandler vrHelmetView.CheckedChanged, Sub()
+                                                    vrFieldOfView.Minimum = LauncherSettings.MinimumFieldOfView(vrHelmetView.Checked)
+                                                    UpdateResolutionLabels()
+                                                End Sub
         vrSettings.Controls.Add(Info("Anti-aliasing smooths jagged edges in the headset. 2× costs about 7% of the frame rate and 4× about 12% (measured on an RTX 4080 SUPER); lower the render scale if the frame rate drops."))
         vrSettings.Controls.Add(Info("100% renders at the connected headset's recommended resolution per eye. Output stays at that recommendation; this slider changes scene detail. Applies on the next VR launch. Unsupported sizes are refused, and original game settings are restored afterward."))
         vrSettings.Controls.Add(resolutionSummary)
@@ -1071,7 +1075,8 @@ Public Class MainForm
         desktopBloom.Checked = settings.DesktopBloom : desktopGlare.Checked = settings.DesktopGlare : vrBloom.Checked = settings.VrBloom : vrGlare.Checked = settings.VrGlare
         desktopColourFilter.Checked = settings.DesktopColourFilter : vrColourFilter.Checked = settings.VrColourFilter
         vrAntiAliasing.SelectedIndex = Math.Max(0, Array.IndexOf(LauncherSettings.VrAntiAliasingChoices, settings.VrAntiAliasing))
-        vrFieldOfView.Value = settings.VrFieldOfView : vrHelmetView.Checked = settings.VrHelmetView : vrHelmetView.Enabled = settings.VrFieldOfView < 100
+        vrHelmetView.Checked = settings.VrHelmetView : vrFieldOfView.Minimum = LauncherSettings.MinimumFieldOfView(settings.VrHelmetView)
+        vrFieldOfView.Value = settings.VrFieldOfView : vrHelmetView.Enabled = settings.VrFieldOfView < 100
         desktopResolution.Items.Clear()
         Dim chosen = New Size(settings.DesktopWidth, settings.DesktopHeight)
         Dim sizes = DesktopDisplay.Resolutions().Append(chosen).Append(Size.Empty).Distinct().OrderBy(Function(s) s.Width).ThenBy(Function(s) s.Height)
@@ -1489,7 +1494,7 @@ Public Class MainForm
                 "Bloom and Light streaks and lens flares, under Desktop and under VR rendering, are on as in DiRT 3. Bloom is the glow added around bright areas; light streaks and lens flares are the blue streak and the flares around the sun, which in VR each eye draws on its own. DiRT 3 has no option for either, so turning one off edits DiRT 3's post-processing effect files for that session (postprocess\effects.xml, and for bloom tracks\generic\effects.xml and night_effects.xml) and puts them back after DiRT 3 closes, like DiRT3VR's other temporary changes. In daytime driving bloom adds little; the glare around the sun is the streaks and flares." & vbCrLf & vbCrLf &
                 "Colour filter, under Desktop and under VR rendering, is on as in DiRT 3: each track has a colour palette that tints the picture, on most tracks towards green or cyan. Turned off, DiRT3VR gives every palette neutral colours for that session (postprocess\palettes.pssg) and puts the file back after DiRT 3 closes. Bloom, light streaks and the rest of the lighting stay as chosen." & vbCrLf & vbCrLf &
                 "Anti-aliasing under VR rendering smooths jagged edges in the headset with DiRT 3's own MSAA: Off (as before), 2× or 4×. 2× costs about 7% of the frame rate and 4× about 12% (Lens's measurement on an RTX 4080 SUPER), so lower the render scale if the frame rate drops; Recommend for this PC only uses a session that ran with the same anti-aliasing." & vbCrLf & vbCrLf &
-                "Field of view under VR rendering keeps 70% to 100% of each eye's view: below 100% the edges are cut off and DiRT 3 renders that many fewer pixels, without stretching the picture, to save GPU time. Helmet view cuts only the top and bottom. Recommend for this PC only uses a session with the same field of view." & vbCrLf & vbCrLf &
+                "Field of view under VR rendering keeps 70% to 100% of each eye's view: below 100% the edges are cut off and DiRT 3 renders that many fewer pixels, without stretching the picture, to save GPU time. Helmet view cuts only the top and bottom, like looking out of a helmet, and goes down to 50% (a real helmet cuts the view to about 50% to 60%); unticking it moves a lower value back up to 70%. Recommend for this PC only uses a session with the same field of view." & vbCrLf & vbCrLf &
                 "Below it, Last VR session shows the headset refresh rate (when the runtime reports it) and whether DiRT 3 rendered the scene size DiRT3VR asked for, read from that session's log." & vbCrLf & vbCrLf &
                 "Quality has separate Desktop and VR columns. Choose one of DiRT 3's presets or set each option; the preset shows Custom when the options match none of them. The values are DiRT 3's DirectX 11 options; Medium is the game's default." & vbCrLf & vbCrLf &
                 "Desktop quality is written into DiRT 3's graphics file at every launch, so options not set to Use game setting replace changes made in the game's own menu. VR quality is applied only while a VR session runs, with DiRT3VR's other temporary changes, and undone afterwards; options on Same as desktop use the desktop choice." & vbCrLf & vbCrLf &
