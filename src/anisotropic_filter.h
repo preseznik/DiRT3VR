@@ -42,8 +42,39 @@ inline bool Adjust(D3D11_SAMPLER_DESC& desc,unsigned value) {
     return true;
 }
 
-// Hooks the device's CreateSamplerState once when DIRT3VR_ANISOTROPY asks for a level;
-// returns false when it was requested but couldn't be installed.
+// The colour lookup (#24f76866). DiRT 3 grades each frame through a colour palette: a 3D colour table unwrapped
+// into a 32x256 texture with one mip level, read through the same trilinear repeating sampler as its surfaces, so
+// Adjust can't tell them apart (D3D11 even returns one object for equal descriptions). Anisotropic filtering takes
+// several samples along the screen-space gradient of the lookup coordinate, which jumps at every colour edge, so it
+// averages unrelated table entries: green and teal patches on the ground in VR (iztok, 2026-11-06). So while a
+// palette is bound to a pixel-shader slot, the device gets the game's own samplers.
+inline bool IsPalette(const D3D11_TEXTURE2D_DESC& desc) {
+    return desc.Width==32 && desc.Height==256 && desc.MipLevels==1 && desc.ArraySize==1;
+}
+
+// Which pixel-shader resource slots of one device context hold a palette.
+class PaletteSlots {
+public:
+    // Records slots [start, start+count); palette[i] says whether the view bound there is a palette (palette may be
+    // null when every view is). Returns whether any slot holds a palette afterwards.
+    bool Set(unsigned start,unsigned count,const bool* palette) {
+        for(unsigned i=0;i<count && start+i<Slots;++i) {
+            const auto slot=start+i;
+            const auto bit=uint64_t{1}<<(slot%64);
+            if(palette && palette[i]) mask_[slot/64]|=bit; else mask_[slot/64]&=~bit;
+        }
+        return Bound();
+    }
+    bool Bound() const { return mask_[0]!=0 || mask_[1]!=0; }
+    static constexpr unsigned Slots=D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT;
+private:
+    uint64_t mask_[2]{};
+};
+static_assert(PaletteSlots::Slots<=128,"PaletteSlots holds 128 slots");
+
+// Hooks the device's CreateSamplerState once when DIRT3VR_ANISOTROPY asks for a level, and, for the colour
+// lookup, CreateShaderResourceView and the context's PSSetShaderResources and PSSetSamplers; returns false when it
+// was requested but couldn't be installed.
 bool Install(ID3D11Device* device,void (*log)(const char*,...));
 
 }
