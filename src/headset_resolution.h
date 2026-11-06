@@ -8,13 +8,15 @@ inline bool ValidHeadsetSize(uint32_t width,uint32_t height) noexcept {
     return width>=320 && height>=180 && width<=4096 && height<=4096;
 }
 // A VR field-of-view crop (#16a86c75, #47d16d40) narrows each eye's view to fovWidth / fovHeight
-// percent in tangent space (70-100; a helmet view crops only the height), so the scene shrinks with it.
-inline bool ValidFovCrop(uint32_t percent) noexcept { return percent>=70 && percent<=100; }
+// percent in tangent space, so the scene shrinks with it. The width keeps DiRT2VR's 70% floor; the
+// height goes down to 50%, as a real helmet cuts the view at top and bottom (a helmet view crops only it).
+inline bool ValidFovWidth(uint32_t percent) noexcept { return percent>=70 && percent<=100; }
+inline bool ValidFovHeight(uint32_t percent) noexcept { return percent>=50 && percent<=100; }
 struct HeadsetResolutionRequest {
     uint32_t width{},height{},scale{},sceneWidth{},sceneHeight{},fovWidth=100,fovHeight=100;
     bool Configure(uint32_t w,uint32_t h,uint32_t percent,uint32_t fovW=100,uint32_t fovH=100) noexcept {
         *this={};
-        if(!ValidHeadsetSize(w,h) || percent<50 || percent>300 || !ValidFovCrop(fovW) || !ValidFovCrop(fovH)) return false;
+        if(!ValidHeadsetSize(w,h) || percent<50 || percent>300 || !ValidFovWidth(fovW) || !ValidFovHeight(fovH)) return false;
         const auto sw=w*percent/100*fovW/100,sh=h*percent/100*fovH/100;
         if(!ValidHeadsetSize(sw,sh)) return false;
         width=w; height=h; scale=percent; sceneWidth=sw; sceneHeight=sh; fovWidth=fovW; fovHeight=fovH;

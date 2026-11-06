@@ -89,7 +89,7 @@ public:
     Frame BeginFrame(uint64_t monotonicGameSequence) noexcept { return Frame(*this,monotonicGameSequence,FrameMode::Stereo); }
     Frame BeginScreenFrame(uint64_t monotonicGameSequence) noexcept { return Frame(*this,monotonicGameSequence,FrameMode::Screen); }
     void Shutdown() noexcept;
-    // Narrows each stereo eye's field of view to width / height (0.7-1) of the runtime's, in tangent
+    // Narrows each stereo eye's field of view to width (0.7-1) / height (0.5-1) of the runtime's, in tangent
     // space: the game renders and the runtime shows the same narrower view (#16a86c75, #47d16d40).
     bool CropFieldOfView(float width,float height) noexcept;
     // includeTilt also resets pitch and roll (the player's choice); automatic centering never does.

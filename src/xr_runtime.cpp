@@ -416,7 +416,8 @@ bool XrRuntime::EndFrame(uint64_t generation,bool submit,FrameMode mode,float as
     return complete && ended;
 }
 bool XrRuntime::CropFieldOfView(float width,float height) noexcept {
-    if(!std::isfinite(width) || !std::isfinite(height) || width<.7f || width>1.f || height<.7f || height>1.f) return false;
+    // Same bounds as ValidFovWidth / ValidFovHeight (headset_resolution.h): height down to 50% for a helmet view.
+    if(!std::isfinite(width) || !std::isfinite(height) || width<.7f || width>1.f || height<.5f || height>1.f) return false;
     fovWidth_=width; fovHeight_=height;
     if(width<1.f || height<1.f) Report("XR field of view cropped to %.0f%% wide, %.0f%% high",width*100.f,height*100.f);
     return true;
