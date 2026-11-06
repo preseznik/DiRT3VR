@@ -81,13 +81,13 @@ Public Class MainForm
     Private ReadOnly desktopAnisotropy As New ComboBox With {.Name = "DesktopAnisotropy", .DropDownStyle = ComboBoxStyle.DropDownList}
     Private ReadOnly vrAnisotropy As New ComboBox With {.Name = "VrAnisotropy", .DropDownStyle = ComboBoxStyle.DropDownList}
     ' Bloom and light streaks + lens flares (#3c6d6ffa), on by default, for the monitor and VR (as DiRT2VR's Bloom: On).
-    Private ReadOnly desktopBloom As New CheckBox With {.Name = "DesktopBloom", .Text = "On", .AutoSize = True}
-    Private ReadOnly desktopGlare As New CheckBox With {.Name = "DesktopGlare", .Text = "On", .AutoSize = True}
-    Private ReadOnly vrBloom As New CheckBox With {.Name = "VrBloom", .Text = "On", .AutoSize = True}
-    Private ReadOnly vrGlare As New CheckBox With {.Name = "VrGlare", .Text = "On", .AutoSize = True}
+    Private ReadOnly desktopBloom As New CheckBox With {.Name = "DesktopBloom", .Text = "Off", .AccessibleName = "Desktop bloom off", .AutoSize = True}
+    Private ReadOnly desktopGlare As New CheckBox With {.Name = "DesktopGlare", .Text = "Off", .AccessibleName = "Desktop light streaks and lens flares off", .AutoSize = True}
+    Private ReadOnly vrBloom As New CheckBox With {.Name = "VrBloom", .Text = "Off", .AccessibleName = "VR bloom off", .AutoSize = True}
+    Private ReadOnly vrGlare As New CheckBox With {.Name = "VrGlare", .Text = "Off", .AccessibleName = "VR light streaks and lens flares off", .AutoSize = True}
     ' The colour filter (#24f76866): DiRT 3's green/cyan track tint, on by default as in DiRT 3.
-    Private ReadOnly desktopColourFilter As New CheckBox With {.Name = "DesktopColourFilter", .Text = "On", .AutoSize = True}
-    Private ReadOnly vrColourFilter As New CheckBox With {.Name = "VrColourFilter", .Text = "On", .AutoSize = True}
+    Private ReadOnly desktopColourFilter As New CheckBox With {.Name = "DesktopColourFilter", .Text = "Off", .AccessibleName = "Desktop colour filter off", .AutoSize = True}
+    Private ReadOnly vrColourFilter As New CheckBox With {.Name = "VrColourFilter", .Text = "Off", .AccessibleName = "VR colour filter off", .AutoSize = True}
     ' VR anti-aliasing (#c8076a1e), LauncherSettings.VrAntiAliasingChoices order.
     Private ReadOnly vrAntiAliasing As New ComboBox With {.Name = "VrAntiAliasing", .DropDownStyle = ComboBoxStyle.DropDownList}
     ' VR field of view and helmet view (#16a86c75, #47d16d40).
@@ -418,7 +418,7 @@ Public Class MainForm
         Field(desktopSettings, "Bloom", desktopBloom)
         Field(desktopSettings, "Light streaks and lens flares", desktopGlare)
         Field(desktopSettings, "Colour filter", desktopColourFilter)
-        desktopSettings.Controls.Add(Info("Bloom is the glow around bright areas; light streaks and lens flares are the blue streak and the flares around the sun. The colour filter is the green or cyan tint DiRT 3 gives most tracks. Turned off, DiRT3VR edits DiRT 3's effect files for that session and puts them back after it closes."))
+        desktopSettings.Controls.Add(Info("Tick Off to disable an effect; unchecked keeps it on, as in DiRT 3. Bloom is the glow around bright areas; light streaks and lens flares are the blue streak and the flares around the sun. The colour filter is the green or cyan tint DiRT 3 gives most tracks. Turned off, DiRT3VR edits DiRT 3's effect files for that session and puts them back after it closes."))
         Dim vrSettings = Section(columns.Second, "VR rendering")
         vrSettings.Controls.Add(Info(ExperimentalFiles.ProfileDescription))
         Field(vrSettings, "VR render scale", renderScale)
@@ -427,6 +427,7 @@ Public Class MainForm
         Field(vrSettings, "Bloom", vrBloom)
         Field(vrSettings, "Light streaks and lens flares", vrGlare)
         Field(vrSettings, "Colour filter", vrColourFilter)
+        vrSettings.Controls.Add(Info("Tick Off to disable an effect in VR. All three effects are on by default, with Off unchecked."))
         vrAntiAliasing.Items.AddRange({"Off", "2× MSAA", "4× MSAA"})
         Field(vrSettings, "Anti-aliasing", vrAntiAliasing)
         StyleChoice(vrAntiAliasing, vrSettings)
@@ -1072,8 +1073,8 @@ Public Class MainForm
         desktopVSync.SelectedIndex = Array.IndexOf({"game", "off", "on"}, settings.DesktopVSync)
         desktopAnisotropy.SelectedIndex = Math.Max(0, Array.IndexOf(LauncherSettings.AnisotropyLevels, settings.DesktopAnisotropy))
         vrAnisotropy.SelectedIndex = Math.Max(0, Array.IndexOf(LauncherSettings.AnisotropyLevels, settings.VrAnisotropy))
-        desktopBloom.Checked = settings.DesktopBloom : desktopGlare.Checked = settings.DesktopGlare : vrBloom.Checked = settings.VrBloom : vrGlare.Checked = settings.VrGlare
-        desktopColourFilter.Checked = settings.DesktopColourFilter : vrColourFilter.Checked = settings.VrColourFilter
+        desktopBloom.Checked = Not settings.DesktopBloom : desktopGlare.Checked = Not settings.DesktopGlare : vrBloom.Checked = Not settings.VrBloom : vrGlare.Checked = Not settings.VrGlare
+        desktopColourFilter.Checked = Not settings.DesktopColourFilter : vrColourFilter.Checked = Not settings.VrColourFilter
         vrAntiAliasing.SelectedIndex = Math.Max(0, Array.IndexOf(LauncherSettings.VrAntiAliasingChoices, settings.VrAntiAliasing))
         vrHelmetView.Checked = settings.VrHelmetView : vrFieldOfView.Minimum = LauncherSettings.MinimumFieldOfView(settings.VrHelmetView)
         vrFieldOfView.Value = settings.VrFieldOfView : vrHelmetView.Enabled = settings.VrFieldOfView < 100
@@ -1091,7 +1092,7 @@ Public Class MainForm
     Public Function CurrentSettings() As LauncherSettings
         Dim resolution = TryCast(desktopResolution.SelectedItem, DesktopResolutionChoice)
         Return New LauncherSettings With {.ModernInterface = modern.Checked, .RuntimeMode = VrRuntime.Modes(Math.Max(0, runtime.SelectedIndex)), .SteamRuntimeManifest = manifest.Text, .VdxrRuntimeManifest = vdxrManifest.Text, .OtherRuntimeManifest = otherManifest.Text, .DiagnosticLogging = logging.Checked, .ExperimentalVrEnabled = experimental.Checked, .VrRenderScale = renderScale.Value, .HudDistance = hudDistance.Value / 2D, .HudFollowView = hudFollow.Checked, .PerfDisplay = perfDisplay.Checked, .PerfFollowView = perfFollow.Checked, .FlatCarViews = flatCarViews.Checked, .FlatCinematic = flatCinematic.Checked, .FlatMenus = flatMenus.Checked,
-            .DesktopAnisotropy = LauncherSettings.AnisotropyLevels(Math.Max(0, desktopAnisotropy.SelectedIndex)), .VrAnisotropy = LauncherSettings.AnisotropyLevels(Math.Max(0, vrAnisotropy.SelectedIndex)), .DesktopBloom = desktopBloom.Checked, .DesktopGlare = desktopGlare.Checked, .VrBloom = vrBloom.Checked, .VrGlare = vrGlare.Checked, .DesktopColourFilter = desktopColourFilter.Checked, .VrColourFilter = vrColourFilter.Checked, .VrAntiAliasing = LauncherSettings.VrAntiAliasingChoices(Math.Max(0, vrAntiAliasing.SelectedIndex)), .VrFieldOfView = vrFieldOfView.Value, .VrHelmetView = vrHelmetView.Checked,
+            .DesktopAnisotropy = LauncherSettings.AnisotropyLevels(Math.Max(0, desktopAnisotropy.SelectedIndex)), .VrAnisotropy = LauncherSettings.AnisotropyLevels(Math.Max(0, vrAnisotropy.SelectedIndex)), .DesktopBloom = Not desktopBloom.Checked, .DesktopGlare = Not desktopGlare.Checked, .VrBloom = Not vrBloom.Checked, .VrGlare = Not vrGlare.Checked, .DesktopColourFilter = Not desktopColourFilter.Checked, .VrColourFilter = Not vrColourFilter.Checked, .VrAntiAliasing = LauncherSettings.VrAntiAliasingChoices(Math.Max(0, vrAntiAliasing.SelectedIndex)), .VrFieldOfView = vrFieldOfView.Value, .VrHelmetView = vrHelmetView.Checked,
             .DesktopWidth = If(resolution Is Nothing, 0, resolution.Size.Width), .DesktopHeight = If(resolution Is Nothing, 0, resolution.Size.Height),
             .DesktopDisplayMode = {"game", "windowed", "fullscreen", "borderless"}(Math.Max(0, desktopMode.SelectedIndex)), .DesktopVSync = {"game", "off", "on"}(Math.Max(0, desktopVSync.SelectedIndex)), .SkipStartupMovies = skipStartupMovies.Checked,
             .RecenterKey = recenterKey, .RecenterModifiers = recenterModifiers, .RecenterDevice = recenterDevice, .RecenterKeepLevel = recenterKeepLevel.Checked,
@@ -1488,6 +1489,7 @@ Public Class MainForm
                 "Starting DiRT3VR again, for example from the Start menu, opens the running window instead of a second launcher." & vbCrLf & vbCrLf &
                 "Windows can sign out or shut down during a session. Use Restore original files on the next start."),
             New HelpTopic(HelpGraphics,
+                "Bloom, Light streaks and lens flares, and Colour filter use Off checkboxes for Desktop and VR rendering. Tick Off to disable an effect. By default they are unchecked and the effects are on, as in DiRT 3." & vbCrLf & vbCrLf &
                 "Desktop: display mode, resolution and VSync for Launch. Use game setting leaves that option unchanged. Borderless fills the main display at its current resolution. Desktop choices stay in the game's graphics file; an exact backup is saved under desktop-backups in the preferences folder before each change." & vbCrLf & vbCrLf &
                 "VR rendering: one VR render scale from 50% to 300%. At 100% the scene matches the connected headset's recommended resolution per eye; output stays at that recommendation while the slider changes scene detail. Refresh headset resolution shows the detected sizes. The launcher checks the headset again before every VR launch and refuses unsupported sizes." & vbCrLf & vbCrLf &
                 "Anisotropic filtering, under Desktop and under VR rendering, sharpens road and ground textures seen at an angle. DiRT 3 has no option for it, so a choice other than Use game setting is applied by DiRT3VR's renderer: Off is plain trilinear filtering, 2× to 16× are stronger. On the monitor this installs the renderer for that Launch session, without VR, and removes it after DiRT 3 closes." & vbCrLf & vbCrLf &
