@@ -85,6 +85,9 @@ Public Class MainForm
     Private ReadOnly desktopGlare As New CheckBox With {.Name = "DesktopGlare", .Text = "On", .AutoSize = True}
     Private ReadOnly vrBloom As New CheckBox With {.Name = "VrBloom", .Text = "On", .AutoSize = True}
     Private ReadOnly vrGlare As New CheckBox With {.Name = "VrGlare", .Text = "On", .AutoSize = True}
+    ' The colour filter (#24f76866): DiRT 3's green/cyan track tint, on by default as in DiRT 3.
+    Private ReadOnly desktopColourFilter As New CheckBox With {.Name = "DesktopColourFilter", .Text = "On", .AutoSize = True}
+    Private ReadOnly vrColourFilter As New CheckBox With {.Name = "VrColourFilter", .Text = "On", .AutoSize = True}
     ' VR anti-aliasing (#c8076a1e), LauncherSettings.VrAntiAliasingChoices order.
     Private ReadOnly vrAntiAliasing As New ComboBox With {.Name = "VrAntiAliasing", .DropDownStyle = ComboBoxStyle.DropDownList}
     ' VR field of view and helmet view (#16a86c75, #47d16d40).
@@ -414,7 +417,8 @@ Public Class MainForm
         desktopSettings.Controls.Add(Info("DiRT 3 has no anisotropic filtering option of its own. A choice other than Use game setting installs DiRT3VR's renderer for that Launch session, without VR, and removes it after DiRT 3 closes."))
         Field(desktopSettings, "Bloom", desktopBloom)
         Field(desktopSettings, "Light streaks and lens flares", desktopGlare)
-        desktopSettings.Controls.Add(Info("Bloom is the glow around bright areas; light streaks and lens flares are the blue streak and the flares around the sun. Turned off, DiRT3VR edits DiRT 3's effect files for that session and puts them back after it closes."))
+        Field(desktopSettings, "Colour filter", desktopColourFilter)
+        desktopSettings.Controls.Add(Info("Bloom is the glow around bright areas; light streaks and lens flares are the blue streak and the flares around the sun. The colour filter is the green or cyan tint DiRT 3 gives most tracks. Turned off, DiRT3VR edits DiRT 3's effect files for that session and puts them back after it closes."))
         Dim vrSettings = Section(columns.Second, "VR rendering")
         vrSettings.Controls.Add(Info(ExperimentalFiles.ProfileDescription))
         Field(vrSettings, "VR render scale", renderScale)
@@ -422,6 +426,7 @@ Public Class MainForm
         StyleChoice(vrAnisotropy, vrSettings)
         Field(vrSettings, "Bloom", vrBloom)
         Field(vrSettings, "Light streaks and lens flares", vrGlare)
+        Field(vrSettings, "Colour filter", vrColourFilter)
         vrAntiAliasing.Items.AddRange({"Off", "2× MSAA", "4× MSAA"})
         Field(vrSettings, "Anti-aliasing", vrAntiAliasing)
         StyleChoice(vrAntiAliasing, vrSettings)
@@ -1064,6 +1069,7 @@ Public Class MainForm
         desktopAnisotropy.SelectedIndex = Math.Max(0, Array.IndexOf(LauncherSettings.AnisotropyLevels, settings.DesktopAnisotropy))
         vrAnisotropy.SelectedIndex = Math.Max(0, Array.IndexOf(LauncherSettings.AnisotropyLevels, settings.VrAnisotropy))
         desktopBloom.Checked = settings.DesktopBloom : desktopGlare.Checked = settings.DesktopGlare : vrBloom.Checked = settings.VrBloom : vrGlare.Checked = settings.VrGlare
+        desktopColourFilter.Checked = settings.DesktopColourFilter : vrColourFilter.Checked = settings.VrColourFilter
         vrAntiAliasing.SelectedIndex = Math.Max(0, Array.IndexOf(LauncherSettings.VrAntiAliasingChoices, settings.VrAntiAliasing))
         vrFieldOfView.Value = settings.VrFieldOfView : vrHelmetView.Checked = settings.VrHelmetView : vrHelmetView.Enabled = settings.VrFieldOfView < 100
         desktopResolution.Items.Clear()
@@ -1080,7 +1086,7 @@ Public Class MainForm
     Public Function CurrentSettings() As LauncherSettings
         Dim resolution = TryCast(desktopResolution.SelectedItem, DesktopResolutionChoice)
         Return New LauncherSettings With {.ModernInterface = modern.Checked, .RuntimeMode = VrRuntime.Modes(Math.Max(0, runtime.SelectedIndex)), .SteamRuntimeManifest = manifest.Text, .VdxrRuntimeManifest = vdxrManifest.Text, .OtherRuntimeManifest = otherManifest.Text, .DiagnosticLogging = logging.Checked, .ExperimentalVrEnabled = experimental.Checked, .VrRenderScale = renderScale.Value, .HudDistance = hudDistance.Value / 2D, .HudFollowView = hudFollow.Checked, .PerfDisplay = perfDisplay.Checked, .PerfFollowView = perfFollow.Checked, .FlatCarViews = flatCarViews.Checked, .FlatCinematic = flatCinematic.Checked, .FlatMenus = flatMenus.Checked,
-            .DesktopAnisotropy = LauncherSettings.AnisotropyLevels(Math.Max(0, desktopAnisotropy.SelectedIndex)), .VrAnisotropy = LauncherSettings.AnisotropyLevels(Math.Max(0, vrAnisotropy.SelectedIndex)), .DesktopBloom = desktopBloom.Checked, .DesktopGlare = desktopGlare.Checked, .VrBloom = vrBloom.Checked, .VrGlare = vrGlare.Checked, .VrAntiAliasing = LauncherSettings.VrAntiAliasingChoices(Math.Max(0, vrAntiAliasing.SelectedIndex)), .VrFieldOfView = vrFieldOfView.Value, .VrHelmetView = vrHelmetView.Checked,
+            .DesktopAnisotropy = LauncherSettings.AnisotropyLevels(Math.Max(0, desktopAnisotropy.SelectedIndex)), .VrAnisotropy = LauncherSettings.AnisotropyLevels(Math.Max(0, vrAnisotropy.SelectedIndex)), .DesktopBloom = desktopBloom.Checked, .DesktopGlare = desktopGlare.Checked, .VrBloom = vrBloom.Checked, .VrGlare = vrGlare.Checked, .DesktopColourFilter = desktopColourFilter.Checked, .VrColourFilter = vrColourFilter.Checked, .VrAntiAliasing = LauncherSettings.VrAntiAliasingChoices(Math.Max(0, vrAntiAliasing.SelectedIndex)), .VrFieldOfView = vrFieldOfView.Value, .VrHelmetView = vrHelmetView.Checked,
             .DesktopWidth = If(resolution Is Nothing, 0, resolution.Size.Width), .DesktopHeight = If(resolution Is Nothing, 0, resolution.Size.Height),
             .DesktopDisplayMode = {"game", "windowed", "fullscreen", "borderless"}(Math.Max(0, desktopMode.SelectedIndex)), .DesktopVSync = {"game", "off", "on"}(Math.Max(0, desktopVSync.SelectedIndex)), .SkipStartupMovies = skipStartupMovies.Checked,
             .RecenterKey = recenterKey, .RecenterModifiers = recenterModifiers, .RecenterDevice = recenterDevice, .RecenterKeepLevel = recenterKeepLevel.Checked,
@@ -1123,7 +1129,7 @@ Public Class MainForm
             Return False
         End If
         Dim question = If(graphicsOnly,
-                      "Set desktop display mode, resolution, VSync, anisotropic filtering and every desktop quality option to Use game setting, every VR quality option to Same as desktop, VR anisotropic filtering to Use game setting, VR anti-aliasing off, VR field of view to 100%, VR render scale to 100%, and bloom and light streaks + lens flares on?",
+                      "Set desktop display mode, resolution, VSync, anisotropic filtering and every desktop quality option to Use game setting, every VR quality option to Same as desktop, VR anisotropic filtering to Use game setting, VR anti-aliasing off, VR field of view to 100%, VR render scale to 100%, and bloom, light streaks + lens flares and the colour filter on?",
                       "Reset every launcher choice to its default: appearance, VR runtime, logging, startup, graphics, recenter key and controller button? VR runtime locations, the experimental VR opt-in and seat positions are kept.") &
                    If(HasUnsavedSettings(), " Your unsaved changes in the launcher controls are replaced.", "") &
                    " Nothing is saved until you choose Save settings or Launch; game files and settings profiles are not changed."
@@ -1481,13 +1487,14 @@ Public Class MainForm
                 "VR rendering: one VR render scale from 50% to 300%. At 100% the scene matches the connected headset's recommended resolution per eye; output stays at that recommendation while the slider changes scene detail. Refresh headset resolution shows the detected sizes. The launcher checks the headset again before every VR launch and refuses unsupported sizes." & vbCrLf & vbCrLf &
                 "Anisotropic filtering, under Desktop and under VR rendering, sharpens road and ground textures seen at an angle. DiRT 3 has no option for it, so a choice other than Use game setting is applied by DiRT3VR's renderer: Off is plain trilinear filtering, 2× to 16× are stronger. On the monitor this installs the renderer for that Launch session, without VR, and removes it after DiRT 3 closes." & vbCrLf & vbCrLf &
                 "Bloom and Light streaks and lens flares, under Desktop and under VR rendering, are on as in DiRT 3. Bloom is the glow added around bright areas; light streaks and lens flares are the blue streak and the flares around the sun, which in VR each eye draws on its own. DiRT 3 has no option for either, so turning one off edits DiRT 3's post-processing effect files for that session (postprocess\effects.xml, and for bloom tracks\generic\effects.xml and night_effects.xml) and puts them back after DiRT 3 closes, like DiRT3VR's other temporary changes. In daytime driving bloom adds little; the glare around the sun is the streaks and flares." & vbCrLf & vbCrLf &
+                "Colour filter, under Desktop and under VR rendering, is on as in DiRT 3: each track has a colour palette that tints the picture, on most tracks towards green or cyan. Turned off, DiRT3VR gives every palette neutral colours for that session (postprocess\palettes.pssg) and puts the file back after DiRT 3 closes. Bloom, light streaks and the rest of the lighting stay as chosen." & vbCrLf & vbCrLf &
                 "Anti-aliasing under VR rendering smooths jagged edges in the headset with DiRT 3's own MSAA: Off (as before), 2× or 4×. 2× costs about 7% of the frame rate and 4× about 12% (Lens's measurement on an RTX 4080 SUPER), so lower the render scale if the frame rate drops; Recommend for this PC only uses a session that ran with the same anti-aliasing." & vbCrLf & vbCrLf &
                 "Field of view under VR rendering keeps 70% to 100% of each eye's view: below 100% the edges are cut off and DiRT 3 renders that many fewer pixels, without stretching the picture, to save GPU time. Helmet view cuts only the top and bottom. Recommend for this PC only uses a session with the same field of view." & vbCrLf & vbCrLf &
                 "Below it, Last VR session shows the headset refresh rate (when the runtime reports it) and whether DiRT 3 rendered the scene size DiRT3VR asked for, read from that session's log." & vbCrLf & vbCrLf &
                 "Quality has separate Desktop and VR columns. Choose one of DiRT 3's presets or set each option; the preset shows Custom when the options match none of them. The values are DiRT 3's DirectX 11 options; Medium is the game's default." & vbCrLf & vbCrLf &
                 "Desktop quality is written into DiRT 3's graphics file at every launch, so options not set to Use game setting replace changes made in the game's own menu. VR quality is applied only while a VR session runs, with DiRT3VR's other temporary changes, and undone afterwards; options on Same as desktop use the desktop choice." & vbCrLf & vbCrLf &
                 "Quick VR presets: Potato / Low-End sets VR quality to Ultra Low and VR render scale to 70%; VR Balanced keeps High's look with the crowd one step lower. Undo preset brings back the controls from before the last preset, until you change an option or the render scale yourself." & vbCrLf & vbCrLf &
-                "Restore graphics defaults sets the desktop, anisotropic filtering and quality choices to Use game setting, VR anti-aliasing off, the VR field of view and the render scale to 100%, and bloom and light streaks + lens flares on. It asks first and changes only the controls until Save settings or Launch."),
+                "Restore graphics defaults sets the desktop, anisotropic filtering and quality choices to Use game setting, VR anti-aliasing off, the VR field of view and the render scale to 100%, and bloom, light streaks + lens flares and the colour filter on. It asks first and changes only the controls until Save settings or Launch."),
             New HelpTopic(HelpControls,
                 "Use your existing keyboard, controller or wheel bindings in DiRT 3." & vbCrLf & vbCrLf &
                 "Driving controls… binds your wheel, pedals, shifter, controller and keys for direct practice, with Launch and Launch VR. A direct start doesn't load your DiRT 3 profile, so DiRT 3 would otherwise use its default preset for each device. It also skips the Press Start screen, where DiRT 3 normally picks your controller, so DiRT3VR gives the player one device: the one you pick under Drives with, else the device you bound steering to (or the one with most bindings), since DiRT 3 drives with one device per player; without bindings here DiRT 3 picks the keyboard. Gearbox chooses automatic gears (DiRT 3's default), sequential, H-pattern or H-pattern with clutch for direct practice; Save keeps it with the bindings. The Binding wizard asks for the essentials (steering, pedals, clutch, handbrake, gear up and down, change view, look back and pause), then offers the H-pattern shifter, flashback and replays, menus, and look and horn; Skip keeps an action's current binding, and only finished groups are kept. Key… and Device… rebind one action, Calibrate… sets an axis's direction, dead zone and saturation, Wheel rotation… sets how far you turn your wheel for full steering lock (your wheel's rotation and the rotation you want in DiRT 3 set the steering saturation), and Xbox preset loads DiRT 3's own Xbox controller layout. Presets save and load whole binding sets. For each bound device the session writes a complete action map (DiRT 3's own map for that device with your bindings in place) and lists it in actionmap\actionMapPaths.xml; both are removed after exit, like DiRT3VR's other temporary changes. Two identical devices share one map, as DiRT 3 tells devices apart by name." & vbCrLf & vbCrLf &

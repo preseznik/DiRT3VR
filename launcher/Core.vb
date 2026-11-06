@@ -246,6 +246,10 @@ Public Class LauncherSettings
     Public Property VrBloom As Boolean = True
     Public Property DesktopGlare As Boolean = True
     Public Property VrGlare As Boolean = True
+    ' The colour filter (#24f76866; Wrench's research): DiRT 3's green/cyan tint from each track's colour palette. On
+    ' (DiRT 3's own) by default; off gives every palette neutral colours for that session (ColourFilter).
+    Public Property DesktopColourFilter As Boolean = True
+    Public Property VrColourFilter As Boolean = True
     ' VR anti-aliasing (#c8076a1e): DiRT 3's own multisampling value for the VR session's graphics file. Lens's
     ' runs showed the eye copy works unchanged at 2xmsaa and 4xmsaa (the backbuffer stays single-sample);
     ' 8× isn't tested, so it isn't offered. Off by default, as every VR session ran before.

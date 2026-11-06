@@ -166,9 +166,9 @@ Public Class InteractiveSession
             Next
             ' Motion blur off: head movement would smear the nearest geometry (#30d34783).
             ' With bloom and/or light streaks + lens flares off for VR (#3c6d6ffa) in the same effects file, and bloom's
-            ' generic track files.
+            ' generic track files; with the colour filter off (#24f76866), the palettes.
             Dim blurNote As String = ""
-            Dim post = PostEffects.SessionChanges(context, motionBlurOff:=True, glareOff:=Not settings.VrGlare, bloomOff:=Not settings.VrBloom, note:=blurNote)
+            Dim post = PostEffects.SessionChanges(context, motionBlurOff:=True, glareOff:=Not settings.VrGlare, bloomOff:=Not settings.VrBloom, note:=blurNote, colourOff:=Not settings.VrColourFilter)
             For Each pair In post.Files
                 changes.Add(pair.Key, pair.Value)
             Next

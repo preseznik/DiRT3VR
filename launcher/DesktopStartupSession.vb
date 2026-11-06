@@ -34,7 +34,7 @@ Public NotInheritable Class DesktopStartupSession
 
     Public Shared Function NeedsSession(settings As LauncherSettings) As Boolean
         Return settings.SkipStartupMovies OrElse settings.LaunchMode = "direct" OrElse SeatPositions.OnDesktop(settings) OrElse NeedsRenderer(settings) OrElse
-               Not settings.DesktopBloom OrElse Not settings.DesktopGlare
+               Not settings.DesktopBloom OrElse Not settings.DesktopGlare OrElse Not settings.DesktopColourFilter
     End Function
 
     ' Whether the session installs DiRT3VR's renderer: direct practice, the seat menu on the monitor, or
@@ -111,9 +111,10 @@ Public NotInheritable Class DesktopStartupSession
             Dim actionMaps = If(settings.LaunchMode = "direct", SessionActionMaps.Changes(context, DrivingControls.Load(context)), New SessionActionMaps.SessionChanges())
             Dim seats = SeatPositions.Changes(context, settings, vr:=False)
             Dim changes = DesktopStartupSession.Changes(context, settings, actionMaps, seats.Files)
-            ' Bloom and light streaks + lens flares off (#3c6d6ffa): the effect files, for this session only.
+            ' Bloom, light streaks + lens flares (#3c6d6ffa) and the colour filter (#24f76866) off: the effect files and
+            ' palettes, for this session only.
             Dim effectsNote As String = ""
-            Dim post = PostEffects.SessionChanges(context, motionBlurOff:=False, glareOff:=Not settings.DesktopGlare, bloomOff:=Not settings.DesktopBloom, note:=effectsNote)
+            Dim post = PostEffects.SessionChanges(context, motionBlurOff:=False, glareOff:=Not settings.DesktopGlare, bloomOff:=Not settings.DesktopBloom, note:=effectsNote, colourOff:=Not settings.DesktopColourFilter)
             For Each pair In post.Files
                 changes.Add(pair.Key, pair.Value)
             Next

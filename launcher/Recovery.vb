@@ -24,8 +24,9 @@ Public Class RecoveryJournal
     ' Schema 8: how many session action maps actionMapPaths.xml lists (approved transform).
     <System.Text.Json.Serialization.JsonIgnore(Condition:=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)>
     Public Property ActionMaps As Integer?
-    ' Schema 11: the post-processing edits postprocess\effects.xml was prepared with (PostEffects.Order, in that order;
-    ' approved transform), and the schema the session's other targets follow (0 when there are none).
+    ' Schema 11: the post-processing edits the session was prepared with (PostEffects.Order, in that order; approved
+    ' transform of postprocess\effects.xml, bloom's track files and the colour palettes), and the schema the session's
+    ' other targets follow (0 when there are none).
     <System.Text.Json.Serialization.JsonIgnore(Condition:=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)>
     Public Property Effects As List(Of String)
     <System.Text.Json.Serialization.JsonIgnore(Condition:=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)>
@@ -85,6 +86,7 @@ Public Class OwnedFileTransaction
             Case MotionBlur.Target : Return MotionBlur.EffectsPath(context)
             Case PostEffects.TrackTarget : Return PostEffects.TrackPath(context)
             Case PostEffects.NightTarget : Return PostEffects.NightPath(context)
+            Case PostEffects.PaletteTarget : Return ColourFilter.PalettePath(context)
             Case SessionActionMaps.PathsTarget : Return SessionActionMaps.PathsPath(context)
             Case Else : Throw New IOException("Unknown recovery target. The journal was preserved.")
         End Select
@@ -95,16 +97,19 @@ Public Class OwnedFileTransaction
         context.RequireClosed()
         If Pending Then Throw New IOException("File recovery is pending. Restore original files first.")
         If changes.Count = 0 Then Return
-        ' Schema 11: post-processing edits beyond VR's motion blur (#3c6d6ffa): bloom and light streaks + lens flares, on
-        ' the monitor or in VR (postprocess\effects.xml with the edits listed, and with bloom the generic track files). The
-        ' journal records the edits and the schema the session's other targets follow; older launchers refuse it.
-        Dim effectKeys = changes.Keys.Where(Function(key) key = MotionBlur.Target OrElse PostEffects.IsBloomTarget(key)).ToArray()
+        ' Schema 11: post-processing edits beyond VR's motion blur (#3c6d6ffa, #24f76866): bloom, light streaks + lens
+        ' flares and the colour filter, on the monitor or in VR (postprocess\effects.xml with the edits listed, with bloom
+        ' the generic track files, with the colour filter the palettes). The journal records the edits and the schema the
+        ' session's other targets follow; older launchers refuse it.
+        Dim effectKeys = changes.Keys.Where(AddressOf PostEffects.IsEffectTarget).ToArray()
         Dim edits As IReadOnlyList(Of String) = If(effects, If(experimental AndAlso changes.ContainsKey(MotionBlur.Target), {PostEffects.MotionBlurEdit}, Array.Empty(Of String)()))
         Dim extended = effectKeys.Length > 0 AndAlso Not (experimental AndAlso edits.SequenceEqual({PostEffects.MotionBlurEdit}) AndAlso Not effectKeys.Any(AddressOf PostEffects.IsBloomTarget))
         If extended Then
             If Not PostEffects.ValidEdits(edits) Then Throw New IOException("Unknown post-processing edits.")
             If edits.Contains(PostEffects.MotionBlurEdit) AndAlso Not experimental Then Throw New IOException("Motion blur changes belong to a VR session.")
             If effectKeys.Any(AddressOf PostEffects.IsBloomTarget) AndAlso Not edits.Contains(PostEffects.BloomEdit) Then Throw New IOException("The generic track effect files change only with bloom off.")
+            If effectKeys.Contains(PostEffects.PaletteTarget) AndAlso Not edits.Contains(PostEffects.ColourEdit) Then Throw New IOException("The colour palettes change only with the colour filter off.")
+            If effectKeys.Contains(MotionBlur.Target) AndAlso edits.All(Function(edit) edit = PostEffects.ColourEdit) Then Throw New IOException("The effects file changes only with an effect off.")
         End If
         Dim baseChanges As IReadOnlyDictionary(Of String, Byte()) = If(extended, changes.Where(Function(pair) Not effectKeys.Contains(pair.Key)).ToDictionary(Function(pair) pair.Key, Function(pair) pair.Value), changes)
         Dim hasStartup = baseChanges.ContainsKey("startup")
@@ -239,6 +244,9 @@ Public Class OwnedFileTransaction
             Case PostEffects.TrackTarget, PostEffects.NightTarget
                 If journal.Schema <> 11 OrElse journal.Effects Is Nothing OrElse Not journal.Effects.Contains(PostEffects.BloomEdit) Then Throw New IOException("Unknown prepared session target.")
                 expected = PostEffects.DisableBloom(original)
+            Case PostEffects.PaletteTarget
+                If journal.Schema <> 11 OrElse journal.Effects Is Nothing OrElse Not journal.Effects.Contains(PostEffects.ColourEdit) Then Throw New IOException("Unknown prepared session target.")
+                expected = ColourFilter.Neutral(original)
             Case SessionActionMaps.PathsTarget
                 If journal.ActionMaps Is Nothing Then Throw New IOException("Unknown prepared session target.")
                 expected = SessionActionMaps.ListMaps(original, journal.ActionMaps.Value)
@@ -259,9 +267,11 @@ Public Class OwnedFileTransaction
         ' checked as their own schema.
         Dim schema = journal.Schema
         If journal.Schema = 11 Then
-            Dim effectTargets = targets.Where(Function(target) target = MotionBlur.Target OrElse PostEffects.IsBloomTarget(target)).ToArray()
+            Dim effectTargets = targets.Where(AddressOf PostEffects.IsEffectTarget).ToArray()
             If journal.Effects Is Nothing OrElse Not PostEffects.ValidEdits(journal.Effects) OrElse journal.BaseSchema Is Nothing OrElse Not {0, 2, 3, 4, 5, 6, 8, 9, 10}.Contains(journal.BaseSchema.Value) OrElse
-               effectTargets.Length = 0 OrElse (effectTargets.Any(AddressOf PostEffects.IsBloomTarget) AndAlso Not journal.Effects.Contains(PostEffects.BloomEdit)) Then Throw New IOException("Invalid post-processing recovery journal. Backups were preserved.")
+               effectTargets.Length = 0 OrElse (effectTargets.Any(AddressOf PostEffects.IsBloomTarget) AndAlso Not journal.Effects.Contains(PostEffects.BloomEdit)) OrElse
+               (effectTargets.Contains(PostEffects.PaletteTarget) AndAlso Not journal.Effects.Contains(PostEffects.ColourEdit)) OrElse
+               (effectTargets.Contains(MotionBlur.Target) AndAlso journal.Effects.All(Function(edit) edit = PostEffects.ColourEdit)) Then Throw New IOException("Invalid post-processing recovery journal. Backups were preserved.")
             targets = targets.Where(Function(target) Not effectTargets.Contains(target)).ToArray()
             schema = journal.BaseSchema.Value
             ' Motion blur goes off only in a VR session; a session with nothing else has no other targets.
@@ -363,8 +373,8 @@ Public Class OwnedFileTransaction
     End Function
 
     Private Shared Function MaxEntries(journal As RecoveryJournal) As Integer
-        ' Schema 11: the other targets' own limit plus the effects file and the two generic track files.
-        If journal.Schema = 11 Then Return If(journal.BaseSchema.GetValueOrDefault() = 0, 0, MaxEntries(journal.BaseSchema.Value)) + 3
+        ' Schema 11: the other targets' own limit plus the effects file, the two generic track files and the palettes.
+        If journal.Schema = 11 Then Return If(journal.BaseSchema.GetValueOrDefault() = 0, 0, MaxEntries(journal.BaseSchema.Value)) + 4
         Return MaxEntries(journal.Schema)
     End Function
 

@@ -17,7 +17,8 @@ Public NotInheritable Class NewFeatures
     ' Control or section names, and the version that first ships them: each launcher setting, section, option or
     ' button added since LastStable, with NextVersion at the time it was added. Empty right after a Stable release.
     Private Shared ReadOnly Since As New Dictionary(Of String, String)(StringComparer.Ordinal) From {
-        {"DesktopBloom", NextVersion}, {"DesktopGlare", NextVersion}, {"VrBloom", NextVersion}, {"VrGlare", NextVersion}}
+        {"DesktopBloom", NextVersion}, {"DesktopGlare", NextVersion}, {"VrBloom", NextVersion}, {"VrGlare", NextVersion},
+        {"DesktopColourFilter", NextVersion}, {"VrColourFilter", NextVersion}}
     Private Shared ReadOnly marked As New ConditionalWeakTable(Of Control, Object)
 
     Private Sub New()

@@ -14,15 +14,20 @@ Imports System.Text.RegularExpressions
 ' the changed elements at them, so every other byte stays as shipped; zero values keep their bytes, and applying
 ' an edit twice gives the same bytes. A session applies the edits in a fixed order (motion blur, then light streaks
 ' and lens flares, then bloom), and recovery accepts only that exact result of the recorded original.
+' - Colour filter (#24f76866; Wrench's tools/colour_filter.py, docs/research/colour-filter.md): the green/cyan tint of
+'   each track's colour palette, in postprocess\palettes.pssg (ColourFilter), not in an effects file.
 Public NotInheritable Class PostEffects
     Public Const MotionBlurEdit As String = "motionblur"
     Public Const GlareEdit As String = "glare"
     Public Const BloomEdit As String = "bloom"
-    ' The edits in the order a session applies them.
-    Public Shared ReadOnly Order As String() = {MotionBlurEdit, GlareEdit, BloomEdit}
+    Public Const ColourEdit As String = "colour"
+    ' The edits in the order a session applies them; the colour filter is the only one outside the effects file.
+    Public Shared ReadOnly Order As String() = {MotionBlurEdit, GlareEdit, BloomEdit, ColourEdit}
     ' Bloom's two generic track files (journal targets; postprocess\effects.xml is MotionBlur.Target).
     Public Const TrackTarget As String = "bloom-track"
     Public Const NightTarget As String = "bloom-night"
+    ' The colour filter's palettes (postprocess\palettes.pssg).
+    Public Const PaletteTarget As String = "colour-palettes"
     Private Const Zero As String = "0.000000"
     Private Const BloomGroup As String = "BloomFromDsX4"
     Private Shared ReadOnly BloomMixes As String() = {"mixMedium", "mixLarge", "mixHuge", "mixStreak"}
@@ -48,6 +53,11 @@ Public NotInheritable Class PostEffects
         Return target = TrackTarget OrElse target = NightTarget
     End Function
 
+    ' Every file a post-processing edit can change: the effects file, bloom's track files and the colour palettes.
+    Public Shared Function IsEffectTarget(target As String) As Boolean
+        Return target = MotionBlur.Target OrElse IsBloomTarget(target) OrElse target = PaletteTarget
+    End Function
+
     ' Whether a list of edits is a valid, non-empty selection in the session's order.
     Public Shared Function ValidEdits(edits As IReadOnlyList(Of String)) As Boolean
         If edits Is Nothing OrElse edits.Count = 0 Then Return False
@@ -55,7 +65,7 @@ Public NotInheritable Class PostEffects
         Return positions.All(Function(position) position >= 0) AndAlso positions.Zip(positions.Skip(1), Function(a, b) a < b).All(Function(ordered) ordered)
     End Function
 
-    ' The chosen edits of postprocess\effects.xml, applied in the session's order.
+    ' The chosen edits of postprocess\effects.xml, applied in the session's order (the colour filter isn't in it).
     Public Shared Function Apply(data As Byte(), edits As IReadOnlyList(Of String)) As Byte()
         If Not ValidEdits(edits) Then Throw New IOException("Unknown post-processing edits.")
         Dim result = data
@@ -64,6 +74,7 @@ Public NotInheritable Class PostEffects
                 Case MotionBlurEdit : result = MotionBlur.Disable(result)
                 Case GlareEdit : result = DisableGlare(result)
                 Case BloomEdit : result = DisableBloom(result)
+                Case ColourEdit ' postprocess\palettes.pssg (ColourFilter)
             End Select
         Next
         Return result
@@ -176,20 +187,23 @@ Public NotInheritable Class PostEffects
         Return Strict.GetBytes(result)
     End Function
 
-    ' A session's post-processing changes: postprocess\effects.xml with the chosen edits (MotionBlur.Target) and,
-    ' with bloom off, the generic track files. A file that is missing, unusable or already as wanted is left out;
-    ' note says what stays on. Edits: the edits the effects file was prepared with (the journal records them).
-    Public Shared Function SessionChanges(context As InstallContext, motionBlurOff As Boolean, glareOff As Boolean, bloomOff As Boolean, ByRef note As String) As (Files As Dictionary(Of String, Byte()), Edits As String())
+    ' A session's post-processing changes: postprocess\effects.xml with the chosen edits (MotionBlur.Target), with
+    ' bloom off the generic track files, and with the colour filter off its palettes. A file that is missing, unusable
+    ' or already as wanted is left out; note says what stays on. Edits: the chosen edits (the journal records them).
+    Public Shared Function SessionChanges(context As InstallContext, motionBlurOff As Boolean, glareOff As Boolean, bloomOff As Boolean, ByRef note As String, Optional colourOff As Boolean = False) As (Files As Dictionary(Of String, Byte()), Edits As String())
         note = ""
         Dim files As New Dictionary(Of String, Byte())
-        Dim chosen = Order.Where(Function(edit) (edit = MotionBlurEdit AndAlso motionBlurOff) OrElse (edit = GlareEdit AndAlso glareOff) OrElse (edit = BloomEdit AndAlso bloomOff)).ToArray()
+        Dim chosen = Order.Where(Function(edit) (edit = MotionBlurEdit AndAlso motionBlurOff) OrElse (edit = GlareEdit AndAlso glareOff) OrElse (edit = BloomEdit AndAlso bloomOff) OrElse (edit = ColourEdit AndAlso colourOff)).ToArray()
         If chosen.Length = 0 Then Return (files, chosen)
         Dim kept As New List(Of String)
-        Dim effects = Changed(MotionBlur.EffectsPath(context), Function(original) Apply(original, chosen))
-        If effects.Usable Then
-            If effects.Data IsNot Nothing Then files.Add(MotionBlur.Target, effects.Data)
-        Else
-            kept.Add(String.Join(", ", chosen.Select(AddressOf Describe)) & " (postprocess\effects.xml)")
+        Dim effectEdits = chosen.Where(Function(edit) edit <> ColourEdit).ToArray()
+        If effectEdits.Length > 0 Then
+            Dim effects = Changed(MotionBlur.EffectsPath(context), Function(original) Apply(original, effectEdits))
+            If effects.Usable Then
+                If effects.Data IsNot Nothing Then files.Add(MotionBlur.Target, effects.Data)
+            Else
+                kept.Add(String.Join(", ", effectEdits.Select(AddressOf Describe)) & " (postprocess\effects.xml)")
+            End If
         End If
         If bloomOff Then
             For Each item In {(TrackTarget, TrackPath(context), "tracks\generic\effects.xml"), (NightTarget, NightPath(context), "tracks\generic\night_effects.xml")}
@@ -201,19 +215,27 @@ Public NotInheritable Class PostEffects
                 End If
             Next
         End If
+        If colourOff Then
+            Dim palettes = Changed(ColourFilter.PalettePath(context), AddressOf ColourFilter.Neutral, ColourFilter.MaximumSize)
+            If Not palettes.Usable Then
+                kept.Add("the colour filter (postprocess\palettes.pssg)")
+            ElseIf palettes.Data IsNot Nothing Then
+                files.Add(PaletteTarget, palettes.Data)
+            End If
+        End If
         If kept.Count > 0 Then note = "DiRT 3's effect files are missing or not in the expected format, so these stay on: " & String.Join("; ", kept) & "."
         Return (files, chosen)
     End Function
 
     Private Shared Function Describe(edit As String) As String
-        Return If(edit = MotionBlurEdit, "motion blur", If(edit = GlareEdit, "light streaks and lens flares", "bloom"))
+        Return If(edit = MotionBlurEdit, "motion blur", If(edit = GlareEdit, "light streaks and lens flares", If(edit = ColourEdit, "the colour filter", "bloom")))
     End Function
 
     ' The changed bytes of one file (Nothing when nothing changes), or not usable when it is missing or unexpected.
-    Private Shared Function Changed(target As String, transform As Func(Of Byte(), Byte())) As (Usable As Boolean, Data As Byte())
+    Private Shared Function Changed(target As String, transform As Func(Of Byte(), Byte()), Optional maximumSize As Long = 4 * 1024 * 1024) As (Usable As Boolean, Data As Byte())
         Try
             SafeFiles.NoLinks(target)
-            If Not File.Exists(target) OrElse New FileInfo(target).Length > 4 * 1024 * 1024 Then Return (False, Nothing)
+            If Not File.Exists(target) OrElse New FileInfo(target).Length > maximumSize Then Return (False, Nothing)
             Dim original = File.ReadAllBytes(target)
             Dim result = transform(original)
             Return (True, If(result.SequenceEqual(original), Nothing, result))
