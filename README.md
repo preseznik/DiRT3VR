@@ -11,6 +11,10 @@ stereoscopic VR and head tracking, and direct practice, driving controls and
 seat positions on the monitor and in VR. In VR, menus, loading screens and
 movies use a virtual screen.
 
+**Controls → Seat → Cockpit steering-wheel shake → Off (Experimental)**
+removes the game's artificial wheel twitch on the monitor and in VR. It starts
+unchecked; save and relaunch to apply.
+
 Tested with a **Quest 3 through Virtual Desktop (VDXR) and SteamVR**, an Xbox
 controller and a Logitech G920. Other headsets and OpenXR runtimes need more
 testing.
