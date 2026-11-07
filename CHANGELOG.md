@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Cockpit steering-wheel shake** (#97f9c211): new **Controls → Seat → Cockpit steering-wheel shake → Off (Experimental)** removes the generated steering offset used by the wheel and hand animation, in desktop and VR. It starts unchecked; save and relaunch to apply. The original update still runs, preserving its timer, random sequence and raw steering value. Runtime visual and physical-wheel confirmation is pending.
 - **VR startup diagnostics** (#433c8fe0): record expected, recommended and maximum sizes for both eyes, plus which comparison failed, when checking the headset resolution. This helps diagnose a SteamVR session falling back to the monitor; the resolution safety check is unchanged.
 - **SimHub telemetry compatibility** (#3ca8fab0): accept the verified SimHub telemetry-patched 2019 Steam executable and its matching helper DLL, in both the launcher and native renderer. The patch changes only the Winsock import name; unknown executable/helper changes are still refused. Existing SimHub files remain the installation's baseline. VR with haptics still needs headset and SimHub confirmation.
 

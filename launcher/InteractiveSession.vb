@@ -68,6 +68,7 @@ Public Class InteractiveSession
         If flatViews <> "" Then start.Environment("DIRT3VR_FLAT_VIEWS") = flatViews Else start.Environment.Remove("DIRT3VR_FLAT_VIEWS")
         ' Anisotropic filtering (#15714dd2, Wrench's contract): only a choice other than the game's.
         Anisotropy.Configure(start, settings.VrAnisotropy)
+        Session.ConfigureSteeringShake(start, settings)
         ' The VR field of view (#16a86c75, #47d16d40; Lens's contract): only a share under 100% is passed.
         For Each item In {("DIRT3VR_VR_FOV_WIDTH", settings.VrFovWidth()), ("DIRT3VR_VR_FOV_HEIGHT", settings.VrFovHeight())}
             If item.Item2 < 100 Then

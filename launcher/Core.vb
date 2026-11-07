@@ -242,6 +242,8 @@ Public Class LauncherSettings
     Public Property CockpitSteady As Boolean = True
     Public Property CockpitHideDriver As Boolean
     Public Property CockpitHideCoDriver As Boolean
+    ' Visual steering-wheel rumble only, in desktop and VR cockpit animation (#97f9c211).
+    Public Property CockpitSteeringShakeOff As Boolean = False
     ' The cockpit field of view on the monitor (#b330cc4f): degrees added to each car's own, 0 = DiRT 3's.
     ' Launch writes it into the cars' camera files for the session; VR uses the headset's own field of view.
     Public Property DesktopFov As Integer

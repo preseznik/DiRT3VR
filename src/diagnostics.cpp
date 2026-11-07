@@ -10,6 +10,7 @@
 #include "desktop_seat.h"
 #include "anisotropic_filter.h"
 #include "cockpit_start.h"
+#include "steering_shake.h"
 #if defined(DIRT3VR_RESEARCH_PATCHES)
 #include "research_patch.h"
 #endif
@@ -308,6 +309,7 @@ void ObserveCreation(HRESULT result, ID3D11Device* device, IDXGISwapChain* chain
         Initialize();
         auto& state = GetState();
         if(state.supported && backgroundplay::Requested()) backgroundplay::Install(Log);
+        if(state.supported && steeringshake::Requested()) steeringshake::Install(Log);
         if(state.supported && directpractice::Requested()) directpractice::Install(Log);
         if(state.supported && directpractice::ReturnRequested()) directpractice::InstallReturn(Log);
         if(state.supported && directpractice::RequestedDifficulty()>=0) directpractice::InstallDifficulty(Log);

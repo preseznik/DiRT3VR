@@ -50,6 +50,7 @@ Public Class MainForm
     Private seatMenuDevice As RecenterDeviceBinding
     Private seatMenuReader As SeatMenuWatcher
     Private ReadOnly seatMenuDesktop As New CheckBox With {.Name = "SeatMenuOnDesktop", .Text = "Seat menu on the monitor too (Launch)", .AutoSize = True}
+    Private ReadOnly cockpitSteeringShakeOff As New CheckBox With {.Name = "CockpitSteeringShakeOff", .Text = "Off (Experimental)", .AccessibleName = "Turn off cockpit steering-wheel shake (Experimental)", .AutoSize = True}
     Private ReadOnly experimental As New CheckBox With {.Name = "ExperimentalVR", .Text = "Enable experimental VR", .AutoSize = True}
     Private ReadOnly tabs As New ModernTabs With {.Name = "LauncherTabs", .Dock = DockStyle.Fill}
     ' Both can be selected and copied, for pasting into reports.
@@ -716,6 +717,8 @@ Public Class MainForm
         Dim seat = Section(content, "Seat")
         seat.Controls.Add(Info("Moves your eye point in the cockpit, per car, for example to match the headset to your seat and rig: sideways (+ left), height and forward. Launch VR applies it, and Launch too when Also when playing on the monitor is on: DiRT3VR writes the car's camera file for the session and restores it after exit."))
         seatPicker = New SeatPicker(seat)
+        Field(seat, "Cockpit steering-wheel shake", cockpitSteeringShakeOff)
+        tips.SetToolTip(cockpitSteeringShakeOff, "Try removing DiRT 3's artificial steering-wheel twitch in desktop and VR cockpit animation. Keeps the original steering range, handling and force feedback. Unchecked keeps the game's animation. Save and relaunch to apply.")
         Dim menuKeyRow As New FlowLayoutPanel With {.Name = "SeatMenuKeyRow", .AutoSize = True, .WrapContents = True, .Margin = New Padding(0)}
         menuKeyRow.Controls.AddRange({seatMenuKeyButton, noSeatMenuKey})
         Field(seat, "Seat menu key", menuKeyRow)
@@ -1054,6 +1057,7 @@ Public Class MainForm
         seatMenuKey = settings.SeatMenuKey : seatMenuModifiers = settings.SeatMenuModifiers : seatMenuDevice = settings.SeatMenuButton : capturingSeatMenu = False : UpdateSeatMenuLabels()
         toggleKey = settings.ToggleVrKey : toggleModifiers = settings.ToggleVrModifiers : toggleDevice = settings.ToggleVrDevice : capturingToggle = False : UpdateToggleLabels()
         seatMenuDesktop.Checked = settings.SeatMenuOnDesktop
+        cockpitSteeringShakeOff.Checked = settings.CockpitSteeringShakeOff
         recenterKeepLevel.Checked = settings.RecenterKeepLevel
         renderScale.Value = settings.VrRenderScale
         hudDistance.Value = CInt(settings.HudDistance * 2D) : hudFollow.Checked = settings.HudFollowView
@@ -1104,7 +1108,7 @@ Public Class MainForm
             .DirectGearbox = directGearbox, .DirectAbs = directPicker.AssistStates.Abs, .DirectStability = directPicker.AssistStates.Stability,
             .DirectCornerBraking = directPicker.AssistStates.CornerBraking, .DirectThrottle = directPicker.AssistStates.Throttle, .DirectSteering = directPicker.AssistStates.Steering,
             .SeatOffsets = seatPicker.Offsets, .SeatSameForAll = seatPicker.SameForAll, .SeatAllCars = seatPicker.AllCars, .StartInCockpit = seatPicker.StartInCockpit, .SeatOnDesktop = seatPicker.OnDesktop,
-            .CockpitSteady = seatPicker.SteadyCamera, .CockpitHideDriver = seatPicker.HidesDriver, .CockpitHideCoDriver = seatPicker.HidesCoDriver, .DesktopFov = seatPicker.DesktopFieldOfView}
+            .CockpitSteady = seatPicker.SteadyCamera, .CockpitHideDriver = seatPicker.HidesDriver, .CockpitHideCoDriver = seatPicker.HidesCoDriver, .CockpitSteeringShakeOff = cockpitSteeringShakeOff.Checked, .DesktopFov = seatPicker.DesktopFieldOfView}
     End Function
 
     Private Sub RememberSavedSettings()
@@ -1504,6 +1508,7 @@ Public Class MainForm
                 "Restore graphics defaults sets the desktop, anisotropic filtering and quality choices to Use game setting, VR anti-aliasing off, the VR field of view and the render scale to 100%, and bloom, light streaks + lens flares and the colour filter on. It asks first and changes only the controls until Save settings or Launch."),
             New HelpTopic(HelpControls,
                 "Use your existing keyboard, controller or wheel bindings in DiRT 3." & vbCrLf & vbCrLf &
+                "Controls → Seat → Cockpit steering-wheel shake → Off (Experimental) removes the game's artificial wheel twitch in desktop and VR cockpit animation. Unchecked keeps the game's animation. It keeps the original steering range, handling and force feedback. Save and relaunch to apply. Launch on the monitor installs DiRT3VR's renderer for the session and removes it after exit." & vbCrLf & vbCrLf &
                 "Driving controls… binds your wheel, pedals, shifter, controller and keys for direct practice, with Launch and Launch VR. A direct start doesn't load your DiRT 3 profile, so DiRT 3 would otherwise use its default preset for each device. It also skips the Press Start screen, where DiRT 3 normally picks your controller, so DiRT3VR gives the player one device: the one you pick under Drives with, else the device you bound steering to (or the one with most bindings), since DiRT 3 drives with one device per player; without bindings here DiRT 3 picks the keyboard. Gearbox chooses automatic gears (DiRT 3's default), sequential, H-pattern or H-pattern with clutch for direct practice; Save keeps it with the bindings. The Binding wizard asks for the essentials (steering, pedals, clutch, handbrake, gear up and down, change view, look back and pause), then offers the H-pattern shifter, flashback and replays, menus, and look and horn; Skip keeps an action's current binding, and only finished groups are kept. Key… and Device… rebind one action, Calibrate… sets an axis's direction, dead zone and saturation, Wheel rotation… sets how far you turn your wheel for full steering lock (your wheel's rotation and the rotation you want in DiRT 3 set the steering saturation), and Xbox preset loads DiRT 3's own Xbox controller layout. Presets save and load whole binding sets. For each bound device the session writes a complete action map (DiRT 3's own map for that device with your bindings in place) and lists it in actionmap\actionMapPaths.xml; both are removed after exit, like DiRT3VR's other temporary changes. Two identical devices share one map, as DiRT 3 tells devices apart by name." & vbCrLf & vbCrLf &
                 "Live input and force feedback shows your wheel, pedals, shifter and controllers as Windows reports them and tests rumble or force feedback on each one. It reads devices without taking them over and changes no game or Windows setting. Close DiRT 3 before testing force feedback." & vbCrLf & vbCrLf &
                 recenter & " recenters the headset view while DiRT 3 is in front. To change it, click the key under VR and seat controls and press another key, optionally with Ctrl, Alt or Shift; Esc cancels. DiRT 3 still receives the key, so pick one the game doesn't use. Alt+Tab, Alt+F4 and Ctrl+Alt+Delete are reserved." & vbCrLf & vbCrLf &

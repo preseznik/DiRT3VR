@@ -37,10 +37,10 @@ Public NotInheritable Class DesktopStartupSession
                Not settings.DesktopBloom OrElse Not settings.DesktopGlare OrElse Not settings.DesktopColourFilter
     End Function
 
-    ' Whether the session installs DiRT3VR's renderer: direct practice, the seat menu on the monitor, or
-    ' anisotropic filtering other than the game's.
+    ' Whether the session installs DiRT3VR's renderer: direct practice, the seat menu on the monitor,
+    ' anisotropic filtering other than the game's, or the steering animation correction.
     Public Shared Function NeedsRenderer(settings As LauncherSettings) As Boolean
-        Return settings.LaunchMode = "direct" OrElse SeatChannel.OnDesktop(settings) OrElse settings.DesktopAnisotropy <> 0
+        Return settings.LaunchMode = "direct" OrElse SeatChannel.OnDesktop(settings) OrElse settings.DesktopAnisotropy <> 0 OrElse settings.CockpitSteeringShakeOff
     End Function
 
     ' The temporary changes: the startup definitions and/or the direct practice config plus the renderer,
@@ -83,11 +83,12 @@ Public NotInheritable Class DesktopStartupSession
             start.Environment.Remove(SeatChannel.EnvironmentName)
         End If
         Anisotropy.Configure(start, settings.DesktopAnisotropy)
-        If settings.LaunchMode <> "direct" AndAlso seatChannelName Is Nothing AndAlso settings.DesktopAnisotropy = 0 Then Return start
+        Session.ConfigureSteeringShake(start, settings)
+        If settings.LaunchMode <> "direct" AndAlso seatChannelName Is Nothing AndAlso settings.DesktopAnisotropy = 0 AndAlso Not settings.CockpitSteeringShakeOff Then Return start
         If Not Path.IsPathFullyQualified(logDirectory) Then Throw New IOException("The session log path must be absolute.")
         start.Environment("DIRT3VR_LOG_DIR") = logDirectory
         ' The renderer runs the monitor menu, like direct practice's lap count, from its Present hook; anisotropic
-        ' filtering needs it too.
+        ' filtering and the steering animation correction need it too.
         start.Environment("DIRT3VR_DIAGNOSTICS") = "1"
         If settings.LaunchMode <> "direct" Then Return start
         DirectPractice.AddStart(start, settings, directDevices)

@@ -10,9 +10,15 @@ Public Module Session
         Return start
     End Function
 
+    Public Sub ConfigureSteeringShake(start As ProcessStartInfo, settings As LauncherSettings)
+        start.Environment.Remove("DIRT3VR_STEERING_SHAKE_OFF")
+        If settings.CockpitSteeringShakeOff Then start.Environment("DIRT3VR_STEERING_SHAKE_OFF") = "1"
+    End Sub
+
     Public Function LaunchDesktop(context As InstallContext, settings As LauncherSettings, Optional monitor As Drawing.Size = Nothing) As Process
         If settings.SkipStartupMovies Then Throw New IOException("Startup logo skipping requires the managed startup session.")
         If settings.LaunchMode = "direct" Then Throw New IOException("Direct practice requires the managed desktop session.")
+        If settings.CockpitSteeringShakeOff Then Throw New IOException("Cockpit steering-wheel shake requires the managed desktop session.")
         Using lease = InteractiveSession.AcquireLease(context)
         context.RequireClosed() : context.ValidateGame()
         If New OwnedFileTransaction(context).Pending Then Throw New IOException("File recovery is pending. Choose Restore original files before launching.")
