@@ -132,6 +132,14 @@ bool XrRuntime::InitializeResources(ID3D11Device* device,float scale,uint32_t ex
     std::array<XrViewConfigurationView,2> views{{{XR_TYPE_VIEW_CONFIGURATION_VIEW},{XR_TYPE_VIEW_CONFIGURATION_VIEW}}};
     if(!Check(xrEnumerateViewConfigurationViews(instance_,system_,XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,2,&count,views.data()),"view properties") || count!=2) return false;
     if(expectedWidth) {
+        for(unsigned i=0;i<views.size();++i) {
+            const auto& view=views[i];
+            Report("XR headset size eye=%u expected=%ux%u recommended=%ux%u maximum=%ux%u recommendation_match=%d maximum_fits=%d",
+                i,expectedWidth,expectedHeight,view.recommendedImageRectWidth,view.recommendedImageRectHeight,
+                view.maxImageRectWidth,view.maxImageRectHeight,
+                int(view.recommendedImageRectWidth==expectedWidth && view.recommendedImageRectHeight==expectedHeight),
+                int(view.maxImageRectWidth>=expectedWidth && view.maxImageRectHeight>=expectedHeight));
+        }
         for(const auto& view:views) {
             if(view.recommendedImageRectWidth!=expectedWidth || view.recommendedImageRectHeight!=expectedHeight ||
                view.maxImageRectWidth<expectedWidth || view.maxImageRectHeight<expectedHeight) {
