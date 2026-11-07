@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **VR startup diagnostics** (#433c8fe0): record expected, recommended and maximum sizes for both eyes, plus which comparison failed, when checking the headset resolution. This helps diagnose a SteamVR session falling back to the monitor; the resolution safety check is unchanged.
 - **SimHub telemetry compatibility** (#3ca8fab0): accept the verified SimHub telemetry-patched 2019 Steam executable and its matching helper DLL, in both the launcher and native renderer. The patch changes only the Winsock import name; unknown executable/helper changes are still refused. Existing SimHub files remain the installation's baseline. VR with haptics still needs headset and SimHub confirmation.
 
 ## 0.1.25 — cleaner colours and Off effect switches (Experimental)
