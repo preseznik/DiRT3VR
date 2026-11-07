@@ -20,8 +20,11 @@ This mod will remain free forever. If you'd like to support the work, you can [s
 ## Requirements
 
 - Windows 10 or 11 (64-bit) and a PC that runs DiRT 3.
-- **Steam DiRT 3 Complete Edition**. Other editions and modified game files
-  aren't supported.
+- **Steam DiRT 3 Complete Edition** (the current 2019 Steam build). The verified
+  [SimHub telemetry fix](https://www.simhubdash.com/downloads/Dirt3TelemetryFixPatcher.zip)
+  is also accepted, with its matching helper DLL beside the game. This enables
+  testing VR with SimHub haptics; headset and haptics confirmation is pending.
+  Other editions and executable modifications aren't supported.
 - For VR: your headset ready in Virtual Desktop (VDXR), SteamVR or another
   OpenXR runtime with 32-bit support. Playing on the monitor needs no headset.
 - A keyboard, controller, or wheel and pedals. Motion controllers aren't used.

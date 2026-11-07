@@ -90,6 +90,8 @@ End Module
 
 Public Class InstallContext
     Public Const SupportedHash As String = "c502b495bb34a097440756769c80dcb36a79b618943f739e20d591d54171ff98"
+    Public Const SimHubHash As String = "b2478172092f402b46b3246b1dd9108b1f8bdf999677f0c8ec39ae7c6ba5c6a7"
+    Public Const SimHubDllHash As String = "43e2cf26a8983255c1220fb356a1fe2b4535faad3e8040ea402133e32244462e"
     Public Const SteamAppId As String = "321040"
     Public ReadOnly GameRoot As String
     Public ReadOnly UserRoot As String
@@ -120,7 +122,7 @@ Public Class InstallContext
         End Get
     End Property
 
-    Public Const UnsupportedGame As String = "This dirt3_game.exe is not supported: DiRT3VR works only with the current Steam version of DiRT 3 Complete Edition (the 2019 update). If you have it on Steam, open DiRT 3 Complete Edition → Properties → Installed Files → Verify integrity of game files, then try again. No game files were changed."
+    Public Const UnsupportedGame As String = "This dirt3_game.exe is not supported: DiRT3VR needs the current Steam version of DiRT 3 Complete Edition (the 2019 update), with or without the verified SimHub telemetry fix. If you have it on Steam, open DiRT 3 Complete Edition → Properties → Installed Files → Verify integrity of game files, then try again. No game files were changed."
 
     Public Sub ValidateGame()
         SafeFiles.NoLinks(GameRoot)
@@ -129,7 +131,15 @@ Public Class InstallContext
         If Not File.Exists(executable) Then Throw New IOException("dirt3_game.exe was not found. Select the DiRT 3 Complete Edition game folder.")
         ' An older DiRT 3 build (the 2015 one, still version 1.2.0.0) has the same name but other code addresses, so the
         ' message says how to get the supported 2019 Steam build (iztok, 2026-11-04).
-        If SafeFiles.Hash(executable) <> SupportedHash Then Throw New IOException(UnsupportedGame)
+        Dim hash = SafeFiles.Hash(executable)
+        If hash = SupportedHash Then Return
+        If hash <> SimHubHash Then Throw New IOException(UnsupportedGame)
+        ' SimHub changes only the verified Winsock import name; all native code stays identical.
+        Dim shim = Path.Combine(GameRoot, "wsmock.dll")
+        SafeFiles.NoLinks(shim)
+        If Not File.Exists(shim) OrElse SafeFiles.Hash(shim) <> SimHubDllHash Then
+            Throw New IOException("This game has the SimHub telemetry patch, but its matching wsmock.dll is missing or different. Reapply the official DiRT 3 telemetry fix from SimHub, then try again. No game files were changed.")
+        End If
     End Sub
 
     ' The refusal names the processes it found (2026-11-06: a --launch restore refused once, about 9 s after the

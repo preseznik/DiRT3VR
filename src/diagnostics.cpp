@@ -32,6 +32,8 @@ namespace dirt3vr {
 namespace {
 using Microsoft::WRL::ComPtr;
 constexpr char SupportedSha256[] = "c502b495bb34a097440756769c80dcb36a79b618943f739e20d591d54171ff98";
+constexpr char SimHubSha256[] = "b2478172092f402b46b3246b1dd9108b1f8bdf999677f0c8ec39ae7c6ba5c6a7";
+constexpr char SimHubDllSha256[] = "43e2cf26a8983255c1220fb356a1fe2b4535faad3e8040ea402133e32244462e";
 struct State {
     std::mutex mutex;
     std::mutex logMutex;
@@ -94,6 +96,15 @@ void Initialize() noexcept {
             const bool pathValid = length && length < 32768;
             const auto hash = pathValid ? FileHash(hostPath) : std::string{};
             state.supported = hash == SupportedSha256;
+            if(hash == SimHubSha256) {
+                // Bind the import-only EXE variant to the verified shim actually loaded beside it.
+                wchar_t shimPath[32768]{};
+                const auto shim=GetModuleHandleW(L"wsmock.dll");
+                const auto shimLength=shim ? GetModuleFileNameW(shim,shimPath,32768) : 0;
+                const auto expected=std::filesystem::path(hostPath).parent_path()/L"wsmock.dll";
+                state.supported=shimLength && shimLength<32768 && _wcsicmp(expected.c_str(),shimPath)==0 &&
+                    FileHash(shimPath)==SimHubDllSha256;
+            }
 #if defined(DIRT3VR_TEST_FIXTURE)
             // Deliberately absent from the shipping binary. No environment value
             // can make a real game eligible for the synthetic fixture allowance.

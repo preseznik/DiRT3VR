@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **SimHub telemetry compatibility** (#3ca8fab0): accept the verified SimHub telemetry-patched 2019 Steam executable and its matching helper DLL, in both the launcher and native renderer. The patch changes only the Winsock import name; unknown executable/helper changes are still refused. Existing SimHub files remain the installation's baseline. VR with haptics still needs headset and SimHub confirmation.
+
 ## 0.1.25 — cleaner colours and Off effect switches (Experimental)
 
 - **Bloom**, **Light streaks and lens flares** and **Colour filter** now use **Off** checkboxes under **Graphics → Desktop** and **Graphics → VR rendering**. Check one to disable the effect; leave it unchecked to keep the effect on. All three are on by default, and existing saved choices keep their effect.
