@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.27 — launcher section tabs and cockpit options (Experimental)
+
 - **Launcher navigation** (#f7408bf5): Advanced view now groups options into section tabs. Launcher opens on Launch mode, Graphics on VR rendering, Controls on Driving controls, Settings on VR runtime, and Advanced on Implementation status. The Seat positions and Settings profiles shortcuts in Quick start open their sections directly.
 
 - **Cockpit controls** (#a54c23bf): move **Steady cockpit camera in VR** and **Cockpit steering-wheel shake** from **Controls → Seat** to **Graphics → VR rendering**. Steering-wheel shake **Off** now starts checked for new settings and Restore launcher defaults; existing saved choices and profiles keep their values.
