@@ -11,7 +11,7 @@ stereoscopic VR and head tracking, and direct practice, driving controls and
 seat positions on the monitor and in VR. In VR, menus, loading screens and
 movies use a virtual screen.
 
-**Controls → General → Cockpit steering-wheel shake → Off (Experimental)**
+**Graphics → VR rendering → Cockpit steering-wheel shake → Off (Experimental)**
 removes the game's artificial wheel twitch on the monitor and in VR. It starts
 checked by default; save and relaunch to apply. Existing saved choices are kept.
 

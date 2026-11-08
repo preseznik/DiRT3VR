@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Cockpit controls** (#a54c23bf): move **Steady cockpit camera in VR** and **Cockpit steering-wheel shake** from **Controls → Seat** to **Controls → General**. Steering-wheel shake **Off** now starts checked for new settings and Restore launcher defaults; existing saved choices and profiles keep their values.
+- **Cockpit controls** (#a54c23bf): move **Steady cockpit camera in VR** and **Cockpit steering-wheel shake** from **Controls → Seat** to **Graphics → VR rendering**. Steering-wheel shake **Off** now starts checked for new settings and Restore launcher defaults; existing saved choices and profiles keep their values.
 
 ## 0.1.26 — cockpit steering-wheel shake and SimHub compatibility (Experimental)
 
