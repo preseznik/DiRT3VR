@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Cockpit controls** (#a54c23bf): move **Steady cockpit camera in VR** and **Cockpit steering-wheel shake** from **Controls → Seat** to **Controls → General**. Steering-wheel shake **Off** now starts checked for new settings and Restore launcher defaults; existing saved choices and profiles keep their values.
+
 ## 0.1.26 — cockpit steering-wheel shake and SimHub compatibility (Experimental)
 
 - **Cockpit steering-wheel shake** (#97f9c211): new **Controls → Seat → Cockpit steering-wheel shake → Off (Experimental)** removes the generated steering offset used by the wheel and hand animation, in desktop and VR. It starts unchecked; save and relaunch to apply. The original update still runs, preserving its timer, random sequence and raw steering value. Desktop and SteamVR null-headset tests exercised suppression; the null-headset test also confirmed stereo submissions and requested XR shutdown. Physical-headset and wheel/FFB confirmation is pending.

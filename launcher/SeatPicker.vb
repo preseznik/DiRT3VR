@@ -48,7 +48,7 @@ Public NotInheritable Class SeatPicker
         End Function
     End Class
 
-    Public Sub New(parent As Control)
+    Public Sub New(parent As Control, Optional steadyCameraParent As Control = Nothing)
         For Each item In EventCatalog.Current.Cars.OrderBy(Function(value) value.Name, StringComparer.Ordinal)
             car.Items.Add(New CarItem(item, Me))
         Next
@@ -69,8 +69,9 @@ Public NotInheritable Class SeatPicker
         parent.Controls.Add(cockpitStart)
         parent.Controls.Add(cockpitNote)
         AddHandler cockpitStart.CheckedChanged, Sub() If Not updating Then RaiseEvent Changed()
-        parent.Controls.Add(steadyBox)
-        parent.Controls.Add(steadyNote)
+        Dim steadyParent = If(steadyCameraParent, parent)
+        steadyParent.Controls.Add(steadyBox)
+        steadyParent.Controls.Add(steadyNote)
         parent.Controls.Add(hideDriverBox)
         parent.Controls.Add(hideCoDriverBox)
         parent.Controls.Add(hideNote)
