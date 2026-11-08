@@ -78,18 +78,18 @@ Partial Public Class MainForm
         Borrow(recenterKeepLevel, comfort)
         Dim seats As New Button With {.Name = "SimpleSeats", .Text = "Seat positions…", .AutoSize = True}
         comfort.Controls.Add(seats)
-        AddHandler seats.Click, Sub() ShowAdvancedTab("Controls")
+        AddHandler seats.Click, Sub() ShowAdvancedTab("Controls", "Seat")
         Dim drivingShortcut As New Button With {.Name = "SimpleDrivingControls", .Text = "Driving controls…", .AutoSize = True}
         comfort.Controls.Add(drivingShortcut)
         AddHandler drivingShortcut.Click, Sub() OpenDrivingControls()
         Dim profiles As New Button With {.Name = "SimpleProfiles", .Text = "Settings profiles…", .AutoSize = True}
         comfort.Controls.Add(profiles)
-        AddHandler profiles.Click, Sub() ShowAdvancedTab("Settings")
+        AddHandler profiles.Click, Sub() ShowAdvancedTab("Settings", "Settings profiles")
         content.Controls.Add(Info("Advanced shows every option on separate tabs: graphics details, live input, VR runtime, profiles, defaults and diagnostics. Switching views keeps every choice and saves nothing."))
         content.Controls.Add(TopicLink(HelpViews))
         headers.AddRange(FindHeaders(quickPage))
         AddHandler viewPicker.ViewChanged, AddressOf ViewPickerChanged
-        tips.SetToolTip(viewPicker, "Simple shows the essential choices on one page; Advanced shows every option. Switching never changes or saves settings.")
+        tips.SetToolTip(viewPicker, "Simple shows the essential choices on one page; Advanced groups all options into section tabs. Switching never changes or saves settings.")
         AddHandler Disposed, Sub()
                                  For Each detached In fullPages.Append(quickPage)
                                      If detached.Parent Is Nothing Then detached.Dispose()
@@ -136,9 +136,13 @@ Partial Public Class MainForm
     End Function
 
     ' Switches to Advanced (after the confirmation) and opens one of its tabs.
-    Private Sub ShowAdvancedTab(title As String)
+    Private Sub ShowAdvancedTab(title As String, sectionTitle As String)
         viewPicker.Advanced = True
-        If Not SimpleViewShown Then tabs.SelectedTab = fullPages.Single(Function(candidate) candidate.Text = title)
+        If SimpleViewShown Then Return
+        Dim page = tabs.TabPages(title)
+        tabs.SelectedTab = page
+        Dim sections = page.Controls.OfType(Of ModernTabs)().Single()
+        sections.SelectedTab = sections.TabPages(sectionTitle)
     End Sub
 
     Private Sub ApplyView(advanced As Boolean)

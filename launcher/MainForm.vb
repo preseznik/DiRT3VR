@@ -329,15 +329,26 @@ Public Class MainForm
         state.FitWidth(width) : notice.FitWidth(width)
     End Sub
 
-    Private Function Page(title As String) As VerticalStack
-        Dim tabPage As New TabPage(title) With {.Padding = New Padding(16), .AutoScroll = True, .UseVisualStyleBackColor = False}
+    Private Function SectionTabs(title As String, topic As String) As ModernTabs
+        Dim page As New TabPage(title) With {.Name = title, .Padding = New Padding(8), .UseVisualStyleBackColor = False}
+        Dim sections As New ModernTabs With {.Name = title & "Sections", .AccessibleName = title & " sections", .Dock = DockStyle.Fill, .Multiline = True}
+        Dim help = TopicLink(topic)
+        help.Dock = DockStyle.Bottom
+        page.Controls.Add(sections)
+        page.Controls.Add(help)
+        tabs.TabPages.Add(page)
+        Return sections
+    End Function
+
+    Private Function SectionTab(sections As ModernTabs, title As String) As VerticalStack
+        Dim tabPage As New TabPage(title) With {.Name = title, .Padding = New Padding(16), .AutoScroll = True, .UseVisualStyleBackColor = False}
         Dim content = Stack()
-        tabPage.Controls.Add(content) : tabs.TabPages.Add(tabPage)
+        tabPage.Controls.Add(content) : sections.TabPages.Add(tabPage)
         AddHandler tabPage.SizeChanged, Sub()
                                          content.Width = Math.Max(1, tabPage.ClientSize.Width - tabPage.Padding.Horizontal - SystemInformation.VerticalScrollBarWidth)
                                          RefreshLabelWidths(content)
                                      End Sub
-        Return content
+        Return Section(content, title)
     End Function
 
     Private Shared Iterator Function FindHeaders(parent As Control) As IEnumerable(Of SectionHeader)
@@ -381,28 +392,24 @@ Public Class MainForm
     End Sub
 
     Private Sub BuildLauncher()
-        Dim content = Page("Launcher")
-        Dim columns As New ResponsiveColumns()
-        content.Controls.Add(columns)
-        Dim launch = Section(columns.First, "Launch mode")
+        Dim sections = SectionTabs("Launcher", HelpStart)
+        Dim launch = SectionTab(sections, "Launch mode")
         directPicker = New DirectPracticePicker(launch)
         launch.Controls.Add(Info("Direct practice starts DiRT 3 straight on the chosen route with your car, through DiRT 3's own benchmark start, without the menus. It works with Launch (on the monitor) and Launch VR; laps and up to 7 AI opponents apply to circuits, and after the finish DiRT 3 either closes by itself or returns to its menus, as you choose. Normal launch keeps DiRT 3's menus for careers, events and multiplayer."))
         launch.Controls.Add(TopicLink(HelpDirect))
         AddHandler directPicker.Changed, Sub() RefreshState()
-        Dim startup = Section(columns.First, "Startup")
+        Dim startup = SectionTab(sections, "Startup")
         startup.Controls.Add(skipStartupMovies)
         startup.Controls.Add(Info("Applies to Launch and Launch VR. Copyright and Press Start remain. DiRT3VR restores the original startup file when the game closes, also when you close this window (it stays in the notification area until then). Leave this option off for multiplayer until compatibility is checked."))
         startup.Controls.Add(TopicLink(HelpStartup))
-        Dim availability = Section(columns.Second, "VR availability")
+        Dim availability = SectionTab(sections, "VR availability")
         availability.Controls.Add(Info("Experimental VR works with VDXR, SteamVR or another OpenXR runtime when enabled in Advanced. All rendered 3D camera views use stereo and headset tracking, including cockpit, bonnet, bumper, chase and replay. Loading screens and movies use a virtual screen."))
         availability.Controls.Add(Info("Interactive play and camera transitions are still being validated. " & RuntimeCapabilities.SteamVrNote))
-        content.Controls.Add(TopicLink(HelpStart))
     End Sub
 
     Private Sub BuildGraphics()
-        Dim content = Page("Graphics")
-        Dim columns As New ResponsiveColumns() : content.Controls.Add(columns)
-        Dim desktopSettings = Section(columns.First, "Desktop")
+        Dim sections = SectionTabs("Graphics", HelpGraphics)
+        Dim desktopSettings = SectionTab(sections, "Desktop")
         desktopMode.Items.AddRange({"Use game setting", "Windowed", "Fullscreen", "Borderless"})
         desktopVSync.Items.AddRange({"Use game setting", "Off", "On"})
         Field(desktopSettings, "Display mode", desktopMode)
@@ -421,7 +428,7 @@ Public Class MainForm
         Field(desktopSettings, "Light streaks and lens flares", desktopGlare)
         Field(desktopSettings, "Colour filter", desktopColourFilter)
         desktopSettings.Controls.Add(Info("Tick Off to disable an effect; unchecked keeps it on, as in DiRT 3. Bloom is the glow around bright areas; light streaks and lens flares are the blue streak and the flares around the sun. The colour filter is the green or cyan tint DiRT 3 gives most tracks. Turned off, DiRT3VR edits DiRT 3's effect files for that session and puts them back after it closes."))
-        Dim vrSettings = Section(columns.Second, "VR rendering")
+        Dim vrSettings = SectionTab(sections, "VR rendering")
         vrSettings.Controls.Add(Info(ExperimentalFiles.ProfileDescription))
         Field(vrSettings, "VR render scale", renderScale)
         Field(vrSettings, "Anisotropic filtering", vrAnisotropy)
@@ -453,7 +460,7 @@ Public Class MainForm
         vrSettings.Controls.Add(lastSessionSummary)
         UpdateLastSession()
         vrSettings.Controls.Add(Info("Changing game graphics during VR can leave a recovery conflict; the launcher preserves your changes and the original backup."))
-        Dim hud = Section(columns.Second, "VR HUD")
+        Dim hud = SectionTab(sections, "VR HUD")
         Field(hud, "Distance", hudDistance)
         hud.Controls.Add(hudFollow)
         hud.Controls.Add(Info("The HUD and the menus show on a transparent panel in front of you, 2 m away by default. Nearer or farther keeps the panel the same size in your view, so only how far away it seems changes. Follow view keeps it in front of you as you turn your head; off, it stays where you last recentered. Applies on the next VR launch."))
@@ -461,19 +468,17 @@ Public Class MainForm
         hud.Controls.Add(perfFollow)
         hud.Controls.Add(Info("A small display with frames per second and GPU usage, below straight ahead (or in front of you with follows view). Every VR session also measures its FPS for the Last VR session line under VR rendering, with or without the display."))
         AddHandler perfDisplay.CheckedChanged, Sub() perfFollow.Enabled = perfDisplay.Checked
-        Dim flat = Section(columns.Second, "Flat screen in VR")
+        Dim flat = SectionTab(sections, "Flat screen in VR")
         flat.Controls.Add(Info("Every 3D view is in stereo. Tick a group to show it on the flat screen in front of you instead, as Toggle VR does; the cockpit view always stays 3D. Applies on the next VR launch."))
         flat.Controls.AddRange({flatCarViews, flatCinematic, flatMenus})
-        BuildQuality(content)
-        Field(content, "Game graphics file", graphicsPath)
-        content.Controls.Add(graphicsDefaultsButton)
-        content.Controls.Add(TopicLink(HelpGraphics))
+        BuildQuality(sections)
+        sections.SelectedTab = sections.TabPages("VR rendering")
         AddHandler graphicsDefaultsButton.Click, Sub() RestoreDefaults(graphicsOnly:=True)
     End Sub
 
     ' Quality: DiRT 3's own presets and options from the embedded catalog, separately for desktop and VR.
-    Private Sub BuildQuality(content As Control)
-        Dim quality = Section(content, "Quality")
+    Private Sub BuildQuality(sections As ModernTabs)
+        Dim quality = SectionTab(sections, "Quality")
         quality.Controls.Add(Info("Desktop: written into DiRT 3's graphics file at every launch (a backup is kept before it changes). Options on Use game setting stay as DiRT 3 has them; the others replace changes made in the game's own options menu on the next launch."))
         quality.Controls.Add(Info("VR: applied only while a VR session runs, together with DiRT3VR's other temporary changes, and undone when it ends. Options on Same as desktop use the desktop choice (or the game's setting)."))
         quality.Controls.Add(Info("These are DiRT 3's own presets and options (DirectX 11 values); Medium is the game's default."))
@@ -481,9 +486,10 @@ Public Class MainForm
         quick.Controls.AddRange({potatoPreset, vrBalancedPreset, recommendButton, undoPreset})
         quality.Controls.Add(quick)
         quality.Controls.Add(Info("Quick VR presets: Potato / Low-End sets VR quality to Ultra Low and VR render scale to 70%. VR Balanced keeps High's look with the crowd one step lower and leaves the render scale alone. Recommend for this PC tunes the VR render scale, or picks one of these presets, from your last VR session's measured frame rate when it ran the same VR quality. Undo preset brings back the controls from before the last preset until you change an option yourself."))
-        Dim columns As New ResponsiveColumns() : content.Controls.Add(columns)
-        desktopQuality = New QualityChoices(Section(columns.First, "Desktop quality"), "Quality", "Use game setting", "Use game settings")
-        vrQuality = New QualityChoices(Section(columns.Second, "VR quality"), "VrQuality", "Same as desktop", "Same as desktop", {GraphicsCatalog.Current.VrBalanced()})
+        Field(quality, "Game graphics file", graphicsPath)
+        quality.Controls.Add(graphicsDefaultsButton)
+        desktopQuality = New QualityChoices(SectionTab(sections, "Desktop quality"), "Quality", "Use game setting", "Use game settings")
+        vrQuality = New QualityChoices(SectionTab(sections, "VR quality"), "VrQuality", "Same as desktop", "Same as desktop", {GraphicsCatalog.Current.VrBalanced()})
         AddHandler potatoPreset.Click, Sub() ApplyQuickPreset("potato")
         AddHandler recommendButton.Click, Sub() RecommendGraphics()
         AddHandler vrBalancedPreset.Click, Sub() ApplyQuickPreset("vrbalanced")
@@ -644,8 +650,8 @@ Public Class MainForm
     End Sub
 
     Private Sub BuildControls()
-        Dim content = Page("Controls")
-        Dim general = Section(content, "General")
+        Dim sections = SectionTabs("Controls", HelpControls)
+        Dim general = SectionTab(sections, "General")
         general.Controls.Add(Info("Use your existing keyboard, controller or wheel bindings in DiRT 3. During experimental VR, closing this window keeps DiRT3VR running in the notification area until the game exits and original files are restored."))
         Dim liveInput As New Button With {.Name = "LiveInput", .Text = "Live input and force feedback…", .AutoSize = True}
         general.Controls.Add(liveInput)
@@ -655,14 +661,14 @@ Public Class MainForm
                                             monitor.ShowDialog(Me)
                                         End Using
                                     End Sub
-        Dim driving = Section(content, "Driving controls")
+        Dim driving = SectionTab(sections, "Driving controls")
         driving.Controls.Add(Info("Bind your wheel, pedals, shifter, controller and keys here for direct practice (Launch and Launch VR). A direct start doesn't load your DiRT 3 profile, so without these DiRT 3 uses its default preset for each device. Actions you don't bind keep DiRT 3's binding for that device. Normal launches keep your profile's controls. A direct start drives with one device: the one bound to steering, or the one you pick under Drives with; without bindings here DiRT 3 picks the keyboard. Gearbox there sets automatic or manual gears for direct practice."))
         Dim drivingButton As New Button With {.Name = "DrivingControls", .Text = "Driving controls…", .AutoSize = True}
         driving.Controls.Add(drivingButton)
         driving.Controls.Add(drivingSummary)
         AddHandler drivingButton.Click, Sub() OpenDrivingControls()
         UpdateDrivingSummary()
-        Dim vrControls = Section(content, "VR and seat controls")
+        Dim vrControls = SectionTab(sections, "VR and seat controls")
         Field(vrControls, "Recenter key", recenterButton)
         vrControls.Controls.Add(recenterHint)
         Dim deviceRow As New FlowLayoutPanel With {.AutoSize = True, .WrapContents = True, .Margin = New Padding(0)}
@@ -716,7 +722,7 @@ Public Class MainForm
                                              End Sub
         tips.SetToolTip(recenterButton, "Click, then press the key or key combination that recenters the headset view while DiRT 3 is in front.")
         UpdateRecenterLabel()
-        Dim seat = Section(content, "Seat")
+        Dim seat = SectionTab(sections, "Seat")
         seat.Controls.Add(Info("Moves your eye point in the cockpit, per car, for example to match the headset to your seat and rig: sideways (+ left), height and forward. Launch VR applies it, and Launch too when Also when playing on the monitor is on: DiRT3VR writes the car's camera file for the session and restores it after exit."))
         seatPicker = New SeatPicker(seat, steadyCameraParent:=cockpitGraphicsOptions)
         Field(cockpitGraphicsOptions, "Cockpit steering-wheel shake", cockpitSteeringShakeOff)
@@ -749,7 +755,7 @@ Public Class MainForm
         AddHandler clearSeatMenuDevice.Click, Sub() SetSeatMenuDevice(Nothing)
         tips.SetToolTip(seatMenuKeyButton, "Click, then press the key or key combination that opens the in-game seat menu while DiRT 3 is in front.")
         UpdateSeatMenuLabels()
-        content.Controls.Add(TopicLink(HelpControls))
+        sections.SelectedTab = sections.TabPages("Driving controls")
     End Sub
 
     ' Public for the launcher tests: removes the Toggle VR key (the controller button, if any, still works).
@@ -955,18 +961,18 @@ Public Class MainForm
     End Function
 
     Private Sub BuildSettings()
-        Dim content = Page("Settings")
-        Dim appearance = Section(content, "Appearance")
+        Dim sections = SectionTabs("Settings", HelpSettings)
+        Dim appearance = SectionTab(sections, "Appearance")
         Field(appearance, "Modern interface", modern)
-        Dim defaultsSection = Section(content, "Defaults")
+        Dim defaultsSection = SectionTab(sections, "Defaults")
         defaultsSection.Controls.Add(Info("Resets every launcher choice on all tabs: appearance, VR runtime, logging, startup, graphics, recenter key and controller button. VR runtime locations, the experimental VR opt-in and seat positions are kept. Game files, settings profiles and saves are not changed, and nothing is saved until Save settings or Launch."))
         defaultsSection.Controls.Add(launcherDefaultsButton)
         AddHandler launcherDefaultsButton.Click, Sub() RestoreDefaults(graphicsOnly:=False)
-        Dim profiles = Section(content, "Settings profiles")
+        Dim profiles = SectionTab(sections, "Settings profiles")
         profilePanel = New SettingsProfilePanel(context, AddressOf CurrentSettings,
             Function(profile) LoadSettingsProfile(profile, AddressOf ConfirmReplaceSettings))
         profiles.Controls.Add(profilePanel)
-        Dim locations = Section(content, "Locations")
+        Dim locations = SectionTab(sections, "Locations")
         Field(locations, "Game folder", gameFolder)
         Dim browse As New Button With {.Name = "BrowseGame", .Text = "Choose game folder…", .AutoSize = True}
         locations.Controls.Add(browse)
@@ -983,7 +989,7 @@ Public Class MainForm
                                                         notice.Text = "Selected game folder. Settings are separate for each installation."
                                                     End Using
                                                 End Sub)
-        Dim runtimes = Section(content, "VR runtime")
+        Dim runtimes = SectionTab(sections, "VR runtime")
         runtime.Items.AddRange({"VDXR", "SteamVR", VrRuntime.OtherName, VrRuntime.SystemName})
         StyleChoice(runtime, Me)
         Field(runtimes, "Runtime", runtime)
@@ -1019,28 +1025,27 @@ Public Class MainForm
                                  End Sub
         UpdateLayerSummary()
         runtimes.Controls.Add(TopicLink(HelpRuntime))
-        Dim options = Section(content, "Diagnostics")
+        Dim options = SectionTab(sections, "Diagnostics")
         options.Controls.Add(Info("Startup results and failures are always recorded in Open logs."))
         Field(options, "Diagnostic logging", logging)
         options.Controls.Add(Info("Adds a presentation trace to the next VR session's log: movie shaders, final composites and draws outside the eye passes, for up to 180 seconds or 512 records. It records metadata only, with no GPU readback. Leave it off unless you are asked for diagnostics."))
         options.Controls.Add(TopicLink(HelpFiles))
-        content.Controls.Add(TopicLink(HelpSettings))
+        sections.SelectedTab = sections.TabPages("VR runtime")
     End Sub
 
     Private Sub BuildAdvanced()
-        Dim content = Page("Advanced")
-        Dim capability = Section(content, "Implementation status")
+        Dim sections = SectionTabs("Advanced", HelpVr)
+        Dim capability = SectionTab(sections, "Implementation status")
         capability.Controls.Add(experimental)
         capability.Controls.Add(Info("Opt in to the experimental VR session, with VDXR, SteamVR or another OpenXR runtime chosen under Settings → VR runtime. Full camera, effects and sustained-driving validation is still in progress. A runtime check alone does not establish game support."))
         capability.Controls.Add(Info("Stop VR turns the headset off and keeps DiRT 3 running on the monitor. End session, or quitting in the game, closes DiRT 3; original files are restored after it closes. You can close this window meanwhile: DiRT3VR stays in the notification area and quits once the files are back."))
         capability.Controls.Add(TopicLink(HelpSession))
         capability.Controls.Add(Info("Supported executable SHA-256: " & InstallContext.SupportedHash))
-        Dim status = Section(content, "Latest diagnostic report")
+        Dim status = SectionTab(sections, "Latest diagnostic report")
         status.Controls.Add(diagnostics)
         Dim refresh As New Button With {.Name = "RefreshDiagnostics", .Text = "Refresh report", .AutoSize = True}
         status.Controls.Add(refresh)
         AddHandler refresh.Click, Sub() LoadDiagnostics()
-        content.Controls.Add(TopicLink(HelpVr))
     End Sub
 
     Private Sub ApplySettings()
