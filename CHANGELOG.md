@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Advanced → Enable experimental VR** is now on by default (#8ee44f40, iztok), so a new install can use **Launch VR** straight away. A choice you already saved stays; untick it to play on the monitor only.
+
 ## 0.1.27 — launcher section tabs and cockpit options (Experimental)
 
 - **Launcher navigation** (#f7408bf5): Advanced view now groups options into section tabs. Launcher opens on Launch mode, Graphics on VR rendering, Controls on Driving controls, Settings on VR runtime, and Advanced on Implementation status. The Seat positions and Settings profiles shortcuts in Quick start open their sections directly.

@@ -1037,7 +1037,7 @@ Public Class MainForm
         Dim sections = SectionTabs("Advanced", HelpVr)
         Dim capability = SectionTab(sections, "Implementation status")
         capability.Controls.Add(experimental)
-        capability.Controls.Add(Info("Opt in to the experimental VR session, with VDXR, SteamVR or another OpenXR runtime chosen under Settings → VR runtime. Full camera, effects and sustained-driving validation is still in progress. A runtime check alone does not establish game support."))
+        capability.Controls.Add(Info("On by default: Launch VR starts the experimental VR session, with VDXR, SteamVR or another OpenXR runtime chosen under Settings → VR runtime. Untick it to use DiRT3VR on the monitor only. Full camera, effects and sustained-driving validation is still in progress. A runtime check alone does not establish game support."))
         capability.Controls.Add(Info("Stop VR turns the headset off and keeps DiRT 3 running on the monitor. End session, or quitting in the game, closes DiRT 3; original files are restored after it closes. You can close this window meanwhile: DiRT3VR stays in the notification area and quits once the files are back."))
         capability.Controls.Add(TopicLink(HelpSession))
         capability.Controls.Add(Info("Supported executable SHA-256: " & InstallContext.SupportedHash))
@@ -1484,7 +1484,7 @@ Public Class MainForm
                 "The original startup file is backed up first and restored when the game exits, also when you close this window during the session (DiRT3VR then waits in the notification area)." & vbCrLf & vbCrLf &
                 "Leave skipping off for multiplayer until compatibility is checked."),
             New HelpTopic(HelpVr,
-                "Advanced → Enable experimental VR turns on the VR session when this package supports it. Choose VDXR (through Virtual Desktop), SteamVR or another OpenXR runtime under Settings → VR runtime. " & RuntimeCapabilities.SteamVrNote & " Close other VR games first." & vbCrLf & vbCrLf &
+                "Advanced → Enable experimental VR (on by default) turns on the VR session when this package supports it. Choose VDXR (through Virtual Desktop), SteamVR or another OpenXR runtime under Settings → VR runtime. " & RuntimeCapabilities.SteamVrNote & " Close other VR games first." & vbCrLf & vbCrLf &
                 "All rendered 3D camera views use stereo and headset tracking, including cockpit, bonnet, bumper, chase and replay. Loading screens, movies and frames without a 3D scene use a virtual screen, and recognized HUD and menu draws use a transparent panel 2 metres away. Camera transitions are still experimental." & vbCrLf & vbCrLf &
                 "Show FPS and GPU usage in the headset (Graphics → VR HUD, off by default) adds a small display below straight ahead, or in front of you when it follows the view. Each VR session also measures its frame rate; Graphics → VR rendering shows the last one (median and low FPS, GPU usage, and whether the GPU or CPU held it back)." & vbCrLf & vbCrLf &
                 "Flat screen in VR (Graphics, all off by default) shows chosen views on the flat screen in front of you instead of in stereo, as Toggle VR does: car views outside the cockpit (chase, bonnet, bumper), cinematic cameras (race intros and replay cameras), and 3D menu backgrounds. The cockpit view always stays 3D. A replay's chase view counts as a car view." & vbCrLf & vbCrLf &

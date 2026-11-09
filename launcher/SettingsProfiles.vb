@@ -6,7 +6,7 @@ Public Class ProfileValues
     Public Property ModernInterface As Boolean = True
     Public Property RuntimeMode As String = "system"
     Public Property DiagnosticLogging As Boolean
-    Public Property ExperimentalVrEnabled As Boolean
+    Public Property ExperimentalVrEnabled As Boolean = True
     Public Property VrRenderScale As Integer = 100
     Public Property DesktopWidth As Integer
     Public Property DesktopHeight As Integer

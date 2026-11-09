@@ -193,7 +193,8 @@ Public Class LauncherSettings
     ' their own runtime. Machine-specific like the other runtime paths; there is no discovery.
     Public Property OtherRuntimeManifest As String = ""
     Public Property DiagnosticLogging As Boolean = False
-    Public Property ExperimentalVrEnabled As Boolean = False
+    ' On by default for new installs (#8ee44f40, iztok); a saved choice stays. Launch VR still needs a package with VR.
+    Public Property ExperimentalVrEnabled As Boolean = True
     Public Property VrRenderScale As Integer = 100
     Public Property DesktopWidth As Integer = 0
     Public Property DesktopHeight As Integer = 0
