@@ -25,11 +25,16 @@ inline float Aspect(unsigned width,unsigned height) noexcept {
 // DiRT3's menu camera identity, every field within float rounding, with only the
 // aspect-dependent X lens and its inverse normalized. On refusal, scale is unchanged.
 bool CameraScale(std::span<const uint8_t> camera,unsigned width,unsigned height,float& scale) noexcept;
+// DiRT3's replay overlay camera (#dda609d6), checked the same way: it draws the replay's letterbox
+// bars, REPLAY label, logo and controls. On success lensX/lensY are its clip-per-unit scales.
+bool ReplayCamera(std::span<const uint8_t> camera,unsigned width,unsigned height,float& lensX,float& lensY) noexcept;
 }
 
 // Scoped canvas mapping for already-admitted screen-space backbuffer draws.
 // Only the fingerprinted menu camera receives a post-VS projection correction;
 // other captured HUD draws retain their native clip bounds and proportions.
+// Replay-camera draws keep that native fit and lose only the replay's two
+// letterbox bars and its DiRT logo (#dda609d6).
 class HudCanvas {
 public:
     enum class Result { Unchanged, Applied, Failed };
@@ -46,6 +51,8 @@ public:
     void Reset() noexcept;
 private:
     bool Initialize(ID3D11Device* device);
+    Result Guarded(ID3D11DeviceContext* context,unsigned width,unsigned height) noexcept;
+    void FitViewports(ID3D11DeviceContext* context,unsigned width,float factor);
     Microsoft::WRL::ComPtr<ID3D11Device> device_;
     Microsoft::WRL::ComPtr<ID3D11GeometryShader> simple_,text_;
     Microsoft::WRL::ComPtr<ID3D11Buffer> parameters_,previousBuffer_;
