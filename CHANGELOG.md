@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Depth blur** under **Graphics → Desktop** and **Graphics → VR rendering** (#16c6c5f5, a user's request): DiRT 3's depth of field, on as in DiRT 3. Its pre-race and replay cameras keep about 100 to 300 metres sharp and blur the land and trees beyond. Tick **Off** and DiRT3VR sets the blur to 0 in DiRT 3's effects file for that session (`postprocess\effects.xml`) and puts the file back afterwards, like bloom. The driving views have no depth blur either way.
+
 - Replays in VR no longer show DiRT 3's two black bars and the DiRT logo (#dda609d6, iztok's choice). Replays draw their overlay with a camera of their own that the renderer didn't recognise. It now does, and leaves out only the bars and the logo; the REPLAY label and the replay controls stay. Replays on the monitor are unchanged.
 
 - **Advanced → Enable experimental VR** is now on by default (#8ee44f40, iztok), so a new install can use **Launch VR** straight away. A choice you already saved stays; untick it to play on the monitor only.

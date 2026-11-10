@@ -100,8 +100,8 @@ Public Class OwnedFileTransaction
         ' Schema 11: post-processing edits beyond VR's motion blur (#3c6d6ffa, #24f76866): bloom, light streaks + lens
         ' flares and the colour filter, on the monitor or in VR (postprocess\effects.xml with the edits listed, with bloom
         ' the generic track files, with the colour filter the palettes and, from 0.1.25, its tint and saturation edits of
-        ' the effects file). The journal records the edits and the schema the session's other targets follow; older
-        ' launchers refuse it, and 0.1.24 refuses the tint and saturation edits.
+        ' the effects file; from 0.1.28 depth blur, #16c6c5f5). The journal records the edits and the schema the session's
+        ' other targets follow; older launchers refuse it, 0.1.24 refuses the tint and saturation edits and 0.1.27 depth blur.
         Dim effectKeys = changes.Keys.Where(AddressOf PostEffects.IsEffectTarget).ToArray()
         Dim edits As IReadOnlyList(Of String) = If(effects, If(experimental AndAlso changes.ContainsKey(MotionBlur.Target), {PostEffects.MotionBlurEdit}, Array.Empty(Of String)()))
         Dim extended = effectKeys.Length > 0 AndAlso Not (experimental AndAlso edits.SequenceEqual({PostEffects.MotionBlurEdit}) AndAlso Not effectKeys.Any(AddressOf PostEffects.IsBloomTarget))

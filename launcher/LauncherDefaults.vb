@@ -14,6 +14,7 @@ Public NotInheritable Class LauncherDefaults
         result.DesktopAnisotropy = defaults.DesktopAnisotropy : result.VrAnisotropy = defaults.VrAnisotropy : result.VrAntiAliasing = defaults.VrAntiAliasing
         result.DesktopBloom = defaults.DesktopBloom : result.VrBloom = defaults.VrBloom : result.DesktopGlare = defaults.DesktopGlare : result.VrGlare = defaults.VrGlare
         result.DesktopColourFilter = defaults.DesktopColourFilter : result.VrColourFilter = defaults.VrColourFilter
+        result.DesktopDepthBlur = defaults.DesktopDepthBlur : result.VrDepthBlur = defaults.VrDepthBlur
         result.VrFieldOfView = defaults.VrFieldOfView : result.VrHelmetView = defaults.VrHelmetView
         result.GraphicsQuality = New Dictionary(Of String, String)
         result.VrGraphicsQuality = New Dictionary(Of String, String)

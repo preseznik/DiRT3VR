@@ -284,6 +284,10 @@ Public Class LauncherSettings
     Public Property VrBloom As Boolean = True
     Public Property DesktopGlare As Boolean = True
     Public Property VrGlare As Boolean = True
+    ' Depth blur (#16c6c5f5): DiRT 3's depth of field, on by default as in DiRT 3. Its cinematic cameras (pre-race views,
+    ' replays) blur everything beyond about 300 m; driving views have none.
+    Public Property DesktopDepthBlur As Boolean = True
+    Public Property VrDepthBlur As Boolean = True
     ' The colour filter (#24f76866; Wrench's research): DiRT 3's green/cyan tint from each track's colour palette. On
     ' (DiRT 3's own) by default; off gives every palette neutral colours, turns each track's tint off and its
     ' saturation to 1.0 for that session (ColourFilter, PostEffects.TintEdit and SaturationEdit).

@@ -34,7 +34,7 @@ Public NotInheritable Class DesktopStartupSession
 
     Public Shared Function NeedsSession(settings As LauncherSettings) As Boolean
         Return settings.SkipStartupMovies OrElse settings.LaunchMode = "direct" OrElse SeatPositions.OnDesktop(settings) OrElse NeedsRenderer(settings) OrElse
-               Not settings.DesktopBloom OrElse Not settings.DesktopGlare OrElse Not settings.DesktopColourFilter
+               Not settings.DesktopBloom OrElse Not settings.DesktopGlare OrElse Not settings.DesktopColourFilter OrElse Not settings.DesktopDepthBlur
     End Function
 
     ' Whether the session installs DiRT3VR's renderer: direct practice, the seat menu on the monitor,
@@ -115,7 +115,7 @@ Public NotInheritable Class DesktopStartupSession
             ' Bloom, light streaks + lens flares (#3c6d6ffa) and the colour filter (#24f76866) off: the effect files and
             ' palettes, for this session only.
             Dim effectsNote As String = ""
-            Dim post = PostEffects.SessionChanges(context, motionBlurOff:=False, glareOff:=Not settings.DesktopGlare, bloomOff:=Not settings.DesktopBloom, note:=effectsNote, colourOff:=Not settings.DesktopColourFilter)
+            Dim post = PostEffects.SessionChanges(context, motionBlurOff:=False, glareOff:=Not settings.DesktopGlare, bloomOff:=Not settings.DesktopBloom, note:=effectsNote, colourOff:=Not settings.DesktopColourFilter, depthBlurOff:=Not settings.DesktopDepthBlur)
             For Each pair In post.Files
                 changes.Add(pair.Key, pair.Value)
             Next
@@ -123,12 +123,12 @@ Public NotInheritable Class DesktopStartupSession
             If settings.LaunchMode <> "direct" AndAlso NeedsRenderer(settings) Then
                 SafeFiles.NoLinks(logs) : Directory.CreateDirectory(logs)
                 SafeFiles.SaveJson(Path.Combine(logs, "session.json"), New With {.schema = 1, .mode = If(SeatChannel.OnDesktop(settings), SeatMenuMode, RendererMode), .startedUtc = DateTime.UtcNow, .launchMode = settings.LaunchMode,
-                                                                                .desktopFov = settings.DesktopFov, .seatCars = seats.Offsets.Keys.ToArray(), .desktopAnisotropy = settings.DesktopAnisotropy, .bloomOff = Not settings.DesktopBloom, .glareOff = Not settings.DesktopGlare, .colourOff = Not settings.DesktopColourFilter, .palettesSwapped = post.Files.ContainsKey(PostEffects.PaletteTarget)})
+                                                                                .desktopFov = settings.DesktopFov, .seatCars = seats.Offsets.Keys.ToArray(), .desktopAnisotropy = settings.DesktopAnisotropy, .bloomOff = Not settings.DesktopBloom, .glareOff = Not settings.DesktopGlare, .colourOff = Not settings.DesktopColourFilter, .depthBlurOff = Not settings.DesktopDepthBlur, .palettesSwapped = post.Files.ContainsKey(PostEffects.PaletteTarget)})
             End If
             If settings.LaunchMode = "direct" Then
                 SafeFiles.NoLinks(logs) : Directory.CreateDirectory(logs)
                 ' Marks the folder as a desktop session, so Last VR session skips it.
-                SafeFiles.SaveJson(Path.Combine(logs, "session.json"), New With {.schema = 1, .mode = DirectMode, .startedUtc = DateTime.UtcNow, .launchMode = settings.LaunchMode, .directRoute = settings.DirectRoute, .directCar = settings.DirectCar, .directLaps = DirectPractice.Laps(settings), .directOpponents = DirectPractice.Opponents(settings), .directOpponentCars = settings.DirectOpponentCars, .directDifficulty = DirectPractice.Difficulty(settings), .directAfterFinish = settings.DirectAfterFinish, .directAssists = DirectPractice.Assists(settings), .drivingMaps = actionMaps.Devices.Select(Function(d) d.DeviceName & " (" & d.BaseFile & ")").ToArray(), .drivingSkipped = actionMaps.Skipped.ToArray(), .directDevices = actionMaps.PreferredDevices, .desktopAnisotropy = settings.DesktopAnisotropy, .bloomOff = Not settings.DesktopBloom, .glareOff = Not settings.DesktopGlare, .colourOff = Not settings.DesktopColourFilter, .palettesSwapped = post.Files.ContainsKey(PostEffects.PaletteTarget)})
+                SafeFiles.SaveJson(Path.Combine(logs, "session.json"), New With {.schema = 1, .mode = DirectMode, .startedUtc = DateTime.UtcNow, .launchMode = settings.LaunchMode, .directRoute = settings.DirectRoute, .directCar = settings.DirectCar, .directLaps = DirectPractice.Laps(settings), .directOpponents = DirectPractice.Opponents(settings), .directOpponentCars = settings.DirectOpponentCars, .directDifficulty = DirectPractice.Difficulty(settings), .directAfterFinish = settings.DirectAfterFinish, .directAssists = DirectPractice.Assists(settings), .drivingMaps = actionMaps.Devices.Select(Function(d) d.DeviceName & " (" & d.BaseFile & ")").ToArray(), .drivingSkipped = actionMaps.Skipped.ToArray(), .directDevices = actionMaps.PreferredDevices, .desktopAnisotropy = settings.DesktopAnisotropy, .bloomOff = Not settings.DesktopBloom, .glareOff = Not settings.DesktopGlare, .colourOff = Not settings.DesktopColourFilter, .depthBlurOff = Not settings.DesktopDepthBlur, .palettesSwapped = post.Files.ContainsKey(PostEffects.PaletteTarget)})
             End If
             settings.Save(context)
             DesktopGraphics.Apply(context, settings, monitor)

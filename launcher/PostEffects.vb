@@ -19,6 +19,9 @@ Imports System.Text.RegularExpressions
 '   ColourBalance tintAmount set to 0 and its colour (saturation) to 1.0 in postprocess\effects.xml
 '   (tools/colour_tint.py; a user's remake mod does all three, Rowan's comparison; saturation iztok's choice). Contrast,
 '   tone mapping and the non-track effects stay.
+' - Depth blur (#16c6c5f5; tools/depth_blur.py): every Dof blurAmount set to 0 in postprocess\effects.xml. The
+'   post-processing chain always runs its depth of field pass; the cinematic cameras' effects (PreRaceDOF, DOF_far,
+'   the frontend) give it a strength, race_base already has none. Focus values and every other group stay.
 Public NotInheritable Class PostEffects
     Public Const MotionBlurEdit As String = "motionblur"
     Public Const GlareEdit As String = "glare"
@@ -28,8 +31,10 @@ Public NotInheritable Class PostEffects
     ' ColourEdit (the palettes); a 0.1.24 journal has ColourEdit alone, one from 6afe405 ColourEdit and TintEdit.
     Public Const TintEdit As String = "tint"
     Public Const SaturationEdit As String = "saturation"
-    ' The edits in the order a session applies them; ColourEdit is the only one outside the effects file.
-    Public Shared ReadOnly Order As String() = {MotionBlurEdit, GlareEdit, BloomEdit, ColourEdit, TintEdit, SaturationEdit}
+    Public Const DepthBlurEdit As String = "depthblur"
+    ' The edits in the order a session applies them; ColourEdit is the only one outside the effects file. Depth blur
+    ' came last (0.1.28), so earlier journals keep their order; a launcher before it refuses a journal with it.
+    Public Shared ReadOnly Order As String() = {MotionBlurEdit, GlareEdit, BloomEdit, ColourEdit, TintEdit, SaturationEdit, DepthBlurEdit}
     ' Bloom's two generic track files (journal targets; postprocess\effects.xml is MotionBlur.Target).
     Public Const TrackTarget As String = "bloom-track"
     Public Const NightTarget As String = "bloom-night"
@@ -45,6 +50,7 @@ Public NotInheritable Class PostEffects
     Private Shared ReadOnly BloomMixes As String() = {"mixMedium", "mixLarge", "mixHuge", "mixStreak"}
     Private Shared ReadOnly GlareParams As New Dictionary(Of String, String())(StringComparer.Ordinal) From {
         {"Streaks", {"multiplier_0", "multiplier_1", "multiplier_2"}}, {"LensFlares", {"multiplier"}}}
+    Private Shared ReadOnly DepthBlurParams As New Dictionary(Of String, String())(StringComparer.Ordinal) From {{"Dof", {"blurAmount"}}}
     Private Shared ReadOnly BinaryMagic As Byte() = {&H1A, &H22, &H52, &H72}
     Private Shared ReadOnly Value As New Regex("\A(\s*)(-?\d+(?:\.\d+)?)(\s*)\z", RegexOptions.CultureInvariant)
     Private Shared ReadOnly TextGroup As New Regex("(<ParameterGroup name=""BloomFromDsX4"">)(.*?)(</ParameterGroup>)", RegexOptions.CultureInvariant Or RegexOptions.Singleline)
@@ -91,6 +97,7 @@ Public NotInheritable Class PostEffects
                 Case ColourEdit ' postprocess\palettes.pssg (ColourFilter)
                 Case TintEdit : result = RemoveTint(result)
                 Case SaturationEdit : result = NeutralSaturation(result)
+                Case DepthBlurEdit : result = DisableDepthBlur(result)
             End Select
         Next
         Return result
@@ -99,6 +106,11 @@ Public NotInheritable Class PostEffects
     ' Every Streaks and LensFlares multiplier set to zero (postprocess\effects.xml, binary).
     Public Shared Function DisableGlare(data As Byte()) As Byte()
         Return SetBinary(data, GlareParams, Zero, "No light streak or lens flare multipliers in this effects file.")
+    End Function
+
+    ' Every depth of field blurAmount set to zero (postprocess\effects.xml, binary).
+    Public Shared Function DisableDepthBlur(data As Byte()) As Byte()
+        Return SetBinary(data, DepthBlurParams, Zero, "No depth of field blur amounts in this effects file.")
     End Function
 
     ' Every BloomFromDsX4 mix set to zero, in a binary or a text effects file.
@@ -125,7 +137,7 @@ Public NotInheritable Class PostEffects
             Dim effects = SeatCameras.Decode(data)
             Return ParamElements(effects, If(edit = TintEdit, TintParams, SaturationParams), "", tracksOnly:=True).Select(Function(item) (item.Name, Number(Value.Match(ElementText(effects, item.Element)).Groups(2).Value))).ToArray()
         End If
-        Dim groups = If(edit = GlareEdit, GlareParams, New Dictionary(Of String, String())(StringComparer.Ordinal) From {{BloomGroup, BloomMixes}})
+        Dim groups = If(edit = GlareEdit, GlareParams, If(edit = DepthBlurEdit, DepthBlurParams, New Dictionary(Of String, String())(StringComparer.Ordinal) From {{BloomGroup, BloomMixes}}))
         If Not IsBinary(data) Then
             If edit <> BloomEdit Then Throw New IOException("Not a binary effects file.")
             Dim found As New List(Of (Name As String, Value As Double))
@@ -227,10 +239,10 @@ Public NotInheritable Class PostEffects
     ' bloom off the generic track files, and with the colour filter off its palettes and the track tints and saturation
     ' in the effects file. A file that is missing, unusable or already as wanted is left out; note says what stays on.
     ' Edits: the chosen edits (the journal records them).
-    Public Shared Function SessionChanges(context As InstallContext, motionBlurOff As Boolean, glareOff As Boolean, bloomOff As Boolean, ByRef note As String, Optional colourOff As Boolean = False) As (Files As Dictionary(Of String, Byte()), Edits As String())
+    Public Shared Function SessionChanges(context As InstallContext, motionBlurOff As Boolean, glareOff As Boolean, bloomOff As Boolean, ByRef note As String, Optional colourOff As Boolean = False, Optional depthBlurOff As Boolean = False) As (Files As Dictionary(Of String, Byte()), Edits As String())
         note = ""
         Dim files As New Dictionary(Of String, Byte())
-        Dim chosen = Order.Where(Function(edit) (edit = MotionBlurEdit AndAlso motionBlurOff) OrElse (edit = GlareEdit AndAlso glareOff) OrElse (edit = BloomEdit AndAlso bloomOff) OrElse ((edit = ColourEdit OrElse edit = TintEdit OrElse edit = SaturationEdit) AndAlso colourOff)).ToArray()
+        Dim chosen = Order.Where(Function(edit) (edit = MotionBlurEdit AndAlso motionBlurOff) OrElse (edit = GlareEdit AndAlso glareOff) OrElse (edit = BloomEdit AndAlso bloomOff) OrElse ((edit = ColourEdit OrElse edit = TintEdit OrElse edit = SaturationEdit) AndAlso colourOff) OrElse (edit = DepthBlurEdit AndAlso depthBlurOff)).ToArray()
         If chosen.Length = 0 Then Return (files, chosen)
         Dim kept As New List(Of String)
         Dim effectEdits = chosen.Where(Function(edit) edit <> ColourEdit).ToArray()
@@ -265,7 +277,7 @@ Public NotInheritable Class PostEffects
     End Function
 
     Private Shared Function Describe(edit As String) As String
-        Return If(edit = MotionBlurEdit, "motion blur", If(edit = GlareEdit, "light streaks and lens flares", If(edit = ColourEdit, "the colour filter", If(edit = TintEdit, "the colour filter's tint and saturation", "bloom"))))
+        Return If(edit = MotionBlurEdit, "motion blur", If(edit = GlareEdit, "light streaks and lens flares", If(edit = ColourEdit, "the colour filter", If(edit = TintEdit, "the colour filter's tint and saturation", If(edit = DepthBlurEdit, "depth blur", "bloom")))))
     End Function
 
     ' The changed bytes of one file (Nothing when nothing changes), or not usable when it is missing or unexpected.
