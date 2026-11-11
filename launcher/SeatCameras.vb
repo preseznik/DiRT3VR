@@ -305,7 +305,8 @@ Public NotInheritable Class SeatCameras
     ' Wrench's cockpit_first (iztok: start in the cockpit, hide nothing): head-cam's record moves to the front of
     ' the view list. The Views are sibling records, each pointing at its own attributes and children, so rotating
     ' them reorders the list and leaves every subtree, string and attribute where it was; twice changes nothing.
-    ' DiRT3VR's renderer (DIRT3VR_START_IN_COCKPIT) keeps the race in that first view instead of DiRT 3's chase_close.
+    ' DiRT3VR's renderer (DIRT3VR_START_IN_COCKPIT) kept the race in that first view instead of DiRT 3's chase_close.
+    ' Kept to recover its sessions: with head-cam first the menu car showed its in-car model after a race (#5886cb28).
     Public Shared Function CockpitFirst(data As Byte()) As Byte()
         Dim document = Decode(data)
         Dim order = Views(document)

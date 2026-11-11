@@ -13,7 +13,9 @@ Public Class SeatOffset
     ' sessions use CockpitFirst, and this stays to recover a journal written before it.
     <JsonIgnore(Condition:=JsonIgnoreCondition.WhenWritingDefault)>
     Public Property Cockpit As Boolean
-    ' Session journal only: the cockpit view moved first, hiding nothing (cockpit_first, LauncherSettings.StartInCockpit).
+    ' Session journal only: the cockpit view moved first, hiding nothing (cockpit_first). Sessions no longer write it:
+    ' with head-cam first DiRT 3 drew the menu car as its in-car model after a race (#5886cb28), and the renderer's
+    ' DIRT3VR_START_IN_COCKPIT starts races in the cockpit by itself. It stays to recover a journal written with it.
     <JsonIgnore(Condition:=JsonIgnoreCondition.WhenWritingDefault)>
     Public Property CockpitFirst As Boolean
     ' Session journal only, VR cockpit comfort (LauncherSettings.CockpitSteady, CockpitHideDriver, CockpitHideCoDriver).
@@ -140,11 +142,12 @@ Public NotInheritable Class SeatPositions
         For Each item In result.Values
             item.ClearSessionFlags()
         Next
-        If vr AndAlso (settings.StartInCockpit OrElse settings.CockpitSteady OrElse settings.CockpitHideDriver OrElse settings.CockpitHideCoDriver) Then
+        ' Start races in the cockpit view needs no camera file change: the renderer keeps the race in head-cam.
+        If vr AndAlso (settings.CockpitSteady OrElse settings.CockpitHideDriver OrElse settings.CockpitHideCoDriver) Then
             For Each car In EventCatalog.Current.Cars
                 If Not result.ContainsKey(car.Code) Then result(car.Code) = New SeatOffset
                 Dim item = result(car.Code)
-                item.CockpitFirst = settings.StartInCockpit : item.Steady = settings.CockpitSteady
+                item.Steady = settings.CockpitSteady
                 item.HideDriver = settings.CockpitHideDriver : item.HideCoDriver = settings.CockpitHideCoDriver
             Next
         End If

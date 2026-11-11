@@ -239,7 +239,7 @@ Public Class LauncherSettings
     Public Property SeatOffsets As New Dictionary(Of String, SeatOffset)
     Public Property SeatSameForAll As Boolean
     Public Property SeatAllCars As New SeatOffset
-    ' VR: start races in the cockpit view (each car's views before head-cam hidden for the session).
+    ' VR: start races in the cockpit view (the renderer's DIRT3VR_START_IN_COCKPIT; no camera file changes).
     Public Property StartInCockpit As Boolean
     ' VR cockpit comfort (#cd56379b): the session's cockpit view without DiRT 3's own G-force head movement,
     ' shake and distortion (on by default), and the driver or co-driver hidden. Kept with the seat settings.
