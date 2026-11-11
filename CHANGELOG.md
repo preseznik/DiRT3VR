@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix: replays in VR still showed the black bars and the DiRT logo in 0.1.28 on a real headset (#dda609d6, iztok's Quest 3 test). The replay camera carries tiny float noise in its view that differs between replays, and 0.1.28 matched it too exactly, so it never recognised the camera outside the one capture it was built from. That noise now counts as zero; every other field still has to match.
+
 ## 0.1.28 — depth blur switch, cleaner VR replays and VR on by default (Experimental)
 
 - **Depth blur** under **Graphics → Desktop** and **Graphics → VR rendering** (#16c6c5f5, a user's request): DiRT 3's depth of field, on as in DiRT 3. Its pre-race and replay cameras keep about 100 to 300 metres sharp and blur the land and trees beyond. Tick **Off** and DiRT3VR sets the blur to 0 in DiRT 3's effects file for that session (`postprocess\effects.xml`) and puts the file back afterwards, like bloom. The driving views have no depth blur either way.

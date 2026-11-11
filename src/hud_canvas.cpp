@@ -67,17 +67,21 @@ constexpr CameraField MenuCamera[]={
     {128,1},{148,1},{168,1},{172,-15.485f},{176,1},{196,1},{216,1},{220,15.485f},{232,15.485f},{236,1},
     {260,4.00881f},{280,-20000},{296,10000},{300,1}};
 // The replay overlay camera of Lens's captures 72628 frames 5564/11724 (1920x1920, #dda609d6),
-// identical in both, likewise without its X lens: a wider orthographic view (1/py 12.76 instead
-// of 4.01) placed at 106.53 instead of 15.485, with a few tiny view terms of its own.
+// likewise without its X lens: a wider orthographic view (1/py 12.76 instead of 4.01) placed at
+// 106.53 instead of 15.485. Its view also carries float noise near zero (112, 140, 188, 224: about
+// 5e-7 and 6e-6) that differs between replays (iztok's Quest 3 capture 40768 frame 3930: 112 is
+// 5.12e-7, not 4.82e-7), so those count as zero within ReplayNoise.
 constexpr CameraField ReplayFields[]={
-    {20,.07836175f},{40,-5e-5f},{56,.5f},{60,1},{84,.07836174f},{104,-5e-5f},{112,4.8225229e-7f},{120,.50532645f},
-    {124,.99999994f},{128,.99999994f},{140,6.1541791e-6f},{148,.99999994f},{168,.99999994f},{172,-106.52929f},
-    {176,1},{188,-6.1541796e-6f},{196,1},{216,1},{220,106.5293f},{224,-6.1541796e-6f},{232,106.5293f},{236,1},
+    {20,.07836175f},{40,-5e-5f},{56,.5f},{60,1},{84,.07836174f},{104,-5e-5f},{120,.50532645f},
+    {124,.99999994f},{128,.99999994f},{148,.99999994f},{168,.99999994f},{172,-106.52929f},
+    {176,1},{196,1},{216,1},{220,106.5293f},{232,106.5293f},{236,1},
     {260,12.761328f},{280,-20000},{296,10000},{300,.99999994f}};
+// How far from zero a zero field may be: the menu camera's are exactly zero, the replay camera's noisy.
+constexpr double MenuNoise=1e-6,ReplayNoise=5e-5;
 // One camera's identity: the X lens (0, 64) and its inverse (240) match the viewport aspect, and
 // every other field up to 304 agrees with the table within float rounding; 304 holds the integer 1.
 template<size_t N>
-bool Identified(std::span<const uint8_t> camera,unsigned width,unsigned height,const CameraField (&fields)[N],float& px,float& py) noexcept {
+bool Identified(std::span<const uint8_t> camera,unsigned width,unsigned height,const CameraField (&fields)[N],double noise,float& px,float& py) noexcept {
     if(camera.size()!=320 || !width || !height || width>4096 || height>4096) return false;
     const auto value=[&](size_t offset) { float result; std::memcpy(&result,camera.data()+offset,4); return result; };
     const float lensX=value(0),lensY=value(20),inverseX=value(240);
@@ -95,7 +99,7 @@ bool Identified(std::span<const uint8_t> camera,unsigned width,unsigned height,c
     for(size_t offset=4;offset<304;offset+=4) {
         if(offset==64 || offset==240) continue;
         const float actual=value(offset),expected=field(offset);
-        if(!std::isfinite(actual) || std::abs(double(actual)-expected)>(expected ? 1e-5*std::abs(double(expected)) : 1e-6)) return false;
+        if(!std::isfinite(actual) || std::abs(double(actual)-expected)>(expected ? 1e-5*std::abs(double(expected)) : noise)) return false;
     }
     uint32_t tail{}; std::memcpy(&tail,camera.data()+304,4);
     if(tail!=1) return false;
@@ -103,12 +107,12 @@ bool Identified(std::span<const uint8_t> camera,unsigned width,unsigned height,c
 }
 bool hud_canvas_detail::ReplayCamera(std::span<const uint8_t> camera,unsigned width,unsigned height,float& lensX,float& lensY) noexcept {
     float px{},py{};
-    if(!Identified(camera,width,height,ReplayFields,px,py)) return false;
+    if(!Identified(camera,width,height,ReplayFields,ReplayNoise,px,py)) return false;
     lensX=px; lensY=py; return true;
 }
 bool hud_canvas_detail::CameraScale(std::span<const uint8_t> camera,unsigned width,unsigned height,float& scale) noexcept {
     float px{},py{};
-    if(!Identified(camera,width,height,MenuCamera,px,py)) return false;
+    if(!Identified(camera,width,height,MenuCamera,MenuNoise,px,py)) return false;
     const float result=(py/hud_canvas_detail::Aspect(width,height))/px;
     if(!std::isfinite(result) || result<=0) return false;
     scale=result; return true;
