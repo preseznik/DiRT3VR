@@ -223,6 +223,9 @@ Public Class LauncherSettings
     Public Property DirectDifficulty As Integer = -1
     ' After the finish: "quit" (DiRT 3 closes, as its benchmark start does) or "menus" (DiRT 3's main menu).
     Public Property DirectAfterFinish As String = "quit"
+    ' Weather and time of day (#0e2b82ba): a track_model_conditions id of DirectRoute; 0, or a row of
+    ' another route, is that route's default (DirectPractice.ChosenCondition).
+    Public Property DirectConditions As Integer
     ' Direct practice assists and gearbox (a direct start doesn't load the player's profile, so these
     ' start from DiRT 3's defaults: ABS on, the others off, automatic gears).
     Public Property DirectGearbox As String = "automatic"
@@ -399,6 +402,7 @@ Public Class LauncherSettings
         If Not DirectPractice.OpponentCarChoices.Contains(DirectOpponentCars) Then Throw New IOException("Choose which cars the opponents drive.")
         If DirectDifficulty < -1 OrElse DirectDifficulty > DirectPractice.MaxDifficulty Then Throw New IOException("Choose the AI difficulty for direct practice.")
         If Not DirectPractice.AfterFinishChoices.Contains(DirectAfterFinish) Then Throw New IOException("Choose what happens after the finish.")
+        If DirectConditions < 0 Then Throw New IOException("Choose the conditions for direct practice.")
         If Not DirectPractice.GearboxChoices.Contains(DirectGearbox) Then Throw New IOException("Choose the gearbox for direct practice.")
         SeatAllCars = If(SeatAllCars, New SeatOffset) : SeatAllCars.ClearSessionFlags() : SeatAllCars.Validate()
         If HudDistance < 1D OrElse HudDistance > 5D OrElse HudDistance * 2D <> Decimal.Truncate(HudDistance * 2D) Then Throw New IOException("Choose a VR HUD distance from 1 to 5 m, in 0.5 m steps.")

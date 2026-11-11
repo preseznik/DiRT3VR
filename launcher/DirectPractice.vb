@@ -82,6 +82,8 @@ Public NotInheritable Class DirectPractice
         If settings.DirectAfterFinish = "menus" Then start.Environment("DIRT3VR_DIRECT_RETURN") = "1"
         Dim chosen = Assists(settings)
         If chosen <> "" Then start.Environment("DIRT3VR_DIRECT_ASSISTS") = chosen
+        Dim weather = Conditions(settings)
+        If weather <> "" Then start.Environment("DIRT3VR_DIRECT_CONDITIONS") = weather
         start.ArgumentList.Add("-benchmark") : start.ArgumentList.Add(FileName)
     End Sub
 
@@ -97,6 +99,27 @@ Public NotInheritable Class DirectPractice
         Dim gearbox = Array.IndexOf(GearboxChoices, settings.DirectGearbox)
         If gearbox > 0 Then pairs.Add("transmission_type=" & Number(gearbox))
         Return String.Join(",", pairs)
+    End Function
+
+    ' Conditions (#0e2b82ba, docs/research/conditions.md): the renderer's values for DiRT 3's weather and
+    ' lighting names, as the race setup's name lookups (0x4aabb0, 0x4247f0) return them.
+    Public Shared ReadOnly WeatherValues As IReadOnlyDictionary(Of String, Integer) = New Dictionary(Of String, Integer) From {
+        {"dry", 0}, {"wet", 1}, {"light_rain", 2}, {"heavy_rain", 3}, {"light_snow", 4}, {"heavy_snow", 5}, {"snowy", 6}}
+    Public Shared ReadOnly LightingValues As IReadOnlyDictionary(Of String, Integer) = New Dictionary(Of String, Integer) From {
+        {"day", 0}, {"day_alt", 1}, {"wet", 2}, {"night", 3}, {"snowing", 4}}
+
+    ' The chosen route's conditions row: the saved one when it belongs to this route, else its default.
+    Public Shared Function ChosenCondition(settings As LauncherSettings) As EventCatalog.EventCondition
+        Dim route = EventCatalog.Current.FindRoute(settings.DirectRoute)
+        If route Is Nothing OrElse route.Conditions.Count = 0 Then Return Nothing
+        Return If(route.Conditions.FirstOrDefault(Function(item) item.Id = settings.DirectConditions), route.Conditions.First(Function(item) item.IsDefault))
+    End Function
+
+    ' The renderer's DIRT3VR_DIRECT_CONDITIONS ("weather,lighting"); "" when the route's default stays.
+    Public Shared Function Conditions(settings As LauncherSettings) As String
+        Dim chosen = ChosenCondition(settings)
+        If chosen Is Nothing OrElse chosen.IsDefault Then Return ""
+        Return Number(WeatherValues(chosen.Weather)) & "," & Number(LightingValues(chosen.Lighting))
     End Function
 
     Public Shared Function ConfigPath(context As InstallContext) As String

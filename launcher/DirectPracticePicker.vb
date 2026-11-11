@@ -9,6 +9,8 @@ Public NotInheritable Class DirectPracticePicker
     Private ReadOnly direct As New RadioButton With {.Name = "LaunchModeDirect", .Text = "Direct practice: start straight on a chosen route", .AutoSize = True}
     Private ReadOnly discipline As New ComboBox With {.Name = "DirectDiscipline", .DropDownStyle = ComboBoxStyle.DropDownList}
     Private ReadOnly route As New ComboBox With {.Name = "DirectRoute", .DropDownStyle = ComboBoxStyle.DropDownList}
+    ' Weather and time of day (#0e2b82ba): the route's own conditions rows, its default first selected.
+    Private ReadOnly conditions As New ComboBox With {.Name = "DirectConditions", .DropDownStyle = ComboBoxStyle.DropDownList}
     Private ReadOnly search As New TextBox With {.Name = "DirectCarSearch", .AccessibleName = "Search cars"}
     Private ReadOnly carClass As New ComboBox With {.Name = "DirectCarClass", .DropDownStyle = ComboBoxStyle.DropDownList}
     Private ReadOnly allCars As New CheckBox With {.Name = "DirectAllCars", .Text = "Show cars from other disciplines (untested)", .AutoSize = True}
@@ -39,11 +41,12 @@ Public NotInheritable Class DirectPracticePicker
         rivalCars.Items.AddRange({"Same class as my car", "Mixed: any car of this discipline", "My car's model"})
         aiLevel.Items.AddRange({"DiRT 3's default", "Level 0 (easiest)", "Level 1", "Level 2", "Level 3", "Level 4", "Level 5 (hardest)"})
         finish.Items.AddRange({"Quit to desktop", "Return to DiRT 3's menus"})
-        For Each box In {discipline, route, carClass, car, rivalCars, aiLevel, finish}
+        For Each box In {discipline, route, conditions, carClass, car, rivalCars, aiLevel, finish}
             StyleChoice(box, parent)
         Next
         Field(parent, "Discipline", discipline)
         Field(parent, "Route", route)
+        Field(parent, "Conditions", conditions)
         Field(parent, "Search cars", search)
         Field(parent, "Class", carClass)
         parent.Controls.Add(allCars)
@@ -57,7 +60,7 @@ Public NotInheritable Class DirectPracticePicker
         assistBoxes.Controls.AddRange({abs, stability, cornerBraking, throttle, steering})
         Field(parent, "Assists", assistBoxes)
         parent.Controls.Add(summary)
-        pickerControls = {discipline, route, search, carClass, allCars, car, finish, abs, stability, cornerBraking, throttle, steering}
+        pickerControls = {discipline, route, conditions, search, carClass, allCars, car, finish, abs, stability, cornerBraking, throttle, steering}
         AddHandler normal.CheckedChanged, Sub() ModeChanged()
         AddHandler direct.CheckedChanged, Sub() ModeChanged()
         AddHandler discipline.SelectedIndexChanged, Sub()
@@ -65,10 +68,12 @@ Public NotInheritable Class DirectPracticePicker
                                                        FillRoutes(0) : FillCars("") : Edited()
                                                    End Sub
         AddHandler route.SelectedIndexChanged, Sub()
+                                                   FillConditions(ConditionsId)
                                                    UpdateRaceControls()
                                                    If Not updating Then Edited()
                                                End Sub
         AddHandler laps.ValueChanged, Sub() If Not updating Then Edited()
+        AddHandler conditions.SelectedIndexChanged, Sub() If Not updating Then Edited()
         AddHandler opponents.ValueChanged, Sub()
                                                UpdateRaceControls()
                                                If Not updating Then Edited()
@@ -121,6 +126,13 @@ Public NotInheritable Class DirectPracticePicker
         End Get
     End Property
 
+    ' The chosen conditions row's id; 0 when the route lists none.
+    Public ReadOnly Property ConditionsId As Integer
+        Get
+            Return If(TryCast(conditions.SelectedItem, EventCatalog.EventCondition)?.Id, 0)
+        End Get
+    End Property
+
     Public ReadOnly Property CarCode As String
         Get
             Return SelectedCarCode()
@@ -165,7 +177,7 @@ Public NotInheritable Class DirectPracticePicker
     End Property
 
     ' Shows saved choices; an unknown or missing route starts on the first rally stage.
-    Public Sub Apply(launchMode As String, routeId As Integer, carCode As String, lapCount As Integer, opponentCount As Integer, opponentChoice As String, level As Integer, afterFinishChoice As String)
+    Public Sub Apply(launchMode As String, routeId As Integer, carCode As String, lapCount As Integer, opponentCount As Integer, opponentChoice As String, level As Integer, afterFinishChoice As String, Optional conditionsId As Integer = 0)
         Dim catalog = EventCatalog.Current
         updating = True
         Try
@@ -173,6 +185,7 @@ Public NotInheritable Class DirectPracticePicker
             Dim chosen = catalog.FindRoute(routeId)
             discipline.SelectedItem = If(chosen IsNot Nothing, catalog.FindDiscipline(chosen.Discipline), catalog.Disciplines(0))
             FillRoutes(routeId)
+            FillConditions(conditionsId)
             search.Text = ""
             Dim chosenCar = catalog.FindCar(carCode)
             allCars.Checked = chosenCar IsNot Nothing AndAlso chosenCar.Discipline <> CurrentDiscipline()
@@ -206,6 +219,25 @@ Public NotInheritable Class DirectPracticePicker
                 If item.Id = routeId Then route.SelectedItem = item
             Next
             If route.SelectedIndex < 0 AndAlso route.Items.Count > 0 Then route.SelectedIndex = 0
+        Finally
+            updating = wasUpdating
+        End Try
+    End Sub
+
+    ' Lists the chosen route's conditions, keeping keepId when the route has it, else its default.
+    Private Sub FillConditions(keepId As Integer)
+        Dim wasUpdating = updating
+        updating = True
+        Try
+            conditions.Items.Clear()
+            Dim chosenRoute = TryCast(route.SelectedItem, EventCatalog.EventRoute)
+            If chosenRoute IsNot Nothing Then
+                For Each item In chosenRoute.Conditions
+                    conditions.Items.Add(item)
+                    If item.Id = keepId Then conditions.SelectedItem = item
+                Next
+                If conditions.SelectedIndex < 0 Then conditions.SelectedItem = chosenRoute.Conditions.FirstOrDefault(Function(item) item.IsDefault)
+            End If
         Finally
             updating = wasUpdating
         End Try
@@ -250,6 +282,7 @@ Public NotInheritable Class DirectPracticePicker
     Private Sub UpdateRaceControls()
         Dim circuit = direct.Checked AndAlso String.Equals(TryCast(route.SelectedItem, EventCatalog.EventRoute)?.TrackType, "circuit", StringComparison.Ordinal)
         laps.Enabled = circuit : opponents.Enabled = circuit
+        conditions.Enabled = direct.Checked AndAlso conditions.Items.Count > 1
         rivalCars.Enabled = circuit AndAlso opponents.Value > 0
         aiLevel.Enabled = rivalCars.Enabled
     End Sub
@@ -265,9 +298,10 @@ Public NotInheritable Class DirectPracticePicker
         Dim chosenCar = TryCast(car.SelectedItem, EventCatalog.EventCar)
         Dim circuit = chosenRoute IsNot Nothing AndAlso chosenRoute.TrackType = "circuit"
         Dim rivals = If(circuit, opponents.Value, 0)
+        Dim weather = TryCast(conditions.SelectedItem, EventCatalog.EventCondition)
         summary.Text = If(Not direct.Checked, "Launch and Launch VR open DiRT 3's own menus.",
                           If(chosenRoute Is Nothing OrElse chosenCar Is Nothing, "Choose a route and a car (adjust the search if no car is listed).",
-                             "Direct practice: " & CurrentDisciplineName() & " · " & chosenRoute.ToString() & If(circuit, " · " & laps.Value & If(laps.Value = 1, " lap", " laps"), "") &
+                             "Direct practice: " & CurrentDisciplineName() & " · " & chosenRoute.ToString() & If(weather IsNot Nothing AndAlso Not weather.IsDefault, " · " & weather.ToString(), "") & If(circuit, " · " & laps.Value & If(laps.Value = 1, " lap", " laps"), "") &
                              If(rivals > 0, " · " & rivals & If(rivals = 1, " opponent", " opponents") & " (" & {"same class", "mixed cars", "your car's model"}(Math.Max(0, rivalCars.SelectedIndex)) & If(DifficultyLevel >= 0, ", AI level " & DifficultyLevel, "") & ")", "") &
                              " · " & chosenCar.Name & ". " & If(rivals > 0, "", "No opponents. ") & If(AfterFinish = "menus", "After the finish DiRT 3 returns to its menus.", "DiRT 3 closes by itself after the finish.")))
     End Sub

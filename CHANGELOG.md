@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Conditions** in direct practice (#0e2b82ba, a user's request): weather and time of day for the chosen route, with DiRT 3's own names and only what the route has. For example, Michigan and Finland have Morning, Sun; Evening, Sun; Night; Wet; Rain. Norway has Snow, and Kenya and Monte Carlo have Night. A direct start used to take each route's first conditions row, which is always the plain day. The renderer now gives the race setup the chosen weather and lighting instead, only while the direct start lasts. Races you start later from DiRT 3's menus keep their own conditions. The event catalog lists each route's conditions, and the default stays the one DiRT 3 picks itself.
 - Fix: replays in VR still showed the black bars and the DiRT logo in 0.1.28 on a real headset (#dda609d6, iztok's Quest 3 test). The replay camera carries tiny float noise in its view that differs between replays, and 0.1.28 matched it too exactly, so it never recognised the camera outside the one capture it was built from. That noise now counts as zero; every other field still has to match.
 
 ## 0.1.28 — depth blur switch, cleaner VR replays and VR on by default (Experimental)

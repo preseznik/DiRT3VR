@@ -61,7 +61,23 @@
       "trackName": "ASPEN RALLYX",
       "locationName": "ASPEN",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 227,
+          "name": "NIGHT",
+          "weather": "snowy",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 226,
+          "name": "MORNING, SUN",
+          "weather": "snowy",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 249,
@@ -73,7 +89,23 @@
       "trackName": "ASPEN RALLYX",
       "locationName": "ASPEN",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 228,
+          "name": "MORNING, SUN",
+          "weather": "snowy",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 229,
+          "name": "NIGHT",
+          "weather": "snowy",
+          "lighting": "night",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 250,
@@ -85,7 +117,23 @@
       "trackName": "ASPEN RALLYX",
       "locationName": "ASPEN",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 230,
+          "name": "EVENING, SUN",
+          "weather": "snowy",
+          "lighting": "day_alt",
+          "isDefault": true
+        },
+        {
+          "id": 231,
+          "name": "SNOW",
+          "weather": "heavy_snow",
+          "lighting": "snowing",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 251,
@@ -97,7 +145,23 @@
       "trackName": "ASPEN RALLYX",
       "locationName": "ASPEN",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 233,
+          "name": "SNOW",
+          "weather": "heavy_snow",
+          "lighting": "snowing",
+          "isDefault": false
+        },
+        {
+          "id": 232,
+          "name": "EVENING, SUN",
+          "weather": "snowy",
+          "lighting": "day_alt",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 252,
@@ -109,7 +173,16 @@
       "trackName": "LA COLISEUM RALLYX",
       "locationName": "L.A. COLISEUM",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 234,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 253,
@@ -121,7 +194,16 @@
       "trackName": "LA COLISEUM RALLYX",
       "locationName": "L.A. COLISEUM",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 235,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 254,
@@ -133,7 +215,23 @@
       "trackName": "LA COLISEUM RALLYX",
       "locationName": "L.A. COLISEUM",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 236,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 237,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 255,
@@ -145,7 +243,23 @@
       "trackName": "LA COLISEUM RALLYX",
       "locationName": "L.A. COLISEUM",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 239,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 238,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 257,
@@ -157,7 +271,16 @@
       "trackName": "MONACO RALLYX",
       "locationName": "MONACO",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 240,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 258,
@@ -169,7 +292,16 @@
       "trackName": "MONACO RALLYX",
       "locationName": "MONACO",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 241,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 259,
@@ -181,7 +313,23 @@
       "trackName": "MONACO RALLYX",
       "locationName": "MONACO",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 243,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 242,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 260,
@@ -193,7 +341,23 @@
       "trackName": "MONACO RALLYX",
       "locationName": "MONACO",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 245,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 244,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 303,
@@ -205,7 +369,16 @@
       "trackName": "SHIBUYA RALLYX",
       "locationName": "SHIBUYA",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 250,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 304,
@@ -217,7 +390,16 @@
       "trackName": "SHIBUYA RALLYX",
       "locationName": "SHIBUYA",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 251,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 305,
@@ -229,7 +411,16 @@
       "trackName": "SHIBUYA RALLYX",
       "locationName": "SHIBUYA",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 252,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 306,
@@ -241,7 +432,16 @@
       "trackName": "SHIBUYA RALLYX",
       "locationName": "SHIBUYA",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 253,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 261,
@@ -253,7 +453,16 @@
       "trackName": "SMELTER RALLYX",
       "locationName": "SMELTER",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 246,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 262,
@@ -265,7 +474,16 @@
       "trackName": "SMELTER RALLYX",
       "locationName": "SMELTER",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 247,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 263,
@@ -277,7 +495,23 @@
       "trackName": "SMELTER RALLYX",
       "locationName": "SMELTER",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 292,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 248,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 264,
@@ -289,7 +523,23 @@
       "trackName": "SMELTER RALLYX",
       "locationName": "SMELTER",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 249,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": true
+        },
+        {
+          "id": 291,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 232,
@@ -301,7 +551,44 @@
       "trackName": "FINLAND TRAIL",
       "locationName": "FINLAND",
       "trackType": "point_to_point",
-      "lengthMetres": 6986
+      "lengthMetres": 6986,
+      "conditions": [
+        {
+          "id": 155,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 156,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 157,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 158,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 277,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 233,
@@ -313,7 +600,44 @@
       "trackName": "FINLAND TRAIL",
       "locationName": "FINLAND",
       "trackType": "point_to_point",
-      "lengthMetres": 3441
+      "lengthMetres": 3441,
+      "conditions": [
+        {
+          "id": 278,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 159,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 160,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 161,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 162,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 234,
@@ -325,7 +649,44 @@
       "trackName": "FINLAND TRAIL",
       "locationName": "FINLAND",
       "trackType": "point_to_point",
-      "lengthMetres": 3929
+      "lengthMetres": 3929,
+      "conditions": [
+        {
+          "id": 279,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 164,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 165,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 166,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 163,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 236,
@@ -337,7 +698,30 @@
       "trackName": "KENYA TRAIL",
       "locationName": "KENYA",
       "trackType": "point_to_point",
-      "lengthMetres": 8565
+      "lengthMetres": 8565,
+      "conditions": [
+        {
+          "id": 167,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 168,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 169,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 237,
@@ -349,7 +733,30 @@
       "trackName": "KENYA TRAIL",
       "locationName": "KENYA",
       "trackType": "point_to_point",
-      "lengthMetres": 8556
+      "lengthMetres": 8556,
+      "conditions": [
+        {
+          "id": 172,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 170,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 171,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 238,
@@ -361,7 +768,30 @@
       "trackName": "KENYA TRAIL",
       "locationName": "KENYA",
       "trackType": "point_to_point",
-      "lengthMetres": 4234
+      "lengthMetres": 4234,
+      "conditions": [
+        {
+          "id": 174,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 175,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 173,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 240,
@@ -373,7 +803,44 @@
       "trackName": "MICHIGAN TRAIL",
       "locationName": "MICHIGAN",
       "trackType": "point_to_point",
-      "lengthMetres": 7231
+      "lengthMetres": 7231,
+      "conditions": [
+        {
+          "id": 179,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 177,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 176,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 178,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 288,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 242,
@@ -385,7 +852,44 @@
       "trackName": "MICHIGAN TRAIL",
       "locationName": "MICHIGAN",
       "trackType": "point_to_point",
-      "lengthMetres": 3520
+      "lengthMetres": 3520,
+      "conditions": [
+        {
+          "id": 181,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 180,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 182,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 289,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 183,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 243,
@@ -397,7 +901,44 @@
       "trackName": "MICHIGAN TRAIL",
       "locationName": "MICHIGAN",
       "trackType": "point_to_point",
-      "lengthMetres": 3483
+      "lengthMetres": 3483,
+      "conditions": [
+        {
+          "id": 184,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 290,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 187,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 186,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 185,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 244,
@@ -409,7 +950,37 @@
       "trackName": "NORWAY TRAIL",
       "locationName": "NORWAY",
       "trackType": "point_to_point",
-      "lengthMetres": 8454
+      "lengthMetres": 8454,
+      "conditions": [
+        {
+          "id": 188,
+          "name": "MORNING, SUN",
+          "weather": "snowy",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 191,
+          "name": "SNOW",
+          "weather": "heavy_snow",
+          "lighting": "snowing",
+          "isDefault": false
+        },
+        {
+          "id": 189,
+          "name": "EVENING, SUN",
+          "weather": "snowy",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 190,
+          "name": "NIGHT",
+          "weather": "snowy",
+          "lighting": "night",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 245,
@@ -421,7 +992,37 @@
       "trackName": "NORWAY TRAIL",
       "locationName": "NORWAY",
       "trackType": "point_to_point",
-      "lengthMetres": 4237
+      "lengthMetres": 4237,
+      "conditions": [
+        {
+          "id": 193,
+          "name": "EVENING, SUN",
+          "weather": "snowy",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 194,
+          "name": "NIGHT",
+          "weather": "snowy",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 192,
+          "name": "MORNING, SUN",
+          "weather": "snowy",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 195,
+          "name": "SNOW",
+          "weather": "heavy_snow",
+          "lighting": "snowing",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 246,
@@ -433,7 +1034,37 @@
       "trackName": "NORWAY TRAIL",
       "locationName": "NORWAY",
       "trackType": "point_to_point",
-      "lengthMetres": 4091
+      "lengthMetres": 4091,
+      "conditions": [
+        {
+          "id": 197,
+          "name": "EVENING, SUN",
+          "weather": "snowy",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 198,
+          "name": "NIGHT",
+          "weather": "snowy",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 199,
+          "name": "SNOW",
+          "weather": "heavy_snow",
+          "lighting": "snowing",
+          "isDefault": false
+        },
+        {
+          "id": 196,
+          "name": "MORNING, SUN",
+          "weather": "snowy",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 269,
@@ -445,7 +1076,30 @@
       "trackName": "ASPEN LANDRUSH",
       "locationName": "ASPEN",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 214,
+          "name": "NIGHT",
+          "weather": "snowy",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 212,
+          "name": "MORNING, SUN",
+          "weather": "snowy",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 213,
+          "name": "SNOW",
+          "weather": "heavy_snow",
+          "lighting": "snowing",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 270,
@@ -457,7 +1111,30 @@
       "trackName": "ASPEN LANDRUSH",
       "locationName": "ASPEN",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 217,
+          "name": "NIGHT",
+          "weather": "snowy",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 216,
+          "name": "SNOW",
+          "weather": "heavy_snow",
+          "lighting": "snowing",
+          "isDefault": false
+        },
+        {
+          "id": 215,
+          "name": "MORNING, SUN",
+          "weather": "snowy",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 271,
@@ -469,7 +1146,16 @@
       "trackName": "ASPEN LANDRUSH",
       "locationName": "ASPEN",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 218,
+          "name": "EVENING, SUN",
+          "weather": "snowy",
+          "lighting": "day_alt",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 272,
@@ -481,7 +1167,16 @@
       "trackName": "ASPEN LANDRUSH",
       "locationName": "ASPEN",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 219,
+          "name": "EVENING, SUN",
+          "weather": "snowy",
+          "lighting": "day_alt",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 273,
@@ -493,7 +1188,16 @@
       "trackName": "SMELTER LANDRUSH",
       "locationName": "SMELTER",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 220,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 274,
@@ -505,7 +1209,16 @@
       "trackName": "SMELTER LANDRUSH",
       "locationName": "SMELTER",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 221,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 275,
@@ -517,7 +1230,30 @@
       "trackName": "SMELTER LANDRUSH",
       "locationName": "SMELTER",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 294,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 222,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 223,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 276,
@@ -529,7 +1265,30 @@
       "trackName": "SMELTER LANDRUSH",
       "locationName": "SMELTER",
       "trackType": "circuit",
-      "lengthMetres": 0
+      "lengthMetres": 0,
+      "conditions": [
+        {
+          "id": 293,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 224,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 225,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 191,
@@ -541,7 +1300,44 @@
       "trackName": "FINLAND RALLY",
       "locationName": "FINLAND",
       "trackType": "point_to_point",
-      "lengthMetres": 5982
+      "lengthMetres": 5982,
+      "conditions": [
+        {
+          "id": 1,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 4,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 5,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 269,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 6,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 192,
@@ -553,7 +1349,44 @@
       "trackName": "FINLAND RALLY",
       "locationName": "FINLAND",
       "trackType": "point_to_point",
-      "lengthMetres": 6249
+      "lengthMetres": 6249,
+      "conditions": [
+        {
+          "id": 7,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 8,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 9,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 10,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 270,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 194,
@@ -565,7 +1398,44 @@
       "trackName": "FINLAND RALLY",
       "locationName": "FINLAND",
       "trackType": "point_to_point",
-      "lengthMetres": 5604
+      "lengthMetres": 5604,
+      "conditions": [
+        {
+          "id": 14,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 271,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 12,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 13,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 11,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 195,
@@ -577,7 +1447,44 @@
       "trackName": "FINLAND RALLY",
       "locationName": "FINLAND",
       "trackType": "point_to_point",
-      "lengthMetres": 2733
+      "lengthMetres": 2733,
+      "conditions": [
+        {
+          "id": 18,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 17,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 15,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 272,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 16,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 196,
@@ -589,7 +1496,44 @@
       "trackName": "FINLAND RALLY",
       "locationName": "FINLAND",
       "trackType": "point_to_point",
-      "lengthMetres": 2911
+      "lengthMetres": 2911,
+      "conditions": [
+        {
+          "id": 19,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 20,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 273,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 22,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 21,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 197,
@@ -601,7 +1545,44 @@
       "trackName": "FINLAND RALLY",
       "locationName": "FINLAND",
       "trackType": "point_to_point",
-      "lengthMetres": 3193
+      "lengthMetres": 3193,
+      "conditions": [
+        {
+          "id": 274,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 26,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 23,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 24,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 25,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 198,
@@ -613,7 +1594,44 @@
       "trackName": "FINLAND RALLY",
       "locationName": "FINLAND",
       "trackType": "point_to_point",
-      "lengthMetres": 2759
+      "lengthMetres": 2759,
+      "conditions": [
+        {
+          "id": 28,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 30,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 275,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 29,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 27,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 199,
@@ -625,7 +1643,44 @@
       "trackName": "FINLAND RALLY",
       "locationName": "FINLAND",
       "trackType": "point_to_point",
-      "lengthMetres": 3202
+      "lengthMetres": 3202,
+      "conditions": [
+        {
+          "id": 34,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 32,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 33,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 276,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 31,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 200,
@@ -637,7 +1692,30 @@
       "trackName": "KENYA RALLY",
       "locationName": "KENYA",
       "trackType": "point_to_point",
-      "lengthMetres": 4719
+      "lengthMetres": 4719,
+      "conditions": [
+        {
+          "id": 35,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 36,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 37,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 201,
@@ -649,7 +1727,30 @@
       "trackName": "KENYA RALLY",
       "locationName": "KENYA",
       "trackType": "point_to_point",
-      "lengthMetres": 4167
+      "lengthMetres": 4167,
+      "conditions": [
+        {
+          "id": 38,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 40,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 39,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 202,
@@ -661,7 +1762,30 @@
       "trackName": "KENYA RALLY",
       "locationName": "KENYA",
       "trackType": "point_to_point",
-      "lengthMetres": 2364
+      "lengthMetres": 2364,
+      "conditions": [
+        {
+          "id": 41,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 42,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 43,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 203,
@@ -673,7 +1797,30 @@
       "trackName": "KENYA RALLY",
       "locationName": "KENYA",
       "trackType": "point_to_point",
-      "lengthMetres": 3239
+      "lengthMetres": 3239,
+      "conditions": [
+        {
+          "id": 44,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 45,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 46,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 204,
@@ -685,7 +1832,30 @@
       "trackName": "KENYA RALLY",
       "locationName": "KENYA",
       "trackType": "point_to_point",
-      "lengthMetres": 2788
+      "lengthMetres": 2788,
+      "conditions": [
+        {
+          "id": 47,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 48,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 49,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 205,
@@ -697,7 +1867,30 @@
       "trackName": "KENYA RALLY",
       "locationName": "KENYA",
       "trackType": "point_to_point",
-      "lengthMetres": 2764
+      "lengthMetres": 2764,
+      "conditions": [
+        {
+          "id": 50,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 51,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 52,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 206,
@@ -709,7 +1902,30 @@
       "trackName": "KENYA RALLY",
       "locationName": "KENYA",
       "trackType": "point_to_point",
-      "lengthMetres": 2913
+      "lengthMetres": 2913,
+      "conditions": [
+        {
+          "id": 55,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 54,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 53,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 207,
@@ -721,7 +1937,30 @@
       "trackName": "KENYA RALLY",
       "locationName": "KENYA",
       "trackType": "point_to_point",
-      "lengthMetres": 3246
+      "lengthMetres": 3246,
+      "conditions": [
+        {
+          "id": 56,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 57,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 58,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 216,
@@ -733,7 +1972,44 @@
       "trackName": "MICHIGAN RALLY",
       "locationName": "MICHIGAN",
       "trackType": "point_to_point",
-      "lengthMetres": 5356
+      "lengthMetres": 5356,
+      "conditions": [
+        {
+          "id": 280,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 60,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 59,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 62,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 61,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 217,
@@ -745,7 +2021,44 @@
       "trackName": "MICHIGAN RALLY",
       "locationName": "MICHIGAN",
       "trackType": "point_to_point",
-      "lengthMetres": 5214
+      "lengthMetres": 5214,
+      "conditions": [
+        {
+          "id": 66,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 65,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 64,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 281,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 63,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 218,
@@ -757,7 +2070,44 @@
       "trackName": "MICHIGAN RALLY",
       "locationName": "MICHIGAN",
       "trackType": "point_to_point",
-      "lengthMetres": 4813
+      "lengthMetres": 4813,
+      "conditions": [
+        {
+          "id": 282,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 67,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 69,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 68,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 70,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 219,
@@ -769,7 +2119,44 @@
       "trackName": "MICHIGAN RALLY",
       "locationName": "MICHIGAN",
       "trackType": "point_to_point",
-      "lengthMetres": 2391
+      "lengthMetres": 2391,
+      "conditions": [
+        {
+          "id": 73,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 72,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 283,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 74,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 71,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 220,
@@ -781,7 +2168,44 @@
       "trackName": "MICHIGAN RALLY",
       "locationName": "MICHIGAN",
       "trackType": "point_to_point",
-      "lengthMetres": 2660
+      "lengthMetres": 2660,
+      "conditions": [
+        {
+          "id": 77,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 78,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 76,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 284,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 75,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 221,
@@ -793,7 +2217,44 @@
       "trackName": "MICHIGAN RALLY",
       "locationName": "MICHIGAN",
       "trackType": "point_to_point",
-      "lengthMetres": 2738
+      "lengthMetres": 2738,
+      "conditions": [
+        {
+          "id": 81,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 82,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 80,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 285,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 79,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 222,
@@ -805,7 +2266,44 @@
       "trackName": "MICHIGAN RALLY",
       "locationName": "MICHIGAN",
       "trackType": "point_to_point",
-      "lengthMetres": 2423
+      "lengthMetres": 2423,
+      "conditions": [
+        {
+          "id": 83,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 84,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 85,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 86,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 286,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 223,
@@ -817,7 +2315,44 @@
       "trackName": "MICHIGAN RALLY",
       "locationName": "MICHIGAN",
       "trackType": "point_to_point",
-      "lengthMetres": 2803
+      "lengthMetres": 2803,
+      "conditions": [
+        {
+          "id": 88,
+          "name": "EVENING, SUN",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 287,
+          "name": "RAIN",
+          "weather": "heavy_rain",
+          "lighting": "wet",
+          "isDefault": false
+        },
+        {
+          "id": 89,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 87,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 90,
+          "name": "WET",
+          "weather": "wet",
+          "lighting": "wet",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 224,
@@ -829,7 +2364,30 @@
       "trackName": "MONTE CARLO RALLY",
       "locationName": "MONTE CARLO",
       "trackType": "point_to_point",
-      "lengthMetres": 5659
+      "lengthMetres": 5659,
+      "conditions": [
+        {
+          "id": 123,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 125,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 124,
+          "name": "FOG",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 225,
@@ -841,7 +2399,30 @@
       "trackName": "MONTE CARLO RALLY",
       "locationName": "MONTE CARLO",
       "trackType": "point_to_point",
-      "lengthMetres": 6237
+      "lengthMetres": 6237,
+      "conditions": [
+        {
+          "id": 129,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 128,
+          "name": "FOG",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 127,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 226,
@@ -853,7 +2434,30 @@
       "trackName": "MONTE CARLO RALLY",
       "locationName": "MONTE CARLO",
       "trackType": "point_to_point",
-      "lengthMetres": 6329
+      "lengthMetres": 6329,
+      "conditions": [
+        {
+          "id": 133,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 132,
+          "name": "FOG",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 131,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 227,
@@ -865,7 +2469,30 @@
       "trackName": "MONTE CARLO RALLY",
       "locationName": "MONTE CARLO",
       "trackType": "point_to_point",
-      "lengthMetres": 5254
+      "lengthMetres": 5254,
+      "conditions": [
+        {
+          "id": 137,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 135,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 136,
+          "name": "FOG",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 228,
@@ -877,7 +2504,30 @@
       "trackName": "MONTE CARLO RALLY",
       "locationName": "MONTE CARLO",
       "trackType": "point_to_point",
-      "lengthMetres": 3038
+      "lengthMetres": 3038,
+      "conditions": [
+        {
+          "id": 139,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 140,
+          "name": "FOG",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 141,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 229,
@@ -889,7 +2539,30 @@
       "trackName": "MONTE CARLO RALLY",
       "locationName": "MONTE CARLO",
       "trackType": "point_to_point",
-      "lengthMetres": 3433
+      "lengthMetres": 3433,
+      "conditions": [
+        {
+          "id": 144,
+          "name": "FOG",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 145,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 143,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 230,
@@ -901,7 +2574,30 @@
       "trackName": "MONTE CARLO RALLY",
       "locationName": "MONTE CARLO",
       "trackType": "point_to_point",
-      "lengthMetres": 2599
+      "lengthMetres": 2599,
+      "conditions": [
+        {
+          "id": 147,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 148,
+          "name": "FOG",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 149,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 231,
@@ -913,7 +2609,30 @@
       "trackName": "MONTE CARLO RALLY",
       "locationName": "MONTE CARLO",
       "trackType": "point_to_point",
-      "lengthMetres": 2563
+      "lengthMetres": 2563,
+      "conditions": [
+        {
+          "id": 153,
+          "name": "NIGHT",
+          "weather": "dry",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 152,
+          "name": "FOG",
+          "weather": "dry",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 151,
+          "name": "MORNING, SUN",
+          "weather": "dry",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 208,
@@ -925,7 +2644,37 @@
       "trackName": "NORWAY RALLY",
       "locationName": "NORWAY",
       "trackType": "point_to_point",
-      "lengthMetres": 5210
+      "lengthMetres": 5210,
+      "conditions": [
+        {
+          "id": 92,
+          "name": "EVENING, SUN",
+          "weather": "snowy",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 93,
+          "name": "NIGHT",
+          "weather": "snowy",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 94,
+          "name": "SNOW",
+          "weather": "heavy_snow",
+          "lighting": "snowing",
+          "isDefault": false
+        },
+        {
+          "id": 91,
+          "name": "MORNING, SUN",
+          "weather": "snowy",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 209,
@@ -937,7 +2686,37 @@
       "trackName": "NORWAY RALLY",
       "locationName": "NORWAY",
       "trackType": "point_to_point",
-      "lengthMetres": 4828
+      "lengthMetres": 4828,
+      "conditions": [
+        {
+          "id": 95,
+          "name": "MORNING, SUN",
+          "weather": "snowy",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 96,
+          "name": "EVENING, SUN",
+          "weather": "snowy",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 97,
+          "name": "NIGHT",
+          "weather": "snowy",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 98,
+          "name": "SNOW",
+          "weather": "heavy_snow",
+          "lighting": "snowing",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 210,
@@ -949,7 +2728,37 @@
       "trackName": "NORWAY RALLY",
       "locationName": "NORWAY",
       "trackType": "point_to_point",
-      "lengthMetres": 5284
+      "lengthMetres": 5284,
+      "conditions": [
+        {
+          "id": 99,
+          "name": "MORNING, SUN",
+          "weather": "snowy",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 102,
+          "name": "SNOW",
+          "weather": "heavy_snow",
+          "lighting": "snowing",
+          "isDefault": false
+        },
+        {
+          "id": 100,
+          "name": "EVENING, SUN",
+          "weather": "snowy",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 101,
+          "name": "NIGHT",
+          "weather": "snowy",
+          "lighting": "night",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 211,
@@ -961,7 +2770,37 @@
       "trackName": "NORWAY RALLY",
       "locationName": "NORWAY",
       "trackType": "point_to_point",
-      "lengthMetres": 2851
+      "lengthMetres": 2851,
+      "conditions": [
+        {
+          "id": 103,
+          "name": "MORNING, SUN",
+          "weather": "snowy",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 104,
+          "name": "EVENING, SUN",
+          "weather": "snowy",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 105,
+          "name": "NIGHT",
+          "weather": "snowy",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 106,
+          "name": "SNOW",
+          "weather": "heavy_snow",
+          "lighting": "snowing",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 212,
@@ -973,7 +2812,37 @@
       "trackName": "NORWAY RALLY",
       "locationName": "NORWAY",
       "trackType": "point_to_point",
-      "lengthMetres": 2862
+      "lengthMetres": 2862,
+      "conditions": [
+        {
+          "id": 108,
+          "name": "EVENING, SUN",
+          "weather": "snowy",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 107,
+          "name": "MORNING, SUN",
+          "weather": "snowy",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 110,
+          "name": "SNOW",
+          "weather": "heavy_snow",
+          "lighting": "snowing",
+          "isDefault": false
+        },
+        {
+          "id": 109,
+          "name": "NIGHT",
+          "weather": "snowy",
+          "lighting": "night",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 213,
@@ -985,7 +2854,37 @@
       "trackName": "NORWAY RALLY",
       "locationName": "NORWAY",
       "trackType": "point_to_point",
-      "lengthMetres": 3447
+      "lengthMetres": 3447,
+      "conditions": [
+        {
+          "id": 111,
+          "name": "MORNING, SUN",
+          "weather": "snowy",
+          "lighting": "day",
+          "isDefault": true
+        },
+        {
+          "id": 112,
+          "name": "EVENING, SUN",
+          "weather": "snowy",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 113,
+          "name": "NIGHT",
+          "weather": "snowy",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 114,
+          "name": "SNOW",
+          "weather": "heavy_snow",
+          "lighting": "snowing",
+          "isDefault": false
+        }
+      ]
     },
     {
       "id": 214,
@@ -997,7 +2896,37 @@
       "trackName": "NORWAY RALLY",
       "locationName": "NORWAY",
       "trackType": "point_to_point",
-      "lengthMetres": 3601
+      "lengthMetres": 3601,
+      "conditions": [
+        {
+          "id": 117,
+          "name": "NIGHT",
+          "weather": "snowy",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 118,
+          "name": "SNOW",
+          "weather": "heavy_snow",
+          "lighting": "snowing",
+          "isDefault": false
+        },
+        {
+          "id": 116,
+          "name": "EVENING, SUN",
+          "weather": "snowy",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 115,
+          "name": "MORNING, SUN",
+          "weather": "snowy",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     },
     {
       "id": 215,
@@ -1009,7 +2938,37 @@
       "trackName": "NORWAY RALLY",
       "locationName": "NORWAY",
       "trackType": "point_to_point",
-      "lengthMetres": 3700
+      "lengthMetres": 3700,
+      "conditions": [
+        {
+          "id": 120,
+          "name": "EVENING, SUN",
+          "weather": "snowy",
+          "lighting": "day_alt",
+          "isDefault": false
+        },
+        {
+          "id": 121,
+          "name": "NIGHT",
+          "weather": "snowy",
+          "lighting": "night",
+          "isDefault": false
+        },
+        {
+          "id": 122,
+          "name": "SNOW",
+          "weather": "heavy_snow",
+          "lighting": "snowing",
+          "isDefault": false
+        },
+        {
+          "id": 119,
+          "name": "MORNING, SUN",
+          "weather": "snowy",
+          "lighting": "day",
+          "isDefault": true
+        }
+      ]
     }
   ],
   "cars": [

@@ -27,6 +27,7 @@ Public Class ProfileValues
     Public Property DirectOpponentCars As String = "class"
     Public Property DirectDifficulty As Integer = -1
     Public Property DirectAfterFinish As String = "quit"
+    Public Property DirectConditions As Integer
     Public Property DirectGearbox As String = "automatic"
     Public Property DirectAbs As Boolean = True
     Public Property DirectStability As Boolean
@@ -46,7 +47,7 @@ Public Class ProfileValues
             .GraphicsQuality = New Dictionary(Of String, String)(value.GraphicsQuality),
             .VrGraphicsQuality = New Dictionary(Of String, String)(value.VrGraphicsQuality),
             .LaunchMode = value.LaunchMode, .DirectRoute = value.DirectRoute, .DirectCar = value.DirectCar, .DirectLaps = value.DirectLaps,
-            .DirectOpponents = value.DirectOpponents, .DirectOpponentCars = value.DirectOpponentCars, .DirectDifficulty = value.DirectDifficulty, .DirectAfterFinish = value.DirectAfterFinish,
+            .DirectOpponents = value.DirectOpponents, .DirectOpponentCars = value.DirectOpponentCars, .DirectDifficulty = value.DirectDifficulty, .DirectAfterFinish = value.DirectAfterFinish, .DirectConditions = value.DirectConditions,
             .DirectGearbox = value.DirectGearbox, .DirectAbs = value.DirectAbs, .DirectStability = value.DirectStability, .DirectCornerBraking = value.DirectCornerBraking,
             .DirectThrottle = value.DirectThrottle, .DirectSteering = value.DirectSteering, .CockpitSteeringShakeOff = value.CockpitSteeringShakeOff}
     End Function
@@ -69,7 +70,7 @@ Public Class ProfileValues
             .GraphicsQuality = New Dictionary(Of String, String)(If(GraphicsQuality, New Dictionary(Of String, String))),
             .VrGraphicsQuality = New Dictionary(Of String, String)(If(VrGraphicsQuality, New Dictionary(Of String, String))),
             .LaunchMode = If(LaunchMode, "normal"), .DirectRoute = DirectRoute, .DirectCar = If(DirectCar, ""), .DirectLaps = DirectLaps,
-            .DirectOpponents = DirectOpponents, .DirectOpponentCars = If(DirectOpponentCars, "class"), .DirectDifficulty = DirectDifficulty, .DirectAfterFinish = If(DirectAfterFinish, "quit"),
+            .DirectOpponents = DirectOpponents, .DirectOpponentCars = If(DirectOpponentCars, "class"), .DirectDifficulty = DirectDifficulty, .DirectAfterFinish = If(DirectAfterFinish, "quit"), .DirectConditions = DirectConditions,
             .DirectGearbox = If(DirectGearbox, "automatic"), .DirectAbs = DirectAbs, .DirectStability = DirectStability, .DirectCornerBraking = DirectCornerBraking,
             .DirectThrottle = DirectThrottle, .DirectSteering = DirectSteering, .CockpitSteeringShakeOff = CockpitSteeringShakeOff}
         result.Validate()

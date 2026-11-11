@@ -16,6 +16,21 @@ Public NotInheritable Class EventCatalog
         End Function
     End Class
 
+    ' One of a route's weather/lighting pairs (#0e2b82ba): DiRT 3's own track_model_conditions row, with
+    ' its Single Race name. IsDefault marks the row a direct start takes by itself.
+    Public Class EventCondition
+        Public Property Id As Integer
+        Public Property Name As String = ""
+        Public Property Weather As String = ""
+        Public Property Lighting As String = ""
+        Public Property IsDefault As Boolean
+
+        Public Overrides Function ToString() As String
+            Dim text = If(Name = "", Weather & " / " & Lighting, Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(Name.ToLowerInvariant()))
+            Return If(IsDefault, text & " (default)", text)
+        End Function
+    End Class
+
     Public Class EventRoute
         Public Property Id As Integer
         Public Property Discipline As String = ""
@@ -27,6 +42,8 @@ Public NotInheritable Class EventCatalog
         Public Property LocationName As String = ""
         Public Property TrackType As String = ""
         Public Property LengthMetres As Integer
+        ' Single Race order; empty for a catalog without conditions (the route's default only).
+        Public Property Conditions As New List(Of EventCondition)
 
         Public Overrides Function ToString() As String
             Dim length = If(LengthMetres > 0, " (" & (LengthMetres / 1000.0).ToString("0.0", Globalization.CultureInfo.InvariantCulture) & " km)", "")
@@ -78,6 +95,13 @@ Public NotInheritable Class EventCatalog
         If catalog.Disciplines.Any(Function(item) Not Identifier.IsMatch(item.Id)) OrElse disciplineIds.Count <> catalog.Disciplines.Count Then Throw New IOException("Invalid event catalog disciplines.")
         If catalog.Routes.Any(Function(item) Not disciplineIds.Contains(item.Discipline) OrElse Not Identifier.IsMatch(item.Country) OrElse Not Identifier.IsMatch(item.Track) OrElse Not Identifier.IsMatch(item.Route)) OrElse
            catalog.Routes.Select(Function(item) item.Id).Distinct().Count() <> catalog.Routes.Count Then Throw New IOException("Invalid event catalog routes.")
+        ' Conditions become the renderer's weather and lighting values, so only names it knows are accepted.
+        If catalog.Routes.Any(Function(item) item.Conditions Is Nothing OrElse (item.Conditions.Count > 0 AndAlso
+                                  (item.Conditions.Where(Function(condition) condition.IsDefault).Count() <> 1 OrElse
+                                   item.Conditions.Select(Function(condition) condition.Id).Distinct().Count() <> item.Conditions.Count OrElse
+                                   item.Conditions.Any(Function(condition) Not DirectPractice.WeatherValues.ContainsKey(If(condition.Weather, "")) OrElse Not DirectPractice.LightingValues.ContainsKey(If(condition.Lighting, "")))))) Then
+            Throw New IOException("Invalid event catalog conditions.")
+        End If
         If catalog.Cars.Any(Function(item) Not disciplineIds.Contains(item.Discipline) OrElse Not Identifier.IsMatch(item.Code)) OrElse
            catalog.Cars.Select(Function(item) item.Code).Distinct().Count() <> catalog.Cars.Count Then Throw New IOException("Invalid event catalog cars.")
         Return catalog

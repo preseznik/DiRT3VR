@@ -250,8 +250,41 @@ inline void MoveToFront(InputDevice* devices,size_t index) {
     std::rotate(devices,devices+index,devices+index+1);
 }
 
+// Conditions (#0e2b82ba, docs/research/conditions.md): the race setup (0x608f90) takes the
+// route's first track_model_conditions row, which is the plain day for every direct-practice
+// route, and turns it into a weather enum ([ebp-0x18]) and a lighting enum ([ebp-0xc]). At
+// 0x60943f it loads both for the race message; the change loads the requested values instead
+// (push imm8; pop ecx; push imm8; pop edx: the same 6 bytes, the stack balanced). That code
+// runs for every race, so it stays only while the benchmark flag is set: Tick puts the original
+// back once a direct start returns to the menus.
+// Weather: 0 dry, 1 wet, 2 light_rain, 3 heavy_rain, 4 light_snow, 5 heavy_snow, 6 snowy.
+// Lighting: 0 day, 1 day_alt, 2 wet, 3 night, 4 snowing.
+inline constexpr uintptr_t conditionsRva=0x20943f;
+inline constexpr uint8_t conditionsOriginal[]{0x8b,0x4d,0xe8,0x8b,0x55,0xf4}; // mov ecx,[ebp-0x18]; mov edx,[ebp-0xc]
+inline constexpr unsigned maxWeather=6,maxLighting=4;
+inline bool ConditionsSiteMatches(const uint8_t* image) {
+    return std::memcmp(image+conditionsRva,conditionsOriginal,sizeof(conditionsOriginal))==0;
+}
+inline bool ConditionsCode(unsigned weather,unsigned lighting,uint8_t (&bytes)[6]) {
+    if(weather>maxWeather || lighting>maxLighting) return false;
+    const uint8_t code[6]{0x6a,uint8_t(weather),0x59,0x6a,uint8_t(lighting),0x5a};
+    std::memcpy(bytes,code,sizeof(code));
+    return true;
+}
+// "W,L" with one digit each; anything else (or a value out of range) is no request.
+inline bool ParseConditions(const char* text,unsigned& weather,unsigned& lighting) {
+    if(!text || std::strlen(text)!=3 || text[1]!=',' || text[0]<'0' || text[0]>'9' || text[2]<'0' || text[2]>'9') return false;
+    const unsigned w=unsigned(text[0]-'0'),l=unsigned(text[2]-'0');
+    if(w>maxWeather || l>maxLighting) return false;
+    weather=w; lighting=l; return true;
+}
+// One Present's worth: the original code goes back once the benchmark flag is off.
+inline bool RestoreConditions(bool applied,uint8_t benchmarkActive) { return applied && benchmarkActive==0; }
+
 bool Requested();
 bool ReturnRequested();
+// DIRT3VR_DIRECT_CONDITIONS="W,L": true and the values when a valid request is set.
+bool RequestedConditions(unsigned& weather,unsigned& lighting);
 // DIRT3VR_DIRECT_DEVICES: true when it holds a valid list.
 bool DevicesRequested();
 // Hooks the device list once; false leaves DiRT 3's own order (keyboard first).

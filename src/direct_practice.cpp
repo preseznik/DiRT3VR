@@ -15,6 +15,8 @@ bool Flag(const wchar_t* name) {
 
 std::atomic<bool> installed{};
 std::atomic<bool> returnInstalled{};
+std::atomic<bool> conditionsInstalled{};
+uint8_t conditionsCode[6]{};
 
 // Writes size bytes over original code. A failed write must not leave a partial behaviour
 // change behind, so any failure puts the original bytes back.
@@ -38,6 +40,12 @@ bool WriteCode(uint8_t* target,const uint8_t* bytes,const uint8_t* original,size
 bool Requested() { return Flag(L"DIRT3VR_DIRECT_PRACTICE"); }
 bool ReturnRequested() { return Flag(L"DIRT3VR_DIRECT_RETURN"); }
 
+bool RequestedConditions(unsigned& weather,unsigned& lighting) {
+    char text[8]{};
+    const auto length=GetEnvironmentVariableA("DIRT3VR_DIRECT_CONDITIONS",text,sizeof(text));
+    return length>0 && length<sizeof(text) && ParseConditions(text,weather,lighting);
+}
+
 unsigned RequestedLaps() {
     wchar_t text[8]{};
     const auto length=GetEnvironmentVariableW(L"DIRT3VR_DIRECT_LAPS",text,8);
@@ -54,9 +62,17 @@ void Tick(void (*log)(const char*,...)) {
     static const unsigned laps=RequestedLaps();
     const bool control=installed.load(std::memory_order_acquire);
     const bool back=returnInstalled.load(std::memory_order_acquire);
-    if(!(laps && control) && !back) return;
+    const bool conditions=conditionsInstalled.load(std::memory_order_acquire);
+    if(!(laps && control) && !back && !conditions) return;
     auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
     auto* active=reinterpret_cast<volatile uint8_t*>(image+benchmarkFlagRva);
+    // Races started from the menus after a direct start keep the conditions they choose.
+    if(RestoreConditions(conditions,*active) &&
+       std::memcmp(image+conditionsRva,conditionsCode,sizeof(conditionsCode))==0 &&
+       WriteCode(image+conditionsRva,conditionsOriginal,conditionsCode,sizeof(conditionsOriginal),"Direct practice conditions restore",log)) {
+        conditionsInstalled.store(false,std::memory_order_release);
+        log("Direct practice conditions: benchmark mode off, the game's own conditions are back");
+    }
     if(laps && control) {
         auto* count=reinterpret_cast<volatile uint32_t*>(image+lapsRva);
         uint32_t value=*count;
@@ -90,6 +106,15 @@ bool Install(void (*log)(const char*,...)) {
         installed.store(true,std::memory_order_release);
         log("Direct practice: benchmark start keeps the player's car under player control (base=0x%x)",static_cast<unsigned>(base));
         if(const auto laps=RequestedLaps()) log("Direct practice laps: %u requested",laps);
+        unsigned weather{},lighting{};
+        if(RequestedConditions(weather,lighting)) {
+            if(!ConditionsSiteMatches(image)) log("Direct practice conditions refused: race setup instructions differ; the route's default conditions stay");
+            else if(ConditionsCode(weather,lighting,conditionsCode) &&
+                    WriteCode(image+conditionsRva,conditionsCode,conditionsOriginal,sizeof(conditionsCode),"Direct practice conditions",log)) {
+                conditionsInstalled.store(true,std::memory_order_release);
+                log("Direct practice conditions: weather %u, lighting %u while the benchmark start lasts",weather,lighting);
+            }
+        }
         // The pause menu is separate: if only its site differs, the player still drives.
         if(!PauseSiteMatches(image,base)) log("Direct practice pause refused: pause check instructions differ; Esc stays without a menu");
         else {
