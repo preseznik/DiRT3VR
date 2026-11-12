@@ -24,11 +24,24 @@ constexpr size_t LightContextBytes = 0x1d0;
 // Runs the recorded builders again with this context (after both eyes, the original camera's copy).
 void ReplaySceneLights(const std::vector<LightCall>& calls, void* context) noexcept;
 
+// Water reflection (#dd027e16; docs/research/water-reflection.md). The reflection renderer mirrors the main
+// camera about the water once per frame and draws through the scene outer, which returns here.
+constexpr uintptr_t ReflectionOuterReturnRva = 0x1adb69;
+// The scene observer's inner hook passes every inner call of that outer: this frame's reflection lists.
+void RememberReflectionDraw(void* renderer, const void* lists, void* a, void* b, void* c, void* d, void* e) noexcept;
+// Before an eye's own draw, with the main cameras already at the eye: mirrors the eye's camera and draws the
+// reflection again from this frame's lists with the eye's projection. False keeps the original reflection.
+using ReflectionInnerFn = void (__thiscall*)(void*, void*, void*, void*, void*, void*, void*);
+bool RenderEyeReflection(void* mainRenderer, const XrFovf& fov, ReflectionInnerFn inner) noexcept;
+
 class ProjectionScope {
 public:
     // lights: rerun once, right after this eye's first camera upload into the context.
     ProjectionScope(void* renderer, void* context, void* cameraA, void* cameraB, const XrFovf& fov,
                     const std::vector<LightCall>* lights = nullptr) noexcept;
+    // The water reflection's draw for one eye: its renderer, its context and the mirrored camera.
+    struct Reflection {};
+    ProjectionScope(Reflection, void* renderer, void* context, void* cameraA, void* cameraB, const XrFovf& fov) noexcept;
     ~ProjectionScope();
     ProjectionScope(const ProjectionScope&) = delete;
     ProjectionScope& operator=(const ProjectionScope&) = delete;

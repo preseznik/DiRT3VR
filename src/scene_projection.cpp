@@ -34,6 +34,22 @@ struct LightGuard { uintptr_t rva; uintptr_t nameRva; };
 constexpr LightGuard LightNames[] = {{0x7d4bc4, 0xb32a48}, {0x7da143, 0xb32a48}, {0x7da2b2, 0xb32ba8},
                                      {0x7da409, 0xb32a48}, {0x7da579, 0xb32ba8}, {0x7daf8d, 0xb32bb4}};
 constexpr unsigned char Ret8[] = {0xc2,0x08,0x00}, Ret16[] = {0xc2,0x10,0x00};
+// Water reflection (#dd027e16; docs/research/water-reflection.md). The reflection renderer (vtable 0xeb2bf0)
+// keeps the main camera (main renderer +0x600) at +0x970. Once per frame 0x5adb90 mirrors that camera about
+// the water into its context (+0x8d4) and camera (+0x8e0), culls with +0x380, then initialises its prepared
+// lists at 0x5ae207; draw method 0x5ada70 calls the scene outer and releases the lists. Each eye reruns
+// 0x5adb90 only up to 0x5ae207, leaving through the function's own epilogue at 0x5ae270, and draws the
+// recorded lists again.
+constexpr uintptr_t OuterRva = 0x58a270, ReflectionTableRva = 0xab2bf0, ReflectionDrawRva = 0x1ada70;
+constexpr uintptr_t ReflectionCameraRva = 0x1adb90, ReflectionTailRva = 0x1ae207, ReflectionExitRva = 0x1ae270;
+constexpr uintptr_t ReflectionCopyReturnRva = 0x1ae1d5, ReflectionCameraCopyRva = 0x7c260;
+constexpr size_t ReflectionHeaderBytes = 0x108;
+// fld [edx+50]; lea ecx,[esi+998]; fstp [esi+470]
+constexpr unsigned char ReflectionTailBytes[] = {0xd9,0x42,0x50,0x8d,0x8e,0x98,0x09,0x00,0x00,0xd9,0x9e,0x70,0x04,0x00,0x00};
+// pop edi; mov byte [esi+e08],1; pop esi; mov esp,ebp; pop ebp; mov esp,ebx; pop ebx; ret
+constexpr unsigned char ReflectionExitBytes[] = {0x5f,0xc6,0x86,0x08,0x0e,0x00,0x00,0x01,0x5e,0x8b,0xe5,0x5d,0x8b,0xe3,0x5b,0xc3};
+// The draw method's outer call: lea edx,[esi+8e0]; push edx; push eax; mov ecx,esi; call outer
+constexpr unsigned char ReflectionDrawCall[] = {0x8d,0x96,0xe0,0x08,0x00,0x00,0x52,0x50,0x8b,0xce};
 constexpr unsigned char StereoGetterEntry[] = {0x55,0x8b,0xec,0x51,0x83,0xb9,0x60,0x4d,0x00,0x00,0x00,0x7e,0x06,0xb0,0x01,0x8b,0xe5,0x5d,0xc3,0x8b,0x81,0x78,0x4d,0x00,0x00,0x85,0xc0,0x74,0x1a,0x8d,0x4d,0xff,0x51,0x50,0xc6,0x45,0xff,0x00,0xe8,0xa5,0x6d,0x4f,0x00,0x83,0xc4,0x08,0x85,0xc0,0x75,0x05,0x38,0x45,0xff,0x75,0xd6,0x32,0xc0,0x8b,0xe5,0x5d,0xc3};
 using SetupFn = void (__thiscall*)(void*, void*, void*, float, unsigned);
 using UploadFn = void (__thiscall*)(void*, void*);
@@ -63,6 +79,27 @@ thread_local ProjectionScope* setupScope{};
 struct PreparedRenderer { void* renderer; void* context; };
 thread_local PreparedRenderer prepared{};
 thread_local const PreparedRenderer* treeScope{};
+
+// The water reflection's last draw, recorded and replayed on the render thread only.
+struct ReflectionRecord {
+    void* renderer{};
+    void *a{}, *b{}, *c{}, *d{}, *e{};
+    std::array<unsigned char, ReflectionHeaderBytes> lists{};
+    uint32_t used[2]{}; // The prepared lists' two allocators (+0x97c, +0x98c), released after the draw.
+    uint32_t frame{};
+    DWORD thread{};
+    bool valid{};
+};
+ReflectionRecord reflection;
+std::atomic_bool reflectionInstalled{}, reflectionStopped{};
+std::atomic_uint64_t reflectionDraws{}, reflectionWidened{}, reflectionRejected{};
+// Read by ReflectionTail from inline assembly, so plain globals.
+void* reflectionTrampoline{};
+void* reflectionExit{};
+void* reflectionCameraRenderer{};
+DWORD reflectionCameraThread{};
+unsigned reflectionCameraExits{};
+bool reflectionCameraOnly{};
 
 void Report(const char* text) noexcept {
     try { if(logMessage) logMessage("%s", text); } catch(...) { }
@@ -169,6 +206,62 @@ void RememberLight(const LightCall& call) noexcept {
 bool BuildVolume(void* output, const void* matrix) noexcept {
     __try { return buildFrustum(output, matrix) == output; }
     __except(EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool Write(void* target, const void* source, size_t length) noexcept {
+    if(!Range(target, length, true)) return false;
+    __try { std::memcpy(target, source, length); return true; }
+    __except(EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+
+// Only the eye's own reflection camera update leaves early; the game's own update runs to the end.
+bool __stdcall ReflectionCameraOnly(void* renderer) noexcept {
+    if(!reflectionCameraOnly || renderer != reflectionCameraRenderer || GetCurrentThreadId() != reflectionCameraThread) return false;
+    ++reflectionCameraExits;
+    return true;
+}
+// Replaces lea ecx,[esi+998] at 0x5ae207: the mirrored camera, context and culling volume are complete and
+// only the prepared lists' initialisation remains. The eye's call stores the pending fld as the original
+// does, then leaves through the function's own epilogue at 0x5ae270.
+__declspec(naked) void ReflectionTail() {
+    __asm {
+        pushfd
+        pushad
+        push esi
+        call ReflectionCameraOnly
+        test al, al
+        popad
+        jz original
+        popfd
+        fstp dword ptr [esi+0x470]
+        jmp dword ptr [reflectionExit]
+    original:
+        popfd
+        jmp dword ptr [reflectionTrampoline]
+    }
+}
+using ReflectionCameraFn = void (__thiscall*)(void*);
+bool CallReflectionCamera(void* renderer) noexcept {
+    __try { reinterpret_cast<ReflectionCameraFn>(base + ReflectionCameraRva)(renderer); return true; }
+    __except(EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool CallReflectionInner(ReflectionInnerFn inner, void* renderer, void* lists, const ReflectionRecord& record) noexcept {
+    __try { inner(renderer, lists, record.a, record.b, record.c, record.d, record.e); return true; }
+    __except(EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+// The reflection draw's arguments: its own vtable, the main camera it mirrors, its mirrored camera and context.
+bool ReflectionIdentity(void* renderer, void* context, void* a, void* b) noexcept {
+    const auto* bytes = static_cast<const unsigned char*>(renderer);
+    void *source{}, *own{};
+    return IsPointer(renderer, base + ReflectionTableRva) && Read(bytes + 0x970, &source, sizeof(source)) && source == a &&
+        IsPointer(a, base + CameraTableRva) && IsPointer(static_cast<const unsigned char*>(a) - 0x600, base + RendererTableRva) &&
+        b == bytes + 0x8e0 && Read(bytes + 0x8d4, &own, sizeof(own)) && own == context &&
+        IsPointer(context, base + ContextTableRva) && Range(context, 0x1d0, true);
+}
+void StopReflection(const char* reason) noexcept {
+    if(reflectionStopped.exchange(true)) return;
+    char text[200]{};
+    std::snprintf(text, sizeof(text), "XR water reflection per eye stopped (%s); the original reflection is kept", reason);
+    Report(text);
 }
 }
 
@@ -308,6 +401,30 @@ struct ProjectionHooks {
             }
             if(treeRejected.fetch_add(1) == 0) Report("XR tree visibility expansion rejected; original tree volume retained");
         }
+        // The water reflection culls with the main camera's own frustum (#dd027e16): in the headset that left
+        // the water beside and behind the game's view without reflections. Widen it to a box around the camera,
+        // sized by its own corners (the reflection's draw distance), like the tree volumes.
+        if(active.load(std::memory_order_acquire) && caller == ReflectionCopyReturnRva && reflectionInstalled.load(std::memory_order_acquire) &&
+           !reflectionStopped.load()) {
+            const auto* renderer = static_cast<unsigned char*>(self) - 0x380;
+            unsigned char* cameraA{};
+            void* mainContext{};
+            CameraRecord a{}, b{};
+            std::array<float, 56> original{};
+            alignas(16) std::array<float, 56> volume{};
+            alignas(16) projection_detail::Matrix matrix{};
+            if(IsPointer(renderer, base + ReflectionTableRva) && Read(renderer + 0x970, &cameraA, sizeof(cameraA)) && cameraA &&
+               Read(cameraA - 0x600 + 0x5f4, &mainContext, sizeof(mainContext)) &&
+               Identity(cameraA - 0x600, mainContext, cameraA, cameraA + 0x90) &&
+               Read(cameraA, a.data(), a.size()) && Read(cameraA + 0x90, b.data(), b.size()) &&
+               Read(source, original.data(), sizeof(original)) &&
+               projection_detail::TreeVisibilityMatrix(a, b, original, matrix) && BuildVolume(volume.data(), matrix.data()) &&
+               std::all_of(volume.begin(), volume.end(), [](float value) { return std::isfinite(value); })) {
+                if(reflectionWidened.fetch_add(1) == 0) Report("XR water reflection visibility expanded around the camera; its draw distance retained");
+                return realCopy(self, volume.data());
+            }
+            if(reflectionRejected.fetch_add(1) == 0) Report("XR water reflection visibility expansion rejected; its original volume retained");
+        }
         if(active.load(std::memory_order_acquire) && caller == 0x18093f) {
             prepared = {};
             const auto renderer = reinterpret_cast<uintptr_t>(self) - 0x350;
@@ -338,7 +455,79 @@ ProjectionScope::ProjectionScope(void* renderer, void* context, void* cameraA, v
     valid_ = active.load(std::memory_order_acquire) && !previous_ && math::ValidFov(fov) && Identity(renderer, context, cameraA, cameraB);
     current = this;
 }
+ProjectionScope::ProjectionScope(Reflection, void* renderer, void* context, void* cameraA, void* cameraB, const XrFovf& fov) noexcept
+    : previous_(current), renderer_(renderer), context_(context), cameraA_(cameraA), cameraB_(cameraB), fov_(fov) {
+    valid_ = active.load(std::memory_order_acquire) && !previous_ && math::ValidFov(fov) && ReflectionIdentity(renderer, context, cameraA, cameraB);
+    current = this;
+}
 ProjectionScope::~ProjectionScope() { current = previous_; }
+
+void RememberReflectionDraw(void* renderer, const void* lists, void* a, void* b, void* c, void* d, void* e) noexcept {
+    reflection.valid = false;
+    if(!reflectionInstalled.load(std::memory_order_acquire) || reflectionStopped.load() || !active.load(std::memory_order_acquire) || !presentSequence) return;
+    try {
+        const auto* bytes = static_cast<const unsigned char*>(renderer);
+        unsigned char frontend{}, history{};
+        // Water only (the menus' floor reflection is +0x1770), and without motion history, so that an extra
+        // draw cannot move the main renderer's history checks.
+        if(!ReflectionIdentity(renderer, c, a, b) || !Read(bytes + 0x1770, &frontend, 1) || frontend ||
+           !Read(bytes + 0x50, &history, 1) || history || !Read(bytes + 0x97c, &reflection.used[0], 4) ||
+           !Read(bytes + 0x98c, &reflection.used[1], 4) || !Read(lists, reflection.lists.data(), reflection.lists.size())) return;
+        reflection.renderer = renderer;
+        reflection.a = a; reflection.b = b; reflection.c = c; reflection.d = d; reflection.e = e;
+        reflection.frame = presentSequence();
+        reflection.thread = GetCurrentThreadId();
+        reflection.valid = true;
+    } catch(...) { reflection.valid = false; }
+}
+
+bool RenderEyeReflection(void* mainRenderer, const XrFovf& fov, ReflectionInnerFn inner) noexcept {
+    if(!inner || !reflection.valid || reflectionStopped.load() || !active.load(std::memory_order_acquire) || !presentSequence) return false;
+    try {
+        auto* bytes = static_cast<unsigned char*>(reflection.renderer);
+        void* pending{};
+        // Same frame and thread, the same main camera, and no newer preparation since the draw released its lists.
+        if(reflection.frame != presentSequence() || reflection.thread != GetCurrentThreadId() ||
+           reflection.a != static_cast<unsigned char*>(mainRenderer) + 0x600 ||
+           !ReflectionIdentity(reflection.renderer, reflection.c, reflection.a, reflection.b) ||
+           !Read(bytes + 0x994, &pending, sizeof(pending)) || pending) return false;
+        // The lists' allocators and prepared object: put back if the early exit were ever missed.
+        constexpr size_t PreparedFirst = 0x974, PreparedBytes = 0xbf8 - PreparedFirst;
+        std::array<unsigned char, PreparedBytes> saved{};
+        uint32_t used[2]{};
+        if(!Read(bytes + PreparedFirst, saved.data(), saved.size()) || !Read(bytes + 0x97c, &used[0], 4) || !Read(bytes + 0x98c, &used[1], 4)) return false;
+        reflectionCameraRenderer = bytes; reflectionCameraThread = GetCurrentThreadId();
+        const auto exits = reflectionCameraExits;
+        reflectionCameraOnly = true;
+        const bool updated = CallReflectionCamera(bytes);
+        reflectionCameraOnly = false;
+        if(!updated || reflectionCameraExits != exits + 1) {
+            Write(bytes + PreparedFirst, saved.data(), saved.size());
+            StopReflection(updated ? "camera update missed its early exit" : "camera update fault");
+            return false;
+        }
+        bool drawn{}, projected{};
+        {
+            ProjectionScope projection(ProjectionScope::Reflection{}, reflection.renderer, reflection.c, reflection.a, reflection.b, fov);
+            if(!projection.Valid()) { StopReflection("identity or projection refused"); return false; }
+            // While it draws, the lists' allocators hold what they held during the game's own draw.
+            auto lists = reflection.lists;
+            if(Write(bytes + 0x97c, &reflection.used[0], 4) && Write(bytes + 0x98c, &reflection.used[1], 4))
+                drawn = CallReflectionInner(inner, bytes, lists.data(), reflection);
+            Write(bytes + 0x97c, &used[0], 4); Write(bytes + 0x98c, &used[1], 4);
+            projected = projection.Valid() && projection.Uploads() > 0;
+        }
+        if(!drawn || !projected) { StopReflection(drawn ? "eye projection not applied" : "draw fault"); return false; }
+        const auto draws = reflectionDraws.fetch_add(1) + 1;
+        if(draws == 1 || draws % 1200 == 0) {
+            char text[160]{};
+            std::snprintf(text, sizeof(text), "XR water reflection drawn for each eye draws=%llu widened=%llu thread=%lu",
+                static_cast<unsigned long long>(draws), static_cast<unsigned long long>(reflectionWidened.load()), GetCurrentThreadId());
+            Report(text);
+        }
+        return true;
+    } catch(...) { StopReflection("exception"); return false; }
+}
 
 void SetSceneProjectionActive(bool enabled) noexcept {
     active.store(enabled && installed.load(std::memory_order_acquire), std::memory_order_release);
@@ -434,6 +623,28 @@ bool InstallSceneProjection(DiagnosticLogger logger, PresentSequenceReader prese
                     lightsInstalled.store(true, std::memory_order_release);
                     Report("XR light hooks attached: point, spot and projected-spot lights are rebuilt for each eye");
                 }
+            }
+            // Per-eye water reflection is optional as well (#dd027e16); DIRT3VR_WATER_PER_EYE=0 turns it off.
+            wchar_t waterFlag[4]{};
+            const bool waterOff = GetEnvironmentVariableW(L"DIRT3VR_WATER_PER_EYE", waterFlag, 4) == 1 && waterFlag[0] == L'0';
+            if(waterOff) Report("XR water reflection per eye off (DIRT3VR_WATER_PER_EYE=0); the reflection keeps the original camera");
+            const bool water = !waterOff && presentSequenceReader && Bytes(ReflectionCameraRva, AlignedEntry, 16) &&
+                Bytes(ReflectionTailRva - 3, ReflectionTailBytes, sizeof(ReflectionTailBytes)) &&
+                Bytes(ReflectionExitRva, ReflectionExitBytes, sizeof(ReflectionExitBytes)) &&
+                Bytes(ReflectionOuterReturnRva - 15, ReflectionDrawCall, sizeof(ReflectionDrawCall)) && Call(ReflectionOuterReturnRva - 5, OuterRva) &&
+                IsPointer(reinterpret_cast<void*>(base + ReflectionTableRva + 13*4), base + ReflectionDrawRva) &&
+                Call(0x1adbdd, SetupRva) && Call(0x1ae1ad, SetupRva) && Call(0x1ae1d0, CopyRva) && Call(0x1ae123, ReflectionCameraCopyRva);
+            if(!water && !waterOff) Report("XR water reflection hook refused: loaded binary contract mismatch; the reflection keeps the original camera");
+            if(water) {
+                presentSequence = presentSequenceReader;
+                auto* tail = reinterpret_cast<void*>(base + ReflectionTailRva);
+                reflectionExit = reinterpret_cast<void*>(base + ReflectionExitRva);
+                bool on = MH_CreateHook(tail, reinterpret_cast<void*>(&ReflectionTail), &reflectionTrampoline) == MH_OK;
+                if(on && MH_EnableHook(tail) != MH_OK) { MH_RemoveHook(tail); on = false; }
+                if(on) {
+                    reflectionInstalled.store(true, std::memory_order_release);
+                    Report("XR water reflection hook attached: each eye mirrors its own camera and draws the reflection again");
+                } else Report("XR water reflection hook activation failed; the reflection keeps the original camera");
             }
             HMODULE pinned{};
             GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,

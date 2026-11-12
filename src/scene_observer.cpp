@@ -71,6 +71,7 @@ struct OuterSample {
     uint64_t mainSequence{};
     uint32_t presentBefore{};
     bool sample{}, valid{};
+    bool reflection{}; // The water reflection's draw (#dd027e16).
     unsigned innerCalls{}, firstCalls{}, secondCalls{}, unexpectedCalls{};
     std::array<unsigned char, CameraBytes> beforeA{}, beforeB{};
     bool camerasRead{};
@@ -159,6 +160,7 @@ void __fastcall Outer(void* self, void*, void* a, void* b, void* c, void* d, voi
     OuterSample scope;
     scope.previous = current; scope.renderer = self; scope.cameraA = a; scope.cameraB = b;
     const bool mainCaller = caller == MainReturnRva;
+    scope.reflection = caller == ReflectionOuterReturnRva;
     scope.valid = mainCaller && PointerIs(self, base + RendererTableRva) &&
         reinterpret_cast<uintptr_t>(a) == reinterpret_cast<uintptr_t>(self) + 0x600 &&
         reinterpret_cast<uintptr_t>(b) == reinterpret_cast<uintptr_t>(self) + 0x690 &&
@@ -208,6 +210,9 @@ void __fastcall Inner(void* self, void*, void* lists, void* a, void* b, void* c,
     const uint32_t presentBefore = sample ? presentSequence() : 0;
     std::array<unsigned char, HeaderBytes> before{}, after{};
     const bool beforeRead = sample && Read(lists, before.data(), before.size());
+    // Water reflection (#dd027e16): its lists for this frame, which each VR eye draws again.
+    if(scope && scope->reflection && scope->renderer == self && scope->innerCalls++ == 0)
+        RememberReflectionDraw(self, lists, a, b, c, d, e);
     const bool replayCandidate = scope && scope->valid && scope->renderer == self && caller == FirstInnerReturnRva;
     bool consumed{};
     if(replayCandidate) {
