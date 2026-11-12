@@ -301,7 +301,7 @@ void InstallSceneObserver(DiagnosticLogger log, PresentSequenceReader readPresen
             HMODULE pinned{};
             GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
                               reinterpret_cast<LPCWSTR>(&Outer), &pinned);
-            if(xrPrototypeEnabled && !InstallSceneProjection(logger)) {
+            if(xrPrototypeEnabled && !InstallSceneProjection(logger, presentSequence)) {
                 xrPrototypeEnabled = false; logger("XR prototype refused: projection hooks unavailable");
             }
             if(xrPrototypeEnabled && !ConfigureVrPresentation(logger)) {

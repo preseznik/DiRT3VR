@@ -693,6 +693,15 @@ bool RenderVrScene(void* renderer,void* lists,void* a,void* b,void* context,void
             }
             // The seat menu's live offset moves the eyes in the car; the camera files hold the launch seat.
             const auto seatOffset=UpdateSeat(*state,frame,cockpit);
+            // Local lights (#82c61759): each eye rebuilds this frame's light values from its own camera,
+            // and afterwards the original camera's copy puts them back, also after a failed eye.
+            std::vector<LightCall> lights;
+            alignas(16) std::array<unsigned char,LightContextBytes> lightContext{};
+            const bool replayLights=SnapshotSceneLights(context,lights) && !lights.empty() && Read(context,lightContext.data(),lightContext.size());
+            struct RestoreLights {
+                const std::vector<LightCall>* calls; void* context;
+                ~RestoreLights() { if(calls) ReplaySceneLights(*calls,context); }
+            } restoreLights{replayLights ? &lights : nullptr,lightContext.data()};
             prime=state->history.NeedsPrime(plugin,state->boundary.Sequence(),state->xr.ReferenceRevision());
             const auto select=reinterpret_cast<HistorySelectFn>(base+HistorySelectRva);
             const auto invalidate=reinterpret_cast<HistoryInvalidateFn>(base+HistoryInvalidateRva);
@@ -709,7 +718,7 @@ bool RenderVrScene(void* renderer,void* lists,void* a,void* b,void* context,void
                 auto eyePose=frame.RelativeEyePose(index);
                 eyePose.position.x+=seatOffset.x; eyePose.position.y+=seatOffset.y; eyePose.position.z+=seatOffset.z;
                 if(!cameras.Apply(eyePose)) { restored&=cameras.Restore(); ready=false; break; }
-                ProjectionScope projection(renderer,context,a,b,frame.Views()[index].fov);
+                ProjectionScope projection(renderer,context,a,b,frame.Views()[index].fov,replayLights ? &lights : nullptr);
                 if(!projection.Valid()) { restored&=cameras.Restore(); ready=false; break; }
                 select(plugin,index);
                 // +0x90 is a shared validity byte. Each selected slot needs

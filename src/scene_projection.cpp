@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <iterator>
 #include <mutex>
@@ -25,15 +26,32 @@ constexpr uintptr_t TreeCopyReturnRvas[] = {0x7690e7, 0x76939d, 0x7695b5};
 constexpr unsigned char AlignedEntry[] = {0x53,0x8b,0xdc,0x83,0xec,0x08,0x83,0xe4,0xf0,0x83,0xc4,0x04,0x55,0x8b,0x6b,0x04};
 constexpr unsigned char CopyEntry[] = {0x55,0x8b,0xec,0x8b,0xc1,0x8b,0x4d,0x08,0x0f,0x28,0x01,0x0f,0x29,0x00,0x0f,0x28};
 constexpr unsigned char UploadCall[] = {0x8b,0x4f,0x28,0x8b,0x11,0x8b,0x82,0x48,0x01,0x00,0x00,0x56,0xff,0xd0};
+// Light builders (#82c61759; docs/research/per-eye-lights.md): thiscall, point (light, context) ret 8,
+// spot and projected spot (light, context, material, extra) ret 0x10. Each pushes its shader parameter
+// names (lightPosVs 0xf32a48, lightDirVs 0xf32ba8, mViewToLightClipSpace 0xf32bb4 at the preferred base).
+constexpr uintptr_t PointLightRva = 0x7d4b30, SpotLightRva = 0x7da0c0, ProjectedLightRva = 0x7da380;
+struct LightGuard { uintptr_t rva; uintptr_t nameRva; };
+constexpr LightGuard LightNames[] = {{0x7d4bc4, 0xb32a48}, {0x7da143, 0xb32a48}, {0x7da2b2, 0xb32ba8},
+                                     {0x7da409, 0xb32a48}, {0x7da579, 0xb32ba8}, {0x7daf8d, 0xb32bb4}};
+constexpr unsigned char Ret8[] = {0xc2,0x08,0x00}, Ret16[] = {0xc2,0x10,0x00};
 constexpr unsigned char StereoGetterEntry[] = {0x55,0x8b,0xec,0x51,0x83,0xb9,0x60,0x4d,0x00,0x00,0x00,0x7e,0x06,0xb0,0x01,0x8b,0xe5,0x5d,0xc3,0x8b,0x81,0x78,0x4d,0x00,0x00,0x85,0xc0,0x74,0x1a,0x8d,0x4d,0xff,0x51,0x50,0xc6,0x45,0xff,0x00,0xe8,0xa5,0x6d,0x4f,0x00,0x83,0xc4,0x08,0x85,0xc0,0x75,0x05,0x38,0x45,0xff,0x75,0xd6,0x32,0xc0,0x8b,0xe5,0x5d,0xc3};
 using SetupFn = void (__thiscall*)(void*, void*, void*, float, unsigned);
 using UploadFn = void (__thiscall*)(void*, void*);
 using FrustumFn = void* (__thiscall*)(void*, const void*);
 using TreeCullFn = void (__thiscall*)(void*, uint32_t, uint32_t, void*, uint32_t, uint32_t, uint32_t, uint32_t);
+using PointLightFn = void (__thiscall*)(void*, void*, void*);
+using SpotLightFn = void (__thiscall*)(void*, void*, void*, void*, void*);
 SetupFn realSetup{};
 UploadFn realUpload{};
 FrustumFn realCopy{}, buildFrustum{};
 TreeCullFn realTreeCull{};
+PointLightFn realPointLight{};
+SpotLightFn realSpotLight{}, realProjectedLight{};
+PresentSequenceReader presentSequence{};
+PreparedLights preparedLights;
+std::atomic_bool lightsInstalled{};
+std::atomic_uint64_t lightReplays{}, lightOverflows{};
+std::atomic<DWORD> lightThread{};
 uintptr_t base{};
 DiagnosticLogger logMessage{};
 std::atomic_bool installed{}, active{};
@@ -74,6 +92,11 @@ bool BytesAt(uintptr_t address, const unsigned char* expected, size_t length) no
 }
 bool Bytes(uintptr_t rva, const unsigned char* expected, size_t length) noexcept {
     return BytesAt(base + rva, expected, length);
+}
+bool Pushes(uintptr_t rva, uintptr_t nameRva) noexcept {
+    const auto name = static_cast<uint32_t>(base + nameRva);
+    const unsigned char push[] = {0x68, uint8_t(name), uint8_t(name >> 8), uint8_t(name >> 16), uint8_t(name >> 24)};
+    return Bytes(rva, push, sizeof(push));
 }
 bool Call(uintptr_t rva, uintptr_t target) noexcept {
     unsigned char bytes[5]{};
@@ -120,6 +143,28 @@ bool WriteMatrices(void* context, const projection_detail::Matrix& projection,
         } __except(EXCEPTION_EXECUTE_HANDLER) { }
         return false;
     }
+}
+// One recorded builder call; a fault leaves that light as it was.
+bool CallLight(const LightCall& call, void* context) noexcept {
+    __try {
+        if(call.kind == LightKind::Point) realPointLight(call.self, call.light, context);
+        else if(call.kind == LightKind::Spot) realSpotLight(call.self, call.light, context, call.material, call.extra);
+        else realProjectedLight(call.self, call.light, context, call.material, call.extra);
+        return true;
+    } __except(EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+void RememberLight(const LightCall& call) noexcept {
+    if(!active.load(std::memory_order_acquire) || !presentSequence) return;
+    try {
+        preparedLights.Remember(presentSequence(), call);
+        DWORD none{};
+        if(lightThread.compare_exchange_strong(none, GetCurrentThreadId())) {
+            char text[160]{};
+            std::snprintf(text, sizeof(text), "XR lights: first builder call kind=%u thread=%lu; each eye reruns them after its camera upload",
+                unsigned(call.kind), GetCurrentThreadId());
+            Report(text);
+        }
+    } catch(...) { }
 }
 bool BuildVolume(void* output, const void* matrix) noexcept {
     __try { return buildFrustum(output, matrix) == output; }
@@ -216,6 +261,24 @@ struct ProjectionHooks {
             else { scope->valid_ = false; Report("XR projection rejected; original camera retained"); }
         }
         realUpload(self, context);
+        // The context now holds this eye's view (+150) and inverse view (+70): rebuild the local lights
+        // from it once, before the eye draws anything (#82c61759).
+        if(scope && scope->valid_ && scope->uploads_ && scope->lights_ && !scope->lightsRefreshed_ && context == scope->context_) {
+            scope->lightsRefreshed_ = true;
+            ReplaySceneLights(*scope->lights_, context);
+        }
+    }
+    static void __fastcall PointLight(void* self, void*, void* light, void* context) {
+        RememberLight({LightKind::Point, self, light, context, nullptr, nullptr});
+        realPointLight(self, light, context);
+    }
+    static void __fastcall SpotLight(void* self, void*, void* light, void* context, void* material, void* extra) {
+        RememberLight({LightKind::Spot, self, light, context, material, extra});
+        realSpotLight(self, light, context, material, extra);
+    }
+    static void __fastcall ProjectedLight(void* self, void*, void* light, void* context, void* material, void* extra) {
+        RememberLight({LightKind::Projected, self, light, context, material, extra});
+        realProjectedLight(self, light, context, material, extra);
     }
     // Main preparation culls trees once per frame against the game camera's own
     // FOV and direction. Mark that call so its tree volumes can be widened too;
@@ -269,8 +332,9 @@ struct ProjectionHooks {
     }
 };
 
-ProjectionScope::ProjectionScope(void* renderer, void* context, void* cameraA, void* cameraB, const XrFovf& fov) noexcept
-    : previous_(current), renderer_(renderer), context_(context), cameraA_(cameraA), cameraB_(cameraB), fov_(fov) {
+ProjectionScope::ProjectionScope(void* renderer, void* context, void* cameraA, void* cameraB, const XrFovf& fov,
+                                 const std::vector<LightCall>* lights) noexcept
+    : previous_(current), renderer_(renderer), context_(context), cameraA_(cameraA), cameraB_(cameraB), fov_(fov), lights_(lights) {
     valid_ = active.load(std::memory_order_acquire) && !previous_ && math::ValidFov(fov) && Identity(renderer, context, cameraA, cameraB);
     current = this;
 }
@@ -283,10 +347,32 @@ bool NativeStereoDisabled(void* renderer) noexcept {
     return installed.load(std::memory_order_acquire) && projection_detail::NativeStereoDisabledAt(renderer, base);
 }
 
-bool InstallSceneProjection(DiagnosticLogger logger) noexcept {
+bool SnapshotSceneLights(void* context, std::vector<LightCall>& calls) noexcept {
+    try {
+        calls.clear();
+        if(!lightsInstalled.load(std::memory_order_acquire) || !presentSequence) return false;
+        if(preparedLights.Snapshot(presentSequence(), context, calls)) return true;
+        if(lightOverflows.fetch_add(1) == 0) Report("XR lights: more than 512 builder calls in a frame; those frames keep the original camera's lights");
+    } catch(...) { }
+    calls.clear();
+    return false;
+}
+void ReplaySceneLights(const std::vector<LightCall>& calls, void* context) noexcept {
+    unsigned failed{};
+    for(const auto& call : calls) if(!CallLight(call, context)) ++failed;
+    const auto replays = lightReplays.fetch_add(1) + 1;
+    if(failed || replays == 1 || replays % 1200 == 0) {
+        char text[160]{};
+        std::snprintf(text, sizeof(text), "XR lights rebuilt replays=%llu calls=%zu failed=%u thread=%lu",
+            static_cast<unsigned long long>(replays), calls.size(), failed, GetCurrentThreadId());
+        Report(text);
+    }
+}
+
+bool InstallSceneProjection(DiagnosticLogger logger, PresentSequenceReader presentSequenceReader) noexcept {
     static std::once_flag once;
     try {
-        std::call_once(once, [logger] {
+        std::call_once(once, [logger, presentSequenceReader] {
             wchar_t flag[8]{};
             if(GetEnvironmentVariableW(L"DIRT3VR_XR_PROTOTYPE", flag, 8) != 1 || flag[0] != L'1') return;
             logMessage = logger;
@@ -306,6 +392,15 @@ bool InstallSceneProjection(DiagnosticLogger logger) noexcept {
                 Call(0x7690d6, BuildRva) && Call(0x76938c, BuildRva) && Call(0x7695a4, BuildRva) &&
                 Call(0x7690e2, CopyRva) && Call(0x769398, CopyRva) && Call(0x7695b0, CopyRva);
             if(!trees) Report("XR tree visibility hook refused: loaded binary contract mismatch; native tree culling retained");
+            // Per-eye lights are optional too: a mismatch keeps the original camera's lights.
+            // DIRT3VR_LIGHTS_PER_EYE=0 turns them off for a comparison.
+            wchar_t lightsFlag[4]{};
+            const bool lightsOff = GetEnvironmentVariableW(L"DIRT3VR_LIGHTS_PER_EYE", lightsFlag, 4) == 1 && lightsFlag[0] == L'0';
+            if(lightsOff) Report("XR light hooks off (DIRT3VR_LIGHTS_PER_EYE=0); lights keep the original camera");
+            bool lights = !lightsOff && presentSequenceReader && Bytes(PointLightRva, AlignedEntry, 16) && Bytes(SpotLightRva, AlignedEntry, 16) &&
+                Bytes(ProjectedLightRva, AlignedEntry, 16) && Bytes(0x7d4bd7, Ret8, 3) && Bytes(0x7da36e, Ret16, 3) && Bytes(0x7db04c, Ret16, 3);
+            for(const auto& guard : LightNames) lights = lights && Pushes(guard.rva, guard.nameRva);
+            if(!lights && !lightsOff) Report("XR light hooks refused: loaded binary contract mismatch; lights keep the original camera");
             const auto initialized = MH_Initialize();
             if(initialized != MH_OK && initialized != MH_ERROR_ALREADY_INITIALIZED) { Report("XR projection hooks unavailable: MinHook initialization"); return; }
             void* addresses[] = {reinterpret_cast<void*>(base + SetupRva), reinterpret_cast<void*>(base + UploadRva), reinterpret_cast<void*>(base + CopyRva), reinterpret_cast<void*>(base + TreeCullRva)};
@@ -322,6 +417,24 @@ bool InstallSceneProjection(DiagnosticLogger logger) noexcept {
                 Report("XR projection hook activation failed; native rendering retained"); return;
             }
             buildFrustum = reinterpret_cast<FrustumFn>(base + BuildRva);
+            if(lights) {
+                presentSequence = presentSequenceReader;
+                void* lightAddresses[] = {reinterpret_cast<void*>(base + PointLightRva), reinterpret_cast<void*>(base + SpotLightRva), reinterpret_cast<void*>(base + ProjectedLightRva)};
+                void* lightDetours[] = {reinterpret_cast<void*>(&ProjectionHooks::PointLight), reinterpret_cast<void*>(&ProjectionHooks::SpotLight), reinterpret_cast<void*>(&ProjectionHooks::ProjectedLight)};
+                void** lightOriginals[] = {reinterpret_cast<void**>(&realPointLight), reinterpret_cast<void**>(&realSpotLight), reinterpret_cast<void**>(&realProjectedLight)};
+                unsigned made{};
+                for(; made < 3; ++made) if(MH_CreateHook(lightAddresses[made], lightDetours[made], lightOriginals[made]) != MH_OK) break;
+                bool on = made == 3;
+                if(on) for(auto* address : lightAddresses) if(MH_QueueEnableHook(address) != MH_OK) on = false;
+                if(on) on = MH_ApplyQueued() == MH_OK;
+                if(!on) {
+                    for(unsigned i = 0; i < made; ++i) { MH_DisableHook(lightAddresses[i]); MH_RemoveHook(lightAddresses[i]); }
+                    Report("XR light hook activation failed; lights keep the original camera");
+                } else {
+                    lightsInstalled.store(true, std::memory_order_release);
+                    Report("XR light hooks attached: point, spot and projected-spot lights are rebuilt for each eye");
+                }
+            }
             HMODULE pinned{};
             GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
                 reinterpret_cast<LPCWSTR>(&ProjectionHooks::Setup), &pinned);
