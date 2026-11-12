@@ -34,6 +34,10 @@ void RememberReflectionDraw(void* renderer, const void* lists, void* a, void* b,
 using ReflectionInnerFn = void (__thiscall*)(void*, void*, void*, void*, void*, void*, void*);
 bool RenderEyeReflection(void* mainRenderer, const XrFovf& fov, ReflectionInnerFn inner) noexcept;
 
+// Ground clutter (#d20e9cf7): an eye's camera after it moved to the eye. Its forward direction aims the
+// next frame's clutter selection, which otherwise keeps only what lies ahead of the game's own camera.
+void RememberEyeDirection(const void* camera) noexcept;
+
 class ProjectionScope {
 public:
     // lights: rerun once, right after this eye's first camera upload into the context.

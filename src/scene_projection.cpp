@@ -50,11 +50,27 @@ constexpr unsigned char ReflectionTailBytes[] = {0xd9,0x42,0x50,0x8d,0x8e,0x98,0
 constexpr unsigned char ReflectionExitBytes[] = {0x5f,0xc6,0x86,0x08,0x0e,0x00,0x00,0x01,0x5e,0x8b,0xe5,0x5d,0x8b,0xe3,0x5b,0xc3};
 // The draw method's outer call: lea edx,[esi+8e0]; push edx; push eax; mov ecx,esi; call outer
 constexpr unsigned char ReflectionDrawCall[] = {0x8d,0x96,0xe0,0x08,0x00,0x00,0x52,0x50,0x8b,0xce};
+// Vegetation pop-in (#d20e9cf7; docs/research/vegetation-culling.md). Main preparation (0x576fd0) selects
+// ground cover through 0xb74650 (renderer +0xd8, called at 0x577640): a perspective frustum from the
+// context's desktop FOV and its own draw distance (+0x168), built at 0xb7482b. Ground clutter (tufts and
+// bushes, GroundClutterPlugin 0xfa0774) gets the camera position, its forward direction and a cone
+// half-angle through 0xb70a90 (from 0xb3d5f4, called at 0x577229) and keeps only cells inside that cone.
+constexpr uintptr_t GroundCoverRva = 0x774650, GroundCoverReturnRva = 0x177645, GroundBuildReturnRva = 0x774830;
+constexpr uintptr_t ClutterViewRva = 0x770a90, ClutterViewReturnRva = 0x73d5f9, ClutterPluginRva = 0x73d5b0;
+// push ebp; mov ebp,esp; push -1; push <SEH handler 0xdaafb8> (relocated); mov eax,fs:[0]
+constexpr unsigned char ClutterEntryHead[] = {0x55,0x8b,0xec,0x6a,0xff,0x68};
+constexpr unsigned char ClutterEntryTail[] = {0x64,0xa1,0x00,0x00,0x00,0x00};
+constexpr uintptr_t ClutterHandlerRva = 0x9aafb8;
+constexpr unsigned char Ret18[] = {0xc2,0x18,0x00}, Ret1c[] = {0xc2,0x1c,0x00};
+// Just under a right angle: the cone test then keeps every cell in front of the plane through the camera.
+constexpr float ClutterHalfAngle = 1.5698f;
 constexpr unsigned char StereoGetterEntry[] = {0x55,0x8b,0xec,0x51,0x83,0xb9,0x60,0x4d,0x00,0x00,0x00,0x7e,0x06,0xb0,0x01,0x8b,0xe5,0x5d,0xc3,0x8b,0x81,0x78,0x4d,0x00,0x00,0x85,0xc0,0x74,0x1a,0x8d,0x4d,0xff,0x51,0x50,0xc6,0x45,0xff,0x00,0xe8,0xa5,0x6d,0x4f,0x00,0x83,0xc4,0x08,0x85,0xc0,0x75,0x05,0x38,0x45,0xff,0x75,0xd6,0x32,0xc0,0x8b,0xe5,0x5d,0xc3};
 using SetupFn = void (__thiscall*)(void*, void*, void*, float, unsigned);
 using UploadFn = void (__thiscall*)(void*, void*);
 using FrustumFn = void* (__thiscall*)(void*, const void*);
 using TreeCullFn = void (__thiscall*)(void*, uint32_t, uint32_t, void*, uint32_t, uint32_t, uint32_t, uint32_t);
+using GroundCoverFn = void (__thiscall*)(void*, void*, float, void*, void*, void*, uint32_t);
+using ClutterViewFn = void (__thiscall*)(void*, void*, void*, const float*, const float*, float, float, void*);
 using PointLightFn = void (__thiscall*)(void*, void*, void*);
 using SpotLightFn = void (__thiscall*)(void*, void*, void*, void*, void*);
 SetupFn realSetup{};
@@ -79,6 +95,16 @@ thread_local ProjectionScope* setupScope{};
 struct PreparedRenderer { void* renderer; void* context; };
 thread_local PreparedRenderer prepared{};
 thread_local const PreparedRenderer* treeScope{};
+// Main preparation's ground cover selection, while its frustum is built.
+thread_local const PreparedRenderer* groundScope{};
+FrustumFn realBuild{};
+GroundCoverFn realGroundCover{};
+ClutterViewFn realClutterView{};
+std::atomic_bool vegetationInstalled{};
+std::atomic_uint64_t groundWidened{}, groundRejected{}, clutterAimed{};
+// Where the eyes looked in the last VR frame, in world space, for the clutter cone (render thread only).
+struct HeadDirection { float forward[3]{}; uint32_t frame{}; bool valid{}; };
+HeadDirection headDirection;
 
 // The water reflection's last draw, recorded and replayed on the render thread only.
 struct ReflectionRecord {
@@ -157,6 +183,10 @@ struct RestoreSetup {
 struct RestoreTree {
     const PreparedRenderer* previous;
     ~RestoreTree() { treeScope = previous; }
+};
+struct RestoreGround {
+    const PreparedRenderer* previous;
+    ~RestoreGround() { groundScope = previous; }
 };
 bool TreeCopy(uintptr_t caller) noexcept {
     return std::find(std::begin(TreeCopyReturnRvas), std::end(TreeCopyReturnRvas), caller) != std::end(TreeCopyReturnRvas);
@@ -383,6 +413,52 @@ struct ProjectionHooks {
             prepared.context && context == prepared.context ? &prepared : nullptr;
         realTreeCull(self, a1, a2, context, a4, a5, a6, a7);
     }
+    // Ground cover (#d20e9cf7): main preparation's selection, for the renderer whose visibility was widened.
+    static void __fastcall GroundCover(void* self, void*, void* local, float value, void* context, void* list, void* device, uint32_t flags) {
+        const auto caller = reinterpret_cast<uintptr_t>(_ReturnAddress()) - base;
+        RestoreGround restore{groundScope};
+        groundScope = active.load(std::memory_order_acquire) && caller == GroundCoverReturnRva &&
+            prepared.context && context == prepared.context ? &prepared : nullptr;
+        realGroundCover(self, local, value, context, list, device, flags);
+    }
+    // Its frustum: the context's desktop FOV and the ground cover's own distance. In VR it becomes a box
+    // around the camera sized by that frustum's own corners, like the tree volumes.
+    static void* __fastcall Build(void* self, void*, const void* matrix) {
+        const auto caller = reinterpret_cast<uintptr_t>(_ReturnAddress()) - base;
+        void* result = realBuild(self, matrix);
+        if(groundScope && caller == GroundBuildReturnRva && result == self && active.load(std::memory_order_acquire)) {
+            const auto renderer = reinterpret_cast<uintptr_t>(groundScope->renderer);
+            CameraRecord a{}, b{};
+            std::array<float, 56> original{};
+            alignas(16) std::array<float, 64> volume{};
+            alignas(16) projection_detail::Matrix box{};
+            if(Identity(groundScope->renderer, groundScope->context, reinterpret_cast<void*>(renderer + 0x600), reinterpret_cast<void*>(renderer + 0x690)) &&
+               Read(reinterpret_cast<void*>(renderer + 0x600), a.data(), a.size()) &&
+               Read(reinterpret_cast<void*>(renderer + 0x690), b.data(), b.size()) && Read(self, original.data(), sizeof(original)) &&
+               projection_detail::TreeVisibilityMatrix(a, b, original, box) && BuildVolume(volume.data(), box.data()) &&
+               std::all_of(volume.begin(), volume.begin() + 56, [](float value) { return std::isfinite(value); })) {
+                if(groundWidened.fetch_add(1) == 0) Report("XR ground cover visibility expanded around the camera; its draw distance retained");
+                return realBuild(self, box.data());
+            }
+            if(groundRejected.fetch_add(1) == 0) Report("XR ground cover visibility expansion rejected; its original frustum retained");
+        }
+        return result;
+    }
+    // Ground clutter (#d20e9cf7): keep its cone, but aim it where the eyes looked in the last VR frame and
+    // open it to a hemisphere, which covers both eyes' views and a head turn before the next frame.
+    static void __fastcall ClutterView(void* self, void*, void* a1, void* a2, const float* position, const float* direction,
+                                       float angle, float scale, void* a7) {
+        const auto caller = reinterpret_cast<uintptr_t>(_ReturnAddress()) - base;
+        alignas(16) float aimed[4]{};
+        if(caller == ClutterViewReturnRva && active.load(std::memory_order_acquire) && headDirection.valid && presentSequence &&
+           presentSequence() - headDirection.frame <= 2 && Read(direction, aimed, sizeof(aimed)) && std::isfinite(angle) && angle < ClutterHalfAngle) {
+            aimed[0] = headDirection.forward[0]; aimed[1] = headDirection.forward[1]; aimed[2] = headDirection.forward[2];
+            if(clutterAimed.fetch_add(1) == 0) Report("XR ground clutter cone aimed at the headset's view and opened to a hemisphere; its distance retained");
+            realClutterView(self, a1, a2, position, aimed, ClutterHalfAngle, scale, a7);
+            return;
+        }
+        realClutterView(self, a1, a2, position, direction, angle, scale, a7);
+    }
     static void* __fastcall Copy(void* self, void*, const void* source) {
         const auto caller = reinterpret_cast<uintptr_t>(_ReturnAddress()) - base;
         if(active.load(std::memory_order_acquire) && treeScope && TreeCopy(caller)) {
@@ -461,6 +537,19 @@ ProjectionScope::ProjectionScope(Reflection, void* renderer, void* context, void
     current = this;
 }
 ProjectionScope::~ProjectionScope() { current = previous_; }
+
+void RememberEyeDirection(const void* camera) noexcept {
+    if(!vegetationInstalled.load(std::memory_order_acquire) || !active.load(std::memory_order_acquire) || !presentSequence) return;
+    try {
+        float forward[3]{};
+        if(!Read(static_cast<const unsigned char*>(camera) + 0x30, forward, sizeof(forward))) return;
+        const double length = std::sqrt(double(forward[0])*forward[0] + double(forward[1])*forward[1] + double(forward[2])*forward[2]);
+        if(!std::isfinite(length) || length < .5 || length > 2.) return;
+        for(unsigned axis = 0; axis < 3; ++axis) headDirection.forward[axis] = float(forward[axis]/length);
+        headDirection.frame = presentSequence();
+        headDirection.valid = true;
+    } catch(...) { }
+}
 
 void RememberReflectionDraw(void* renderer, const void* lists, void* a, void* b, void* c, void* d, void* e) noexcept {
     reflection.valid = false;
@@ -645,6 +734,37 @@ bool InstallSceneProjection(DiagnosticLogger logger, PresentSequenceReader prese
                     reflectionInstalled.store(true, std::memory_order_release);
                     Report("XR water reflection hook attached: each eye mirrors its own camera and draws the reflection again");
                 } else Report("XR water reflection hook activation failed; the reflection keeps the original camera");
+            }
+            // Vegetation in VR (#d20e9cf7): ground cover's frustum and ground clutter's cone. Optional;
+            // DIRT3VR_VEGETATION_WIDE=0 keeps both on the game camera's view.
+            wchar_t vegetationFlag[4]{};
+            const bool vegetationOff = GetEnvironmentVariableW(L"DIRT3VR_VEGETATION_WIDE", vegetationFlag, 4) == 1 && vegetationFlag[0] == L'0';
+            if(vegetationOff) Report("XR vegetation widening off (DIRT3VR_VEGETATION_WIDE=0); ground cover and clutter keep the game camera's view");
+            const bool vegetation = !vegetationOff && presentSequenceReader && Bytes(GroundCoverRva, AlignedEntry, 16) && Bytes(0x774ad1, Ret18, 3) &&
+                Call(0x177640, GroundCoverRva) && Call(0x77482b, BuildRva) &&
+                Bytes(ClutterViewRva, ClutterEntryHead, sizeof(ClutterEntryHead)) &&
+                IsPointer(reinterpret_cast<void*>(base + ClutterViewRva + 6), base + ClutterHandlerRva) &&
+                Bytes(ClutterViewRva + 10, ClutterEntryTail, sizeof(ClutterEntryTail)) && Bytes(0x770b56, Ret1c, 3) &&
+                Call(ClutterViewReturnRva - 5, ClutterViewRva) && Call(0x177229, ClutterPluginRva);
+            if(!vegetation && !vegetationOff) Report("XR vegetation hooks refused: loaded binary contract mismatch; ground cover and clutter keep the game camera's view");
+            if(vegetation) {
+                presentSequence = presentSequenceReader;
+                void* plantAddresses[] = {reinterpret_cast<void*>(base + GroundCoverRva), reinterpret_cast<void*>(base + BuildRva), reinterpret_cast<void*>(base + ClutterViewRva)};
+                void* plantDetours[] = {reinterpret_cast<void*>(&ProjectionHooks::GroundCover), reinterpret_cast<void*>(&ProjectionHooks::Build), reinterpret_cast<void*>(&ProjectionHooks::ClutterView)};
+                void** plantOriginals[] = {reinterpret_cast<void**>(&realGroundCover), reinterpret_cast<void**>(&realBuild), reinterpret_cast<void**>(&realClutterView)};
+                unsigned made{};
+                for(; made < 3; ++made) if(MH_CreateHook(plantAddresses[made], plantDetours[made], plantOriginals[made]) != MH_OK) break;
+                bool on = made == 3;
+                if(on) for(auto* address : plantAddresses) if(MH_QueueEnableHook(address) != MH_OK) on = false;
+                if(on) on = MH_ApplyQueued() == MH_OK;
+                if(!on) {
+                    for(unsigned i = 0; i < made; ++i) { MH_DisableHook(plantAddresses[i]); MH_RemoveHook(plantAddresses[i]); }
+                    Report("XR vegetation hook activation failed; ground cover and clutter keep the game camera's view");
+                } else {
+                    buildFrustum = realBuild; // Our own volume builds skip the detour.
+                    vegetationInstalled.store(true, std::memory_order_release);
+                    Report("XR vegetation hooks attached: ground cover around the camera, clutter aimed at the headset's view");
+                }
             }
             HMODULE pinned{};
             GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,

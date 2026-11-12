@@ -718,6 +718,7 @@ bool RenderVrScene(void* renderer,void* lists,void* a,void* b,void* context,void
                 auto eyePose=frame.RelativeEyePose(index);
                 eyePose.position.x+=seatOffset.x; eyePose.position.y+=seatOffset.y; eyePose.position.z+=seatOffset.z;
                 if(!cameras.Apply(eyePose)) { restored&=cameras.Restore(); ready=false; break; }
+                if(index==0) RememberEyeDirection(a); // Aims next frame's ground clutter (#d20e9cf7).
                 // Water reflection (#dd027e16): mirror this eye's camera and draw the reflection again before
                 // the eye, so the water shows what this eye would see; false keeps the original reflection.
                 RenderEyeReflection(renderer,frame.Views()[index].fov,realInner);
