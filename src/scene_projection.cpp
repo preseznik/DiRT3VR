@@ -90,9 +90,22 @@ std::atomic_bool installed{}, active{};
 std::atomic_uint64_t visibilityCount{}, visibilityRejected{}, treeCount{}, treeRejected{};
 thread_local ProjectionScope* current{};
 thread_local ProjectionScope* setupScope{};
-// The main renderer whose visibility was last widened on this (render) thread.
-// Tree volumes are widened only inside its own preparation's tree cull.
+// The main renderer whose visibility was last widened. Tree volumes and ground cover are widened only inside
+// its own preparation. That preparation runs on the render thread (call at 0x580a5d) or, when renderer +0x160
+// is set, as a job on a worker thread (0x577750 -> 0x576fd0, queued at 0x580a45 after the copy at 0x58093a).
+// So the pair is shared, packed into one atomic (32-bit pointers), never thread-local (#d20e9cf7).
 struct PreparedRenderer { void* renderer; void* context; };
+std::atomic_uint64_t preparedShared{};
+void PublishPrepared(void* renderer, void* context) noexcept {
+    preparedShared.store(uint64_t(reinterpret_cast<uintptr_t>(renderer)) | uint64_t(reinterpret_cast<uintptr_t>(context)) << 32,
+                         std::memory_order_release);
+}
+PreparedRenderer LoadPrepared() noexcept {
+    const auto packed = preparedShared.load(std::memory_order_acquire);
+    return {reinterpret_cast<void*>(uintptr_t(uint32_t(packed))), reinterpret_cast<void*>(uintptr_t(uint32_t(packed >> 32)))};
+}
+static_assert(sizeof(void*) == 4, "DiRT 3 is a 32-bit game");
+// Each thread's copy of the pair while its tree cull or ground cover selection runs.
 thread_local PreparedRenderer prepared{};
 thread_local const PreparedRenderer* treeScope{};
 // Main preparation's ground cover selection, while its frustum is built.
@@ -102,9 +115,17 @@ GroundCoverFn realGroundCover{};
 ClutterViewFn realClutterView{};
 std::atomic_bool vegetationInstalled{};
 std::atomic_uint64_t groundWidened{}, groundRejected{}, clutterAimed{};
-// Where the eyes looked in the last VR frame, in world space, for the clutter cone (render thread only).
+// Where the eyes looked in the last VR frame, in world space, for the clutter cone. Written by the render
+// thread; read by the preparation, which may run as a worker job, so both copy it under the lock.
 struct HeadDirection { float forward[3]{}; uint32_t frame{}; bool valid{}; };
-HeadDirection headDirection;
+HeadDirection headDirectionShared;
+SRWLOCK headDirectionLock = SRWLOCK_INIT;
+HeadDirection LoadHeadDirection() noexcept {
+    AcquireSRWLockShared(&headDirectionLock);
+    const auto copy = headDirectionShared;
+    ReleaseSRWLockShared(&headDirectionLock);
+    return copy;
+}
 
 // The water reflection's last draw, recorded and replayed on the render thread only.
 struct ReflectionRecord {
@@ -409,6 +430,7 @@ struct ProjectionHooks {
     static void __fastcall TreeCull(void* self, void*, uint32_t a1, uint32_t a2, void* context, uint32_t a4, uint32_t a5, uint32_t a6, uint32_t a7) {
         const auto caller = reinterpret_cast<uintptr_t>(_ReturnAddress()) - base;
         RestoreTree restore{treeScope};
+        if(caller == TreeCullReturnRva) prepared = LoadPrepared();
         treeScope = active.load(std::memory_order_acquire) && caller == TreeCullReturnRva &&
             prepared.context && context == prepared.context ? &prepared : nullptr;
         realTreeCull(self, a1, a2, context, a4, a5, a6, a7);
@@ -417,6 +439,7 @@ struct ProjectionHooks {
     static void __fastcall GroundCover(void* self, void*, void* local, float value, void* context, void* list, void* device, uint32_t flags) {
         const auto caller = reinterpret_cast<uintptr_t>(_ReturnAddress()) - base;
         RestoreGround restore{groundScope};
+        if(caller == GroundCoverReturnRva) prepared = LoadPrepared();
         groundScope = active.load(std::memory_order_acquire) && caller == GroundCoverReturnRva &&
             prepared.context && context == prepared.context ? &prepared : nullptr;
         realGroundCover(self, local, value, context, list, device, flags);
@@ -450,7 +473,9 @@ struct ProjectionHooks {
                                        float angle, float scale, void* a7) {
         const auto caller = reinterpret_cast<uintptr_t>(_ReturnAddress()) - base;
         alignas(16) float aimed[4]{};
-        if(caller == ClutterViewReturnRva && active.load(std::memory_order_acquire) && headDirection.valid && presentSequence &&
+        const bool main = caller == ClutterViewReturnRva && active.load(std::memory_order_acquire);
+        const auto headDirection = main ? LoadHeadDirection() : HeadDirection{};
+        if(main && headDirection.valid && presentSequence &&
            presentSequence() - headDirection.frame <= 2 && Read(direction, aimed, sizeof(aimed)) && std::isfinite(angle) && angle < ClutterHalfAngle) {
             aimed[0] = headDirection.forward[0]; aimed[1] = headDirection.forward[1]; aimed[2] = headDirection.forward[2];
             if(clutterAimed.fetch_add(1) == 0) Report("XR ground clutter cone aimed at the headset's view and opened to a hemisphere; its distance retained");
@@ -502,7 +527,6 @@ struct ProjectionHooks {
             if(reflectionRejected.fetch_add(1) == 0) Report("XR water reflection visibility expansion rejected; its original volume retained");
         }
         if(active.load(std::memory_order_acquire) && caller == 0x18093f) {
-            prepared = {};
             const auto renderer = reinterpret_cast<uintptr_t>(self) - 0x350;
             void* context{};
             CameraRecord a{}, b{};
@@ -516,9 +540,10 @@ struct ProjectionHooks {
                projection_detail::VisibilityMatrix(a, b, original, matrix) && BuildVolume(volume.data(), matrix.data()) &&
                std::all_of(volume.begin(), volume.end(), [](float value) { return std::isfinite(value); })) {
                 if(visibilityCount.fetch_add(1) == 0) Report("XR main visibility expanded before preparation; native distance and LOD retained");
-                prepared = {reinterpret_cast<void*>(renderer), context};
+                PublishPrepared(reinterpret_cast<void*>(renderer), context);
                 return realCopy(self, volume.data());
             }
+            PublishPrepared(nullptr, nullptr);
             if(visibilityRejected.fetch_add(1) == 0) Report("XR visibility expansion rejected; original volume retained");
         }
         return realCopy(self, source);
@@ -545,9 +570,13 @@ void RememberEyeDirection(const void* camera) noexcept {
         if(!Read(static_cast<const unsigned char*>(camera) + 0x30, forward, sizeof(forward))) return;
         const double length = std::sqrt(double(forward[0])*forward[0] + double(forward[1])*forward[1] + double(forward[2])*forward[2]);
         if(!std::isfinite(length) || length < .5 || length > 2.) return;
-        for(unsigned axis = 0; axis < 3; ++axis) headDirection.forward[axis] = float(forward[axis]/length);
-        headDirection.frame = presentSequence();
-        headDirection.valid = true;
+        HeadDirection next{};
+        for(unsigned axis = 0; axis < 3; ++axis) next.forward[axis] = float(forward[axis]/length);
+        next.frame = presentSequence();
+        next.valid = true;
+        AcquireSRWLockExclusive(&headDirectionLock);
+        headDirectionShared = next;
+        ReleaseSRWLockExclusive(&headDirectionLock);
     } catch(...) { }
 }
 
@@ -620,6 +649,7 @@ bool RenderEyeReflection(void* mainRenderer, const XrFovf& fov, ReflectionInnerF
 
 void SetSceneProjectionActive(bool enabled) noexcept {
     active.store(enabled && installed.load(std::memory_order_acquire), std::memory_order_release);
+    if(!enabled) PublishPrepared(nullptr, nullptr);
 }
 bool NativeStereoDisabled(void* renderer) noexcept {
     return installed.load(std::memory_order_acquire) && projection_detail::NativeStereoDisabledAt(renderer, base);
