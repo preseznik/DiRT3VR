@@ -12,7 +12,7 @@ Public NotInheritable Class NewFeatures
     Public Const LastStable As String = "0.1.23"
     ' The next release. After every release, set the version after it; entries added since use it
     ' (NewFeaturesTests fails while this build is past NextVersion).
-    Public Const NextVersion As String = "0.1.29"
+    Public Const NextVersion As String = "0.1.30"
 
     ' Control or section names, and the version that first ships them: each launcher setting, section, option or
     ' button added since LastStable, with NextVersion at the time it was added. Empty right after a Stable release.
