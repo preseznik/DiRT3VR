@@ -40,7 +40,7 @@ bool Install(void (*log)(const char*,...)) {
         uint8_t push[5],headCam[5]; Push(base,push); Push(base,headCam,headCamRva);
         size_t written=0;
         for(;written<std::size(sites);++written) {
-            uint8_t patched[5]; Patched(sites[written],patched);
+            uint8_t patched[5]; Patched(base,sites[written],patched);
             if(!Write(image+sites[written].rva,patched)) break;
         }
         const bool complete=written==std::size(sites) && Write(image+defaultRva,headCam);
@@ -51,7 +51,7 @@ bool Install(void (*log)(const char*,...)) {
             return;
         }
         installed=true;
-        log("Cockpit start: current_camera defaults to head-cam (0x59fb31) and DiRT 3's race-start switches to the chase view are skipped (0x553c03, 0x53bcc9)");
+        log("Cockpit start: the race setup selects head-cam instead of the chase view (0x553c03), the start sequence's chase-view switches are skipped (0x53bcc9) and current_camera defaults to head-cam (0x59fb31)");
     });
     return installed || !requested;
 }
