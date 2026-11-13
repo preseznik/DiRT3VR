@@ -147,6 +147,12 @@ void* reflectionCameraRenderer{};
 DWORD reflectionCameraThread{};
 unsigned reflectionCameraExits{};
 bool reflectionCameraOnly{};
+// The menus' floor reflection in VR (#8817e533) is drawn once from the game camera, so both eyes saw it in the
+// wrong place (a second car beside the menu car). Mirroring each eye's camera, as for water, did not line it up
+// either (run 20261113-2214), so in VR it is left out; DIRT3VR_MENU_REFLECTION=game keeps DiRT 3's own.
+enum class MenuReflection { Game, Off };
+MenuReflection menuReflection{MenuReflection::Off};
+std::atomic_uint64_t menuReflectionSkips{};
 
 void Report(const char* text) noexcept {
     try { if(logMessage) logMessage("%s", text); } catch(...) { }
@@ -599,6 +605,15 @@ void RememberReflectionDraw(void* renderer, const void* lists, void* a, void* b,
     } catch(...) { reflection.valid = false; }
 }
 
+bool SkipMenuReflection(void* renderer) noexcept {
+    if(menuReflection != MenuReflection::Off || !active.load(std::memory_order_acquire)) return false;
+    unsigned char frontend{};
+    if(!IsPointer(renderer, base + ReflectionTableRva) || !Read(static_cast<const unsigned char*>(renderer) + 0x1770, &frontend, 1) ||
+       !frontend) return false;
+    if(menuReflectionSkips.fetch_add(1) == 0) Report("XR menus' floor reflection left out in VR; it cannot line up with both eyes");
+    return true;
+}
+
 bool RenderEyeReflection(void* mainRenderer, const XrFovf& fov, ReflectionInnerFn inner) noexcept {
     if(!inner || !reflection.valid || reflectionStopped.load() || !active.load(std::memory_order_acquire) || !presentSequence) return false;
     try {
@@ -742,6 +757,11 @@ bool InstallSceneProjection(DiagnosticLogger logger, PresentSequenceReader prese
                     lightsInstalled.store(true, std::memory_order_release);
                     Report("XR light hooks attached: point, spot and projected-spot lights are rebuilt for each eye");
                 }
+            }
+            wchar_t menuFlag[8]{};
+            if(GetEnvironmentVariableW(L"DIRT3VR_MENU_REFLECTION", menuFlag, 8) == 4 && !wcscmp(menuFlag, L"game")) {
+                menuReflection = MenuReflection::Game;
+                Report("XR menus' floor reflection kept (DIRT3VR_MENU_REFLECTION=game)");
             }
             // Per-eye water reflection is optional as well (#dd027e16); DIRT3VR_WATER_PER_EYE=0 turns it off.
             wchar_t waterFlag[4]{};

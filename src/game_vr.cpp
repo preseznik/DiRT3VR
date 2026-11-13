@@ -146,6 +146,16 @@ bool WriteNear(void* pointer,float value) noexcept {
     __try { std::memcpy(pointer,&value,sizeof(value)); return true; }
     __except(EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
+// VR eyes clip no closer than the cockpit's own head-cam near, 0.075 m (#5d1fc238): the menus' (0.2) and the
+// race intros' low cameras (0.3) otherwise cut off the floor at the bottom of the headset's wider view.
+// DIRT3VR_VR_NEAR=game keeps DiRT 3's own value.
+float EyeNearLimit() noexcept {
+    static const float limit=[] {
+        wchar_t value[8]{};
+        return GetEnvironmentVariableW(L"DIRT3VR_VR_NEAR",value,8)==4 && !wcscmp(value,L"game") ? 0.f : 0.075f;
+    }();
+    return limit;
+}
 class ScopedRendererNear {
 public:
     explicit ScopedRendererNear(void* renderer):address_(static_cast<unsigned char*>(renderer)+0x40) {
@@ -153,6 +163,12 @@ public:
     }
     ~ScopedRendererNear() { Restore(); }
     bool Valid() const noexcept { return valid_; }
+    // The eye's near clip, at most limit (#5d1fc238); Restore puts DiRT 3's own value back.
+    bool Lower(float limit) noexcept {
+        if(!valid_ || !(limit>0) || original_<=limit) return valid_;
+        float actual{};
+        return WriteNear(address_,limit) && Read(address_,&actual,sizeof(actual)) && actual==limit;
+    }
     bool Restore() noexcept {
         if(!valid_) return false;
         float actual{};
@@ -430,6 +446,8 @@ bool Prepare(PrototypeState& state,ID3D11Texture2D* back) {
     if(state.log) state.log("XR prototype enabled headset=%ux%u render_scale=%u fov=%u/%u scene=%ux%u game_units_per_metre=1; first tracked focused frame required",
         state.resolution.width,state.resolution.height,state.resolution.scale,state.resolution.fovWidth,state.resolution.fovHeight,
         state.resolution.sceneWidth,state.resolution.sceneHeight);
+    if(state.log) state.log(EyeNearLimit()>0 ? "XR eyes clip no closer than %.3f m (DiRT 3's cockpit near)" : "XR eyes keep DiRT 3's near clip (DIRT3VR_VR_NEAR=game)",
+        EyeNearLimit());
     return true;
 }
 RecenterShortcut ConfiguredRecenter() {
@@ -714,7 +732,7 @@ bool RenderVrScene(void* renderer,void* lists,void* a,void* b,void* context,void
                 if(!eye) { ready=false; break; }
                 ScopedEyeCameras cameras(a,b,originalA,originalB,index==1);
                 ScopedRendererNear nearPlane(renderer);
-                if(!nearPlane.Valid()) { ready=false; break; }
+                if(!nearPlane.Valid() || !nearPlane.Lower(EyeNearLimit())) { ready=false; break; }
                 auto eyePose=frame.RelativeEyePose(index);
                 eyePose.position.x+=seatOffset.x; eyePose.position.y+=seatOffset.y; eyePose.position.z+=seatOffset.z;
                 if(!cameras.Apply(eyePose)) { restored&=cameras.Restore(); ready=false; break; }

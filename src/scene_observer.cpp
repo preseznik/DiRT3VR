@@ -221,6 +221,8 @@ void __fastcall Inner(void* self, void*, void* lists, void* a, void* b, void* c,
             consumed = RenderVrScene(self, lists, a, b, c, d, e, scope->mainSequence, realInner, logger);
         else consumed = ReplayPair(*scope, lists, a, b, c, d, e);
     }
+    // The menus' floor reflection in VR (#8817e533): left out, as it cannot line up with both eyes.
+    if(!consumed && scope && scope->reflection && scope->renderer == self && SkipMenuReflection(self)) consumed = true;
     if(!consumed)
         realInner(self, lists, a, b, c, d, e); // Opaque arguments are passed through unchanged.
     if(sample) {

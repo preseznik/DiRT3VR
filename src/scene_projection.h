@@ -33,6 +33,10 @@ void RememberReflectionDraw(void* renderer, const void* lists, void* a, void* b,
 // reflection again from this frame's lists with the eye's projection. False keeps the original reflection.
 using ReflectionInnerFn = void (__thiscall*)(void*, void*, void*, void*, void*, void*, void*);
 bool RenderEyeReflection(void* mainRenderer, const XrFovf& fov, ReflectionInnerFn inner) noexcept;
+// The menus' floor reflection (+0x1770 set, #8817e533): drawn once from the game camera, both eyes see it in
+// the wrong place. True when the scene observer should leave this reflection draw out in VR (the default;
+// DIRT3VR_MENU_REFLECTION=game keeps it).
+bool SkipMenuReflection(void* renderer) noexcept;
 
 // Ground clutter (#d20e9cf7): an eye's camera after it moved to the eye. Its forward direction aims the
 // next frame's clutter selection, which otherwise keeps only what lies ahead of the game's own camera.
