@@ -3,6 +3,7 @@
 #include "render_probe.h"
 #include "game_vr.h"
 #include "scene_projection.h"
+#include "grass_fade.h"
 #include <windows.h>
 #include <intrin.h>
 #include <MinHook.h>
@@ -312,6 +313,7 @@ void InstallSceneObserver(DiagnosticLogger log, PresentSequenceReader readPresen
             if(xrPrototypeEnabled && !ConfigureVrPresentation(logger)) {
                 xrPrototypeEnabled = false; logger("XR prototype refused: presentation guards unavailable");
             }
+            if(xrPrototypeEnabled) InstallGrassFade(logger);
             logger("Scene observers attached outer_rva=0x%zx inner_rva=0x%zx passive=%u replay=%u xr_prototype=%u stereo=false", OuterRva, InnerRva, !replayEnabled && !xrPrototypeEnabled, replayEnabled, xrPrototypeEnabled);
         });
     } catch(...) { if(log) log("Scene observer initialization failed; original rendering retained"); }
