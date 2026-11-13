@@ -4,20 +4,20 @@
 
 namespace dirt3vr::cockpitstart {
 namespace {
-// Writes 5 bytes of code; on any failure the original bytes go back.
-bool Write(uint8_t* target,const uint8_t (&bytes)[5]) {
+// Writes a few bytes of code; on any failure the original bytes go back.
+template<size_t N> bool Write(uint8_t* target,const uint8_t (&bytes)[N]) {
     DWORD protection{},ignored{};
-    if(!VirtualProtect(target,sizeof(bytes),PAGE_EXECUTE_READWRITE,&protection)) return false;
-    uint8_t original[sizeof(bytes)];
-    std::memcpy(original,target,sizeof(original));
-    std::memcpy(target,bytes,sizeof(bytes));
-    const bool flushed=FlushInstructionCache(GetCurrentProcess(),target,sizeof(bytes))!=FALSE;
-    const bool restored=VirtualProtect(target,sizeof(bytes),protection,&ignored)!=FALSE;
+    if(!VirtualProtect(target,N,PAGE_EXECUTE_READWRITE,&protection)) return false;
+    uint8_t original[N];
+    std::memcpy(original,target,N);
+    std::memcpy(target,bytes,N);
+    const bool flushed=FlushInstructionCache(GetCurrentProcess(),target,N)!=FALSE;
+    const bool restored=VirtualProtect(target,N,protection,&ignored)!=FALSE;
     if(flushed && restored) return true;
-    if(VirtualProtect(target,sizeof(original),PAGE_EXECUTE_READWRITE,&protection)) {
-        std::memcpy(target,original,sizeof(original));
-        FlushInstructionCache(GetCurrentProcess(),target,sizeof(original));
-        VirtualProtect(target,sizeof(original),protection,&ignored);
+    if(VirtualProtect(target,N,PAGE_EXECUTE_READWRITE,&protection)) {
+        std::memcpy(target,original,N);
+        FlushInstructionCache(GetCurrentProcess(),target,N);
+        VirtualProtect(target,N,protection,&ignored);
     }
     return false;
 }
@@ -37,21 +37,22 @@ bool Install(void (*log)(const char*,...)) {
         auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
         const auto base=reinterpret_cast<uintptr_t>(image);
         if(!SitesMatch(image,base)) { log("Cockpit start refused: chase-view instructions differ; races start in the chase view"); return; }
-        uint8_t push[5],headCam[5]; Push(base,push); Push(base,headCam,headCamRva);
-        size_t written=0;
-        for(;written<std::size(sites);++written) {
-            uint8_t patched[5]; Patched(base,sites[written],patched);
-            if(!Write(image+sites[written].rva,patched)) break;
+        uint8_t push[5],headCam[5],jump[5],stored[6];
+        Push(base,push); Push(base,headCam,headCamRva); Jump(sequence,jump); Stored(base,stored);
+        // All or none: put back what was already changed.
+        if(!Write(image+storedRva,stored)) { log("Cockpit start refused: the code change could not be completed"); return; }
+        if(!Write(image+sequence.rva,jump)) {
+            Write(image+storedRva,storedOriginal);
+            log("Cockpit start refused: the code change could not be completed");
+            return;
         }
-        const bool complete=written==std::size(sites) && Write(image+defaultRva,headCam);
-        if(!complete) {
-            // All or none: put back the sites already changed.
-            for(size_t i=0;i<written;++i) Write(image+sites[i].rva,push);
+        if(!Write(image+defaultRva,headCam)) {
+            Write(image+sequence.rva,push); Write(image+storedRva,storedOriginal);
             log("Cockpit start refused: the code change could not be completed");
             return;
         }
         installed=true;
-        log("Cockpit start: the race setup selects head-cam instead of the chase view (0x553c03), the start sequence's chase-view switches are skipped (0x53bcc9) and current_camera defaults to head-cam (0x59fb31)");
+        log("Cockpit start: the start sequence stores head-cam as the view to return to (0x53bcbd) and skips its chase-view switches (0x53bcc9), and current_camera defaults to head-cam (0x59fb31); the race setup and the menus' car keep DiRT 3's chase view");
     });
     return installed || !requested;
 }

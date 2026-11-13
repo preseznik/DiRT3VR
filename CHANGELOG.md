@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix: with **Start races in the cockpit view** on, DiRT 3 0.1.29 crashed to the desktop when you went back to the menus after a race (#5ef4eff5, iztok's and a user's report). The race setup that 0.1.29 changed to pick the cockpit view also runs for the menus' car, so the menu car got the cockpit view and DiRT 3 then read the race car after it was gone. The race setup is DiRT 3's own again. Instead, the race's start sequence now returns to the cockpit view when it ends, and only races have a start sequence. Reproduced and checked on the virtual headset with a normal launch: Time Trial, End Session, Quit.
 - Change: in VR, roadside grass now fades out by 70 % of DiRT 3's grass distance instead of at its end, for example by 147 m instead of 210 m on Finland rally (#d20e9cf7, iztok's request). DiRT 3's grass shader already fades each tuft out by distance, but in VR new grass reached full strength before DiRT 3 had filled it in, so it popped in. Grass is still picked and filled in as far as before; it only fades out sooner, so grass that arrives late is already faded. Fake-headset recordings on Finland rally route 4 look almost the same as before, with slightly thinner grass far ahead. Not confirmed on a real headset yet.
 
 ## 0.1.29 — direct practice conditions and VR fixes (Experimental)
