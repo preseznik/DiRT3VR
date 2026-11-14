@@ -305,9 +305,33 @@ Public NotInheritable Class SessionActionMaps
     Public Shared Function ForLaunch(context As InstallContext, launchMode As String, controls As DrivingControls) As SessionChanges
         Dim direct = launchMode = "direct"
         If controls Is Nothing OrElse Not (direct OrElse controls.NormalLaunch) Then Return New SessionChanges()
+        If direct Then
+            Dim problem = DrivingProblem(controls)
+            If problem <> "" Then Throw New IOException(problem)
+        End If
         Dim result = Changes(context, controls)
         If Not direct Then result.PreferredDevices = Array.Empty(Of String)()
         Return result
+    End Function
+
+    ' What a direct start must have on the device it drives with (#22e6a933).
+    Public Shared ReadOnly DrivingEssentials As String() = {"Steer Left", "Steer Right", "Accelerate", "Brake"}
+
+    ' Why a direct start with these bindings would leave the player without steering or pedals, or "" (#22e6a933,
+    ' iztok4090). A direct start drives with one device: the first PreferredDevices entry, else the keyboard, which
+    ' DiRT 3 lists first. With the launcher's bindings on, that device needs the essentials bound here: a direct start
+    ' doesn't load the profile, so for the rest DiRT 3 has only its stock preset for that device.
+    Public Shared Function DrivingProblem(controls As DrivingControls) As String
+        If controls Is Nothing OrElse Not controls.Enabled OrElse controls.Bindings Is Nothing OrElse controls.Bindings.Count = 0 Then Return ""
+        Dim preferred = PreferredDevices(controls)
+        Dim device = If(preferred.Length > 0, preferred(0), "keyboard")
+        Dim own = controls.Bindings.Where(Function(b) DeviceNameOf(b) = device).ToList()
+        Dim missing = DrivingEssentials.Where(Function(action) Not own.Any(Function(b) b.Action = action)).ToArray()
+        If missing.Length = 0 Then Return ""
+        Dim label = If(device = "keyboard", "the keyboard", If(own.Count > 0, own(0).Device, device))
+        Return "Direct practice would drive with " & label & ", which has no launcher binding for " & String.Join(", ", missing) & ". " &
+               "Bind them in Controls → Driving controls… (the Binding wizard asks for them first), pick the device you drive with under Drives with, " &
+               "or turn off Use launcher driving bindings to drive with DiRT 3's own preset."
     End Function
 
     Public Shared Function Changes(context As InstallContext, controls As DrivingControls) As SessionChanges

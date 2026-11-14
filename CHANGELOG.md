@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Direct practice no longer starts without steering or pedals (#22e6a933, iztok4090's request after a user's report). A direct start drives with one device and doesn't load your DiRT 3 profile, so with only some actions bound in the launcher (menu buttons, say) the race drove with DiRT 3's stock preset for that device, or not with the wheel at all. With **Use launcher driving bindings** on, Launch now stops and says what to bind when the device direct practice drives with has no launcher binding for Steer Left, Steer Right, Accelerate or Brake. Normal launches aren't affected.
 - **Also in Normal launches** in **Controls → Driving controls…** (#7809481e, iztok4090's request): the launcher's driving bindings now apply in Normal launches too, not only in direct practice, so a wheel bound there works in DiRT 3's own menus, careers and events. It sits beside **Use launcher driving bindings**, and both are on by default; a saved driving controls file keeps its own Use setting. A Normal launch writes the same session action maps as direct practice but leaves the device choice to DiRT 3's Press Start screen. Its recovery journal is a new schema 12, which older launchers refuse. Not yet checked with a real wheel in a Normal launch, where DiRT 3 also loads your profile's own controls.
 
 ## 0.1.30 — roadside grass in VR and the cockpit-start crash fix (Experimental)
