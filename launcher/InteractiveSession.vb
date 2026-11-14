@@ -174,8 +174,8 @@ Public Class InteractiveSession
                 changes.Add(pair.Key, pair.Value)
             Next
             Dim effects = If(post.Files.ContainsKey(MotionBlur.Target), post.Files(MotionBlur.Target), Nothing)
-            ' Driving controls: the launcher's bindings as session action maps, direct practice only (#8121970e).
-            Dim actionMaps = If(settings.LaunchMode = "direct", SessionActionMaps.Changes(context, DrivingControls.Load(context)), New SessionActionMaps.SessionChanges())
+            ' Driving controls: the launcher's bindings as session action maps (#8121970e), also in Normal launches (#7809481e).
+            Dim actionMaps = SessionActionMaps.ForLaunch(context, settings.LaunchMode, DrivingControls.Load(context))
             For Each pair In actionMaps.Files
                 changes.Add(pair.Key, pair.Value)
             Next

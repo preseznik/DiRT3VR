@@ -10,8 +10,9 @@ Imports System.Xml
 ' isn't picked up. So every bound device gets one complete map: DiRT 3's loaded map for that device
 ' (matched by deviceName; else dinput_default for DirectInput devices), with the launcher's bindings
 ' replacing those actions. The map files are created for the session and actionMapPaths.xml lists them
-' after the stock maps; the recovery journal removes both changes after DiRT 3 exits. Direct practice
-' only: a normal start loads the profile, whose own bindings may still win (not tested yet).
+' after the stock maps; the recovery journal removes both changes after DiRT 3 exits. Direct practice, and
+' Normal launches with DrivingControls.NormalLaunch on (#7809481e; a normal start loads the profile, and
+' whether its own bindings win over these maps is checked on iztok's wheel).
 Public NotInheritable Class SessionActionMaps
     Public Const PathsTarget As String = "actionpaths"
     Public Const MapTargetPrefix As String = "actionmap/"
@@ -299,6 +300,16 @@ Public NotInheritable Class SessionActionMaps
     End Function
 
     ' The session's action map changes for the saved driving controls, or none when they're off.
+    ' The session maps for a launch: direct practice, and Normal launches when DrivingControls.NormalLaunch is on
+    ' (#7809481e). The preferred devices are for a direct start only; a Normal start keeps DiRT 3's Press Start.
+    Public Shared Function ForLaunch(context As InstallContext, launchMode As String, controls As DrivingControls) As SessionChanges
+        Dim direct = launchMode = "direct"
+        If controls Is Nothing OrElse Not (direct OrElse controls.NormalLaunch) Then Return New SessionChanges()
+        Dim result = Changes(context, controls)
+        If Not direct Then result.PreferredDevices = Array.Empty(Of String)()
+        Return result
+    End Function
+
     Public Shared Function Changes(context As InstallContext, controls As DrivingControls) As SessionChanges
         Dim result As New SessionChanges()
         If controls Is Nothing OrElse Not controls.Enabled OrElse controls.Bindings.Count = 0 Then Return result

@@ -19,7 +19,8 @@ Public NotInheritable Class NewFeatures
     Private Shared ReadOnly Since As New Dictionary(Of String, String)(StringComparer.Ordinal) From {
         {"DesktopBloom", "0.1.24"}, {"DesktopGlare", "0.1.24"}, {"VrBloom", "0.1.24"}, {"VrGlare", "0.1.24"},
         {"DesktopColourFilter", "0.1.24"}, {"VrColourFilter", "0.1.24"}, {"CockpitSteeringShakeOff", "0.1.26"},
-        {"LauncherView", "0.1.27"}, {"DesktopDepthBlur", "0.1.28"}, {"VrDepthBlur", "0.1.28"}, {"DirectConditions", "0.1.29"}}
+        {"LauncherView", "0.1.27"}, {"DesktopDepthBlur", "0.1.28"}, {"VrDepthBlur", "0.1.28"}, {"DirectConditions", "0.1.29"},
+        {"DrivingControls", "0.1.31"}}
     Private Shared ReadOnly marked As New ConditionalWeakTable(Of Control, Object)
 
     Private Sub New()

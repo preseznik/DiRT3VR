@@ -56,7 +56,10 @@ Public NotInheritable Class DrivingControls
     Public Const MaxFileBytes As Integer = 524288
 
     Public Property Version As Integer = 1
-    Public Property Enabled As Boolean
+    ' Both on by default (iztok4090, #7809481e); a saved file keeps its own values.
+    Public Property Enabled As Boolean = True
+    ' Also apply the bindings in Normal launches (#7809481e), not only in direct practice.
+    Public Property NormalLaunch As Boolean = True
     Public Property ListenAllDevices As Boolean = True
     ' The steering wheel's own rotation lock to lock, as set in its software (#a72b44ea, as DiRT2VR 0.18);
     ' 0 until set with Wheel rotation…. Only used to show and apply the steering saturation.
@@ -154,7 +157,7 @@ Public NotInheritable Class DrivingControls
         Validate()
         Dim found = Problems()
         If Enabled AndAlso found.Count > 0 Then Throw New IOException(String.Join(Environment.NewLine, found))
-        Dim bytes = JsonSerializer.SerializeToUtf8Bytes(New DrivingControls With {.Enabled = Enabled, .ListenAllDevices = ListenAllDevices, .WheelRotation = WheelRotation, .ActiveDevice = ActiveDevice, .Bindings = Bindings.Select(Function(b) b.Copy()).ToList()}, SafeFiles.JsonOptions)
+        Dim bytes = JsonSerializer.SerializeToUtf8Bytes(New DrivingControls With {.Enabled = Enabled, .NormalLaunch = NormalLaunch, .ListenAllDevices = ListenAllDevices, .WheelRotation = WheelRotation, .ActiveDevice = ActiveDevice, .Bindings = Bindings.Select(Function(b) b.Copy()).ToList()}, SafeFiles.JsonOptions)
         If bytes.Length > MaxFileBytes Then Throw New IOException("The driving controls file is too large.")
         SafeFiles.WriteAtomic(Path.GetFullPath(file), bytes)
     End Sub

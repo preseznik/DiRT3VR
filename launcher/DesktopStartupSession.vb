@@ -59,13 +59,11 @@ Public NotInheritable Class DesktopStartupSession
             If Not File.Exists(payload) Then Throw New IOException("DiRT3VR's renderer is missing from this package: " & payload)
             result.Add("proxy", File.ReadAllBytes(payload))
         End If
-        If settings.LaunchMode = "direct" Then
-            result.Add("direct", DirectPractice.Config(settings))
-            Dim maps = If(actionMaps, SessionActionMaps.Changes(context, DrivingControls.Load(context)))
-            For Each pair In maps.Files
-                result.Add(pair.Key, pair.Value)
-            Next
-        End If
+        If settings.LaunchMode = "direct" Then result.Add("direct", DirectPractice.Config(settings))
+        ' The launcher's driving bindings: direct practice, and Normal launches when that's on (#7809481e).
+        For Each pair In If(actionMaps, SessionActionMaps.ForLaunch(context, settings.LaunchMode, DrivingControls.Load(context))).Files
+            result.Add(pair.Key, pair.Value)
+        Next
         For Each pair In If(seatFiles, SeatPositions.Changes(context, settings, vr:=False).Files)
             result.Add(pair.Key, pair.Value)
         Next
@@ -109,7 +107,7 @@ Public NotInheritable Class DesktopStartupSession
                 Dim blocked = RendererLoad.LaunchBlock(context)
                 If blocked <> "" Then Throw New IOException(blocked)
             End If
-            Dim actionMaps = If(settings.LaunchMode = "direct", SessionActionMaps.Changes(context, DrivingControls.Load(context)), New SessionActionMaps.SessionChanges())
+            Dim actionMaps = SessionActionMaps.ForLaunch(context, settings.LaunchMode, DrivingControls.Load(context))
             Dim seats = SeatPositions.Changes(context, settings, vr:=False)
             Dim changes = DesktopStartupSession.Changes(context, settings, actionMaps, seats.Files)
             ' Bloom, light streaks + lens flares (#3c6d6ffa) and the colour filter (#24f76866) off: the effect files and

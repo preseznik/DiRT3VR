@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Also in Normal launches** in **Controls → Driving controls…** (#7809481e, iztok4090's request): the launcher's driving bindings now apply in Normal launches too, not only in direct practice, so a wheel bound there works in DiRT 3's own menus, careers and events. It sits beside **Use launcher driving bindings**, and both are on by default; a saved driving controls file keeps its own Use setting. A Normal launch writes the same session action maps as direct practice but leaves the device choice to DiRT 3's Press Start screen. Its recovery journal is a new schema 12, which older launchers refuse. Not yet checked with a real wheel in a Normal launch, where DiRT 3 also loads your profile's own controls.
+
 ## 0.1.30 — roadside grass in VR and the cockpit-start crash fix (Experimental)
 
 - Fix: in VR, the floor close to you was cut off in the menus and in the race intros, where DiRT 3's camera sits low (#5d1fc238, iztok's test). Those cameras clip at 0.2 m and 0.3 m, and the headset's wider view reaches the floor nearer than that. VR eyes now clip no closer than 0.075 m, DiRT 3's own value for the cockpit, so depth precision stays as it is in the cockpit. Checked on the virtual headset: the floor reaches the bottom of the view at livery select and in the race intro.
