@@ -783,6 +783,50 @@ void Tick(void (*log)(const char*,...)) {
     }
 }
 
+// AES key log (#cb2fa6e5): DIRT3VR_RESEARCH_KEYS=1 logs each distinct key text DiRT 3 sets up, with the caller:
+// copy 1 makeKey 0x748110 (cdecl key, direction, bits, hex) and copy 2 setKey 0x756f90 (thiscall bits, hex).
+using MakeKeyFn=int(__cdecl*)(void*,unsigned char,int,const char*);
+using SetKeyFn=int(__thiscall*)(void*,int,const char*);
+MakeKeyFn realMakeKey{};
+SetKeyFn realSetKey{};
+std::mutex keyMutex;
+std::string keysSeen;
+void LogKey(const char* which,int bits,const char* hex,void* caller) {
+    const int chars=bits/4;
+    if(!traceLog || !hex || chars<=0 || chars>64 || !Readable(hex,static_cast<size_t>(chars))) return;
+    char text[72]{};
+    std::memcpy(text,hex,static_cast<size_t>(chars));
+    std::lock_guard lock(keyMutex);
+    if(keysSeen.find(text)!=std::string::npos || keysSeen.size()>8192) return;
+    keysSeen+=text; keysSeen+='|';
+    traceLog("Research key %s bits=%d caller=0x%p: %s",which,bits,caller,text);
+}
+int __cdecl MakeKey(void* key,unsigned char direction,int bits,const char* hex) {
+    LogKey("makeKey",bits,hex,_ReturnAddress());
+    return realMakeKey(key,direction,bits,hex);
+}
+int __fastcall SetKey(void* self,void*,int bits,const char* hex) {
+    LogKey("setKey",bits,hex,_ReturnAddress());
+    return realSetKey(self,bits,hex);
+}
+void InstallKeyLog(void (*log)(const char*,...)) {
+    wchar_t flag[8]{};
+    if(GetEnvironmentVariableW(L"DIRT3VR_RESEARCH_KEYS",flag,8)!=1 || flag[0]!=L'1') return;
+    static const uint8_t makeEntry[]{0x55,0x8b,0xec,0x83,0xec,0x20,0x57,0x8b,0x7d,0x08};
+    static const uint8_t setEntry[]{0x55,0x8b,0xec,0x83,0xec,0x20,0x56,0x8b,0x75,0x08,0x57};
+    auto* image=reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+    auto* make=image+(0x748110-0x400000);
+    auto* set=image+(0x756f90-0x400000);
+    if(std::memcmp(make,makeEntry,sizeof(makeEntry))!=0 || std::memcmp(set,setEntry,sizeof(setEntry))!=0) { log("Research key log refused: key setup instructions differ"); return; }
+    traceLog=log;
+    const auto initialized=MH_Initialize();
+    if(initialized!=MH_OK && initialized!=MH_ERROR_ALREADY_INITIALIZED) return;
+    const auto first=MH_CreateHook(make,reinterpret_cast<void*>(&MakeKey),reinterpret_cast<void**>(&realMakeKey));
+    const auto second=MH_CreateHook(set,reinterpret_cast<void*>(&SetKey),reinterpret_cast<void**>(&realSetKey));
+    const auto enabled=first==MH_OK && second==MH_OK ? MH_EnableHook(MH_ALL_HOOKS) : MH_UNKNOWN;
+    log("Research key log: makeKey=%d setKey=%d enabled=%d",first,second,enabled);
+}
+
 void Apply(void (*log)(const char*,...)) {
     static std::once_flag once;
     std::call_once(once,[log] {
@@ -792,6 +836,7 @@ void Apply(void (*log)(const char*,...)) {
         InstallAutoSaveChoice(log);
         InstallStoreTrace(log);
         InstallDataWatch(log);
+        InstallKeyLog(log);
         InstallCallCounter(log);
         InstallStackSampler(log);
         InstallGameLog(log);
