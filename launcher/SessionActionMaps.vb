@@ -66,6 +66,8 @@ Public NotInheritable Class SessionActionMaps
         Public ReadOnly Property Skipped As New List(Of String)
         ' The devices DiRT 3 should give the player in a direct start, best first (PreferredDevices).
         Public Property PreferredDevices As String() = Array.Empty(Of String)()
+        ' The DiRT 3 profile file the maps started from (#cb2fa6e5), or "".
+        Public Property ProfileSource As String = ""
 
         ' For the launch notice: the devices whose bindings couldn't be applied, or "".
         Public ReadOnly Property Note As String
@@ -170,16 +172,47 @@ Public NotInheritable Class SessionActionMaps
     ' by how many actions they carry. DiRT 3's names as in the session maps; never the keyboard. Passed to the
     ' renderer as DIRT3VR_DIRECT_DEVICES (Wrench's side moves the first match to the front).
     ' The player's pick in Driving controls (DrivingControls.ActiveDevice, #1b46c373) goes first when it's bound.
-    Public Shared Function PreferredDevices(controls As DrivingControls) As String()
-        If controls Is Nothing OrElse Not controls.Enabled OrElse controls.Bindings Is Nothing Then Return Array.Empty(Of String)()
-        Dim ordered = controls.Bindings.Where(Function(b) Not b.Keyboard).GroupBy(Function(b) DeviceNameOf(b), StringComparer.Ordinal).
+    ' profile (#cb2fa6e5): devices whose saved DiRT 3 controls steer come after the launcher's steering devices.
+    Public Shared Function PreferredDevices(controls As DrivingControls, Optional profile As ProfileControls = Nothing) As String()
+        Dim usable = Function(name As String) name <> "" AndAlso name <> "keyboard" AndAlso WritableName(name) AndAlso Not name.Contains("|"c)
+        Dim steers = Function(action As String) action = "Steer Left" OrElse action = "Steer Right"
+        Dim saved = If(profile Is Nothing, New List(Of String)(), profile.Devices.Where(Function(name) usable(name) AndAlso profile.Inputs.Any(Function(i) i.Device = name AndAlso steers(i.Action))).ToList())
+        If controls Is Nothing OrElse Not controls.Enabled OrElse controls.Bindings Is Nothing Then Return saved.ToArray()
+        Dim launcher = controls.Bindings.Where(Function(b) Not b.Keyboard).GroupBy(Function(b) DeviceNameOf(b), StringComparer.Ordinal).
             Where(Function(g) g.Key <> "" AndAlso g.Key <> "keyboard" AndAlso WritableName(g.Key) AndAlso Not g.Key.Contains("|"c)).
             OrderByDescending(Function(g) g.Any(Function(b) b.Action = "Steer Left" OrElse b.Action = "Steer Right")).
             ThenByDescending(Function(g) g.Count()).ThenBy(Function(g) g.Key, StringComparer.Ordinal).
             Select(Function(g) g.Key).ToList()
+        Dim launcherSteering = launcher.Where(Function(name) controls.Bindings.Any(Function(b) DeviceNameOf(b) = name AndAlso steers(b.Action))).ToList()
+        Dim ordered = launcherSteering.Concat(saved.Where(Function(name) Not launcherSteering.Contains(name))).ToList()
+        ordered.AddRange(launcher.Where(Function(name) Not ordered.Contains(name)))
         Dim picked = If(controls.ActiveDevice, "")
         If picked <> "" AndAlso ordered.Remove(picked) Then ordered.Insert(0, picked)
         Return ordered.ToArray()
+    End Function
+
+    ' The stock map with the player's saved DiRT 3 controls for this device in place (#cb2fa6e5): each action the profile
+    ' lists takes the profile's inputs for the device (none: the action is left unbound, as in the profile); actions the
+    ' profile doesn't list keep the stock inputs; profile actions the stock map lacks follow. Inputs that can't be
+    ' written into a map are left out.
+    Public Shared Function WithProfile(stock As ActionMapFile, deviceName As String, profile As ProfileControls) As ActionMapFile
+        Dim result As New ActionMapFile With {.File = stock.File, .Name = stock.Name, .DeviceName = stock.DeviceName, .Priority = stock.Priority}
+        Dim axesFor = Function(action As String) profile.InputsFor(action, deviceName).Where(Function(i) SafeAxis.IsMatch(i.Axis)).
+            Select(Function(i) New MapAxis With {.AxisName = i.Axis, .Type = i.Type, .DeadZone = Number(Math.Round(CDec(i.DeadZone), 4)), .Saturation = Number(Math.Round(CDec(i.Saturation), 4))}).ToList()
+        Dim used As New HashSet(Of String)(StringComparer.Ordinal)
+        For Each action In stock.Actions
+            If Not used.Add(action.Name) Then Continue For
+            If Not profile.Actions.Contains(action.Name) Then result.Actions.Add(action) : Continue For
+            Dim mine = axesFor(action.Name)
+            If mine.Count > 0 Then result.Actions.Add(New MapAction With {.Name = action.Name, .Axes = mine})
+        Next
+        For Each name In profile.Inputs.Where(Function(i) i.Device = deviceName).Select(Function(i) i.Action).Distinct(StringComparer.Ordinal)
+            If used.Contains(name) OrElse Not SafeAction.IsMatch(name) Then Continue For
+            used.Add(name)
+            Dim mine = axesFor(name)
+            If mine.Count > 0 Then result.Actions.Add(New MapAction With {.Name = name, .Axes = mine})
+        Next
+        Return result
     End Function
 
     ' The device's complete map: the base map's actions in their order, each action the player bound
@@ -302,14 +335,16 @@ Public NotInheritable Class SessionActionMaps
     ' The session's action map changes for the saved driving controls, or none when they're off.
     ' The session maps for a launch: direct practice, and Normal launches when DrivingControls.NormalLaunch is on
     ' (#7809481e). The preferred devices are for a direct start only; a Normal start keeps DiRT 3's Press Start.
-    Public Shared Function ForLaunch(context As InstallContext, launchMode As String, controls As DrivingControls) As SessionChanges
+    ' profile: the player's saved DiRT 3 controls (#cb2fa6e5), used in a direct start only; a normal start loads them itself.
+    Public Shared Function ForLaunch(context As InstallContext, launchMode As String, controls As DrivingControls, Optional profile As ProfileControls = Nothing) As SessionChanges
         Dim direct = launchMode = "direct"
+        If Not direct Then profile = Nothing
         If controls Is Nothing OrElse Not (direct OrElse controls.NormalLaunch) Then Return New SessionChanges()
         If direct Then
-            Dim problem = DrivingProblem(controls)
+            Dim problem = DrivingProblem(controls, profile)
             If problem <> "" Then Throw New IOException(problem)
         End If
-        Dim result = Changes(context, controls)
+        Dim result = Changes(context, controls, profile)
         If Not direct Then result.PreferredDevices = Array.Empty(Of String)()
         Return result
     End Function
@@ -320,27 +355,35 @@ Public NotInheritable Class SessionActionMaps
     ' Why a direct start with these bindings would leave the player without steering or pedals, or "" (#22e6a933,
     ' iztok4090). A direct start drives with one device: the first PreferredDevices entry, else the keyboard, which
     ' DiRT 3 lists first. With the launcher's bindings on, that device needs the essentials bound here: a direct start
-    ' doesn't load the profile, so for the rest DiRT 3 has only its stock preset for that device.
-    Public Shared Function DrivingProblem(controls As DrivingControls) As String
+    ' doesn't load the profile, so DiRT 3 has only its stock preset for that device, or the player's saved controls when
+    ' the launcher reads them (profile, #cb2fa6e5), which then count too.
+    Public Shared Function DrivingProblem(controls As DrivingControls, Optional profile As ProfileControls = Nothing) As String
         If controls Is Nothing OrElse Not controls.Enabled OrElse controls.Bindings Is Nothing OrElse controls.Bindings.Count = 0 Then Return ""
-        Dim preferred = PreferredDevices(controls)
+        Dim preferred = PreferredDevices(controls, profile)
         Dim device = If(preferred.Length > 0, preferred(0), "keyboard")
         Dim own = controls.Bindings.Where(Function(b) DeviceNameOf(b) = device).ToList()
-        Dim missing = DrivingEssentials.Where(Function(action) Not own.Any(Function(b) b.Action = action)).ToArray()
+        Dim missing = DrivingEssentials.Where(Function(action) Not own.Any(Function(b) b.Action = action) AndAlso
+                                                  Not (profile IsNot Nothing AndAlso profile.InputsFor(action, device).Any())).ToArray()
         If missing.Length = 0 Then Return ""
         Dim label = If(device = "keyboard", "the keyboard", If(own.Count > 0, own(0).Device, device))
-        Return "Direct practice would drive with " & label & ", which has no launcher binding for " & String.Join(", ", missing) & ". " &
+        Return "Direct practice would drive with " & label & ", which has no " & If(profile Is Nothing, "launcher binding", "binding in the launcher or your DiRT 3 profile") & " for " & String.Join(", ", missing) & ". " &
                "Bind them in Controls → Driving controls… (the Binding wizard asks for them first), pick the device you drive with under Drives with, " &
                "or turn off Use launcher driving bindings to drive with DiRT 3's own preset."
     End Function
 
-    Public Shared Function Changes(context As InstallContext, controls As DrivingControls) As SessionChanges
+    ' The session maps: one per device with launcher bindings, and with profile (#cb2fa6e5, direct practice) one per
+    ' device in the player's saved DiRT 3 controls, built on those instead of the stock preset.
+    Public Shared Function Changes(context As InstallContext, controls As DrivingControls, Optional profile As ProfileControls = Nothing) As SessionChanges
         Dim result As New SessionChanges()
-        If controls Is Nothing OrElse Not controls.Enabled OrElse controls.Bindings.Count = 0 Then Return result
-        controls.Validate()
-        Dim found = controls.Problems()
-        If found.Count > 0 Then Throw New IOException(String.Join(Environment.NewLine, found) & Environment.NewLine & "Open Controls → Driving controls to fix these bindings.")
-        result.PreferredDevices = PreferredDevices(controls)
+        Dim bindings = If(controls IsNot Nothing AndAlso controls.Enabled AndAlso controls.Bindings IsNot Nothing, controls.Bindings, New List(Of DrivingBinding)())
+        If bindings.Count = 0 AndAlso profile Is Nothing Then Return result
+        If bindings.Count > 0 Then
+            controls.Validate()
+            Dim found = controls.Problems()
+            If found.Count > 0 Then Throw New IOException(String.Join(Environment.NewLine, found) & Environment.NewLine & "Open Controls → Driving controls to fix these bindings.")
+        End If
+        result.PreferredDevices = PreferredDevices(controls, profile)
+        result.ProfileSource = If(profile?.Source, "")
         Dim pathsFile = PathsPath(context)
         SafeFiles.NoLinks(pathsFile)
         If Not File.Exists(pathsFile) Then Throw New IOException("DiRT 3's action map list is missing: " & pathsFile)
@@ -355,18 +398,22 @@ Public NotInheritable Class SessionActionMaps
             If map IsNot Nothing Then loaded.Add(map)
         Next
         Dim order = Function(name As String) If(name = "keyboard", 0, If(name = "xinput_pad", 1, 2))
-        Dim groups = controls.Bindings.GroupBy(Function(b) DeviceNameOf(b), StringComparer.Ordinal).OrderBy(Function(g) order(g.Key)).ThenBy(Function(g) g.Key, StringComparer.Ordinal).ToList()
+        Dim names = bindings.Select(Function(b) DeviceNameOf(b)).Concat(If(profile?.Devices, New List(Of String)())).Distinct(StringComparer.Ordinal)
+        Dim groups = names.OrderBy(Function(name) order(name)).ThenBy(Function(name) name, StringComparer.Ordinal).
+            Select(Function(name) (Key:=name, Bindings:=bindings.Where(Function(b) DeviceNameOf(b) = name).ToList())).ToList()
         Dim index = 0
         For Each group In groups
             If Not WritableName(group.Key) Then result.Skipped.Add(group.Key & ": its name can't be written into DiRT 3's action maps, so DiRT 3's own bindings stay.") : Continue For
+            If index >= MaxMaps Then result.Skipped.Add(group.Key & ": more devices than the session maps allow, so DiRT 3's own bindings stay.") : Continue For
             ' The loaded map DiRT 3 uses for this device: the highest priority for its name, the later one on a tie.
             Dim base = loaded.Where(Function(m) m.DeviceName = group.Key).Select(Function(m, i) (Map:=m, At:=i)).OrderBy(Function(p) p.Map.Priority).ThenBy(Function(p) p.At).LastOrDefault().Map
             If base Is Nothing AndAlso group.Key <> "keyboard" AndAlso group.Key <> "xinput_pad" Then
                 base = loaded.Where(Function(m) m.DeviceName = DefaultDirectInput).OrderBy(Function(m) m.Priority).LastOrDefault()
             End If
             If base Is Nothing Then result.Skipped.Add(group.Key & ": DiRT 3's own map for it wasn't found, so DiRT 3's own bindings stay.") : Continue For
+            If profile IsNot Nothing AndAlso profile.Devices.Contains(group.Key) Then base = WithProfile(base, group.Key, profile)
             index += 1
-            result.Files.Add(MapTarget(index), Write(Compose(base, group.Key, index, group)))
+            result.Files.Add(MapTarget(index), Write(Compose(base, group.Key, index, group.Bindings)))
             result.Devices.Add((group.Key, base.File))
         Next
         If index > 0 Then result.Files.Add(PathsTarget, ListMaps(paths, index))

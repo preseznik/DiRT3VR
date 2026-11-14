@@ -15,6 +15,8 @@ Public NotInheritable Class DrivingControlsForm
     Private model As DrivingControls
     Private ReadOnly enabledBox As New CheckBox With {.Name = "DrivingEnabled", .Text = "Use launcher driving bindings", .AutoSize = True}
     ' Beside it (iztok4090, #7809481e): the bindings in Normal launches too, not only in direct practice.
+    ' Direct practice starts from the player's saved DiRT 3 controls (#cb2fa6e5).
+    Private ReadOnly profileBox As New CheckBox With {.Name = "DrivingUseProfile", .Text = "Direct practice starts from my DiRT 3 controls", .AutoSize = True, .Margin = New Padding(24, 3, 3, 3)}
     Private ReadOnly normalBox As New CheckBox With {.Name = "DrivingNormalLaunch", .Text = "Also in Normal launches", .AutoSize = True, .Margin = New Padding(24, 3, 3, 3)}
     Private ReadOnly rows As New ListView With {.Name = "DrivingRows", .View = View.Details, .FullRowSelect = True, .MultiSelect = False, .Dock = DockStyle.Fill, .HideSelection = False, .ShowItemToolTips = True}
     Private ReadOnly bindKeyboard As Button
@@ -45,6 +47,7 @@ Public NotInheritable Class DrivingControlsForm
         StartPosition = FormStartPosition.CenterParent : AutoScaleMode = AutoScaleMode.Dpi
         enabledBox.Checked = model.Enabled
         normalBox.Checked = model.NormalLaunch : normalBox.Enabled = enabledBox.Checked
+        profileBox.Checked = model.UseProfile
         AddHandler enabledBox.CheckedChanged, Sub() normalBox.Enabled = enabledBox.Checked
         rows.Columns.Add("Action", 170) : rows.Columns.Add("Device", 280) : rows.Columns.Add("Input", 230)
         rows.Columns.Add("Dead zone", 100) : rows.Columns.Add("Saturation", 110)
@@ -64,7 +67,7 @@ Public NotInheritable Class DrivingControlsForm
             layout.RowStyles.Add(If(i = 3, New RowStyle(SizeType.Percent, 100), New RowStyle(SizeType.AutoSize)))
         Next
         Dim switches As New FlowLayoutPanel With {.Name = "DrivingSwitches", .AutoSize = True, .WrapContents = True, .Margin = Padding.Empty}
-        switches.Controls.Add(enabledBox) : switches.Controls.Add(normalBox)
+        switches.Controls.Add(enabledBox) : switches.Controls.Add(normalBox) : switches.Controls.Add(profileBox)
         layout.Controls.Add(switches, 0, 0)
         layout.Controls.Add(New Label With {.Name = "DrivingNotice", .Text = RuntimeNotice, .AutoSize = True, .MaximumSize = New Size(900, 0), .Margin = New Padding(0, 8, 0, 12), .UseMnemonic = False}, 0, 1)
 
@@ -360,12 +363,13 @@ Public NotInheritable Class DrivingControlsForm
 
     ' Replaces the edited bindings with a loaded preset; nothing is saved until Save.
     Public Sub UsePreset(loaded As DrivingControls)
-        model = loaded : enabledBox.Checked = loaded.Enabled : normalBox.Checked = loaded.NormalLaunch : RefreshRows()
+        model = loaded : enabledBox.Checked = loaded.Enabled : normalBox.Checked = loaded.NormalLaunch : profileBox.Checked = loaded.UseProfile : RefreshRows()
     End Sub
 
     Private Sub ReadOptions()
         model.Enabled = enabledBox.Checked
         model.NormalLaunch = normalBox.Checked
+        model.UseProfile = profileBox.Checked
     End Sub
 
     ' The gearbox shown here: a DirectPractice.GearboxChoices value.

@@ -60,6 +60,8 @@ Public NotInheritable Class DrivingControls
     Public Property Enabled As Boolean = True
     ' Also apply the bindings in Normal launches (#7809481e), not only in direct practice.
     Public Property NormalLaunch As Boolean = True
+    ' Direct practice starts from the controls saved in the player's DiRT 3 profile (#cb2fa6e5), read only.
+    Public Property UseProfile As Boolean = True
     Public Property ListenAllDevices As Boolean = True
     ' The steering wheel's own rotation lock to lock, as set in its software (#a72b44ea, as DiRT2VR 0.18);
     ' 0 until set with Wheel rotation…. Only used to show and apply the steering saturation.
@@ -117,6 +119,11 @@ Public NotInheritable Class DrivingControls
         Return Path.Combine(context.UserRoot, "driving-presets")
     End Function
 
+    ' The player's saved DiRT 3 controls for a launch (#cb2fa6e5): direct practice with UseProfile on, else Nothing.
+    Public Function ProfileFor(launchMode As String) As ProfileControls
+        Return If(UseProfile AndAlso launchMode = "direct", ProfileControls.ForCurrentUser(), Nothing)
+    End Function
+
     Public Shared Function Load(context As InstallContext) As DrivingControls
         Dim file = SettingsPath(context)
         Return If(IO.File.Exists(file), LoadFile(file), New DrivingControls())
@@ -157,7 +164,7 @@ Public NotInheritable Class DrivingControls
         Validate()
         Dim found = Problems()
         If Enabled AndAlso found.Count > 0 Then Throw New IOException(String.Join(Environment.NewLine, found))
-        Dim bytes = JsonSerializer.SerializeToUtf8Bytes(New DrivingControls With {.Enabled = Enabled, .NormalLaunch = NormalLaunch, .ListenAllDevices = ListenAllDevices, .WheelRotation = WheelRotation, .ActiveDevice = ActiveDevice, .Bindings = Bindings.Select(Function(b) b.Copy()).ToList()}, SafeFiles.JsonOptions)
+        Dim bytes = JsonSerializer.SerializeToUtf8Bytes(New DrivingControls With {.Enabled = Enabled, .NormalLaunch = NormalLaunch, .UseProfile = UseProfile, .ListenAllDevices = ListenAllDevices, .WheelRotation = WheelRotation, .ActiveDevice = ActiveDevice, .Bindings = Bindings.Select(Function(b) b.Copy()).ToList()}, SafeFiles.JsonOptions)
         If bytes.Length > MaxFileBytes Then Throw New IOException("The driving controls file is too large.")
         SafeFiles.WriteAtomic(Path.GetFullPath(file), bytes)
     End Sub
